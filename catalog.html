@@ -3,400 +3,952 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>كتالوج الحلول التعليمية للعام 2026-2027</title>
+    <title>كتالوج حلول التعلم | קטלוג פתרונות למידה</title>
     <link rel="stylesheet" href="./css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Noto+Sans+Arabic:wght@300;400;500;600&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+    
     <style>
-        /* Catalog-specific overrides — standalone page (no sidebar/dashboard shell) */
+        :root {
+            --font-heading: 'Cairo', sans-serif;
+            --font-body: 'Noto Sans Arabic', sans-serif;
+            --font-ui: 'Rubik', sans-serif;
+        }
+
         body {
-            font-family: 'Noto Sans Arabic', sans-serif;
-            background: var(--gray-50);
-            color: var(--gray-800);
-            margin: 0;
-            direction: rtl;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            font-family: var(--font-body);
+            background-color: var(--gray-50, #fafafa);
+            color: var(--gray-700, #3f3f46);
+            line-height: 1.6;
         }
 
-        /* Apply Cairo font for headings in Arabic */
-        h1, h2, h3, h4, h5, h6 {
-            font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
-        }
-
-        /* ── Header ── */
-        .catalog-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            padding: 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 12px rgba(0,0,0,.12);
-        }
-        .catalog-header-inner {
+        .catalog-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-        .catalog-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #fff;
-            text-decoration: none;
-        }
-        .catalog-logo-icon {
-            font-size: 32px;
-            line-height: 1;
-        }
-        .catalog-logo-text {
-            display: flex;
-            flex-direction: column;
-        }
-        .catalog-logo-text .name-ar {
-            font-size: 20px;
-            font-weight: 800;
-            line-height: 1.2;
-            color: #fff;
-        }
-        .catalog-logo-text .name-he {
-            font-size: 14px;
-            font-weight: 500;
-            line-height: 1.2;
-            color: rgba(255,255,255,.8);
-        }
-
-        .btn-back {
-            background: rgba(255,255,255,.18);
-            border: 1px solid rgba(255,255,255,.3);
-            color: #fff;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .2s;
-            font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-back:hover {
-            background: rgba(255,255,255,.3);
-        }
-
-        /* ── Page Content ── */
-        .catalog-content {
+            padding: 32px 24px;
             flex: 1;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
+        }
+
+        .catalog-filters {
+            background: #ffffff;
+            border-radius: 16px;
             padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-100, #f4f4f5);
+            margin-bottom: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        /* ── Page Title ── */
-        .catalog-page-title {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--gray-800);
-            margin: 0 0 24px 0;
-            text-align: center;
+        .filter-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
         }
 
-        /* ── Search ── */
-        .catalog-search {
+        .search-wrapper {
             position: relative;
-            margin-bottom: 20px;
+            flex: 1;
         }
-        .catalog-search input {
-            width: 100%;
-            padding: 16px 20px 16px 48px;
-            font-size: 16px;
-            border-radius: var(--border-radius-lg);
-            border: 2px solid var(--gray-200);
-            background: #fff;
-            transition: all .2s;
-            font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
-            box-sizing: border-box;
-        }
-        .catalog-search input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(12,167,170,.15);
-        }
-        .catalog-search-icon {
+
+        .search-wrapper .search-icon {
             position: absolute;
-            left: 16px;
+            right: 16px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 20px;
+            font-size: 18px;
             color: var(--gray-400);
             pointer-events: none;
         }
 
-        /* ── Filters ── */
-        .catalog-filters {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 28px;
+        .search-input, .filter-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-family: var(--font-body);
+            font-size: 15px;
+            transition: all 0.2s;
+            background-color: #fff;
         }
 
-        /* ── Card Grid ── */
-        .catalog-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 24px;
+        .search-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: var(--primary, #0d9488);
+            box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1);
         }
 
-        /* ── Catalog Card ── */
-        .catalog-card {
-            background: #fff;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            border: 1px solid var(--gray-100);
-            transition: all .25s;
+        .filter-select {
+            font-family: var(--font-ui);
+            font-weight: 500;
             cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: left 16px center;
+        }
+
+        .btn-reset {
+            padding: 12px 24px;
+            white-space: nowrap;
+            font-family: var(--font-ui);
+            font-weight: 600;
+        }
+
+        .solutions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 28px;
+        }
+
+        .solution-card {
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border: 1px solid var(--gray-100, #f4f4f5);
             display: flex;
             flex-direction: column;
-        }
-        .catalog-card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-3px);
+            height: 100%;
+            transition: all 0.25s;
         }
 
-        /* Colored header strip */
-        .catalog-card-strip {
-            padding: 18px 16px;
-            text-align: center;
-            color: #fff;
+        .solution-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+        }
+
+        .card-top {
+            padding: 24px;
+            color: #ffffff;
             position: relative;
-            min-height: 56px;
+            flex-shrink: 0;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .card-top::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.25) 100%);
+            pointer-events: none;
+        }
+
+        .card-title {
+            font-family: var(--font-heading);
+            font-size: 20px;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.4;
+            position: relative;
+            z-index: 1;
+            color: #ffffff !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+            margin-top: 16px;
+        }
+
+        .card-tag {
+            background: rgba(255,255,255,0.25);
+            backdrop-filter: blur(6px);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-family: var(--font-ui);
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #ffffff;
+        }
+
+        .card-middle {
+            flex: 1;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-family: var(--font-body);
+            font-size: 14px;
+            color: var(--gray-700, #3f3f46);
+            line-height: 1.6;
+        }
+
+        .info-icon {
+            font-size: 18px;
+            min-width: 24px;
+            text-align: center;
+            margin-top: 2px;
+        }
+
+        .info-label {
+            font-family: var(--font-ui);
+            font-weight: 600;
+            color: var(--gray-600, #52525b);
+            margin-left: 4px;
+        }
+
+        .instructor-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .instructor-tag {
+            background: #f0fdfa;
+            color: #0f766e;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-family: var(--font-ui);
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(13, 148, 136, 0.15);
+        }
+
+        .card-bottom {
+            padding: 16px 24px 24px;
+            border-top: 1px solid var(--gray-100, #f4f4f5);
+            display: flex;
+            gap: 12px;
+            background: #fafafa;
+            flex-shrink: 0;
+        }
+
+        .btn-card {
+            flex: 1;
+            padding: 11px;
+            border-radius: 12px;
+            font-family: var(--font-ui);
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: none;
+        }
+
+        .btn-card-primary {
+            background: var(--primary, #0d9488);
+            color: #ffffff;
+        }
+        .btn-card-primary:hover {
+            background: #0f766e;
+            transform: translateY(-2px);
+        }
+
+        .btn-card-outline {
+            background: #ffffff;
+            color: var(--gray-700);
+            border: 1.5px solid var(--gray-300, #d4d4d8);
+        }
+        .btn-card-outline:hover {
+            border-color: var(--primary, #0d9488);
+            color: var(--primary, #0d9488);
+            background: #f0fdfa;
+        }
+
+        .empty-state, .loading-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--gray-500, #71717a);
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 24, 32, 0.6);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 24px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 720px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--gray-100, #f2f2f2);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            background: var(--gray-50, #fafafa);
+            border-radius: 16px 16px 0 0;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-family: var(--font-heading);
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--gray-800);
+            line-height: 1.4;
+        }
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: var(--gray-200);
+            color: var(--gray-600);
+            font-size: 20px;
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
-        .catalog-card-strip .strip-label {
-            font-size: 16px;
-            font-weight: 700;
-            text-shadow: 0 1px 3px rgba(0,0,0,.2);
-            line-height: 1.4;
-            max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
+        .modal-close:hover {
+            background: #fee2e2;
+            color: #dc2626;
+            transform: rotate(90deg);
+        }
+        .modal-body { padding: 28px; line-height: 1.8; }
+        .modal-footer {
+            padding: 20px 28px;
+            border-top: 1px solid var(--gray-100, #f2f2f2);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: var(--gray-50, #fafafa);
+            border-radius: 0 0 16px 16px;
+            flex-wrap: wrap;
         }
 
-        .catalog-card-body {
-            padding: 20px;
-            flex: 1;
+        .modal-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .modal-detail-item {
             display: flex;
             flex-direction: column;
+            gap: 4px;
         }
-        .catalog-card-name {
-            font-size: 16px;
+        .modal-detail-item.full-width { grid-column: 1 / -1; }
+        .modal-detail-label {
+            font-family: var(--font-ui);
+            font-size: 11px;
             font-weight: 700;
+            color: var(--gray-400, #9ca3af);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modal-detail-value {
+            font-family: var(--font-body);
+            font-size: 15px;
+            font-weight: 500;
             color: var(--gray-800);
-            margin-bottom: 8px;
-            line-height: 1.4;
-        }
-        .catalog-card-guide {
-            font-size: 14px;
-            color: var(--gray-500);
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .catalog-card-guide .guide-icon {
-            color: var(--primary);
-        }
-        .catalog-card-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        /* Mentor tags styling - displayed as separate tags */
-        .catalog-card-mentors {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-        .mentor-tag {
-            display: inline-block;
-            background: rgba(12, 167, 170, 0.1);
-            color: var(--primary);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 600;
-            border: 1px solid rgba(12, 167, 170, 0.2);
-        }
-        .catalog-card-footer {
-            padding: 14px 20px;
-            border-top: 1px solid var(--gray-100);
-            background: var(--gray-50);
-        }
-
-        /* ── Empty State ── */
-        .catalog-empty {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 60px 20px;
-        }
-        .catalog-empty-icon {
-            font-size: 56px;
-            margin-bottom: 16px;
-        }
-        .catalog-empty-text {
-            font-size: 18px;
-            color: var(--gray-500);
-            font-weight: 600;
-        }
-
-        /* ── Detail Modal — ensure z-index above toast-container (2000) ── */
-        #detailModal {
-            z-index: 3000 !important;
-        }
-        /* Ensure toast items remain interactive when added */
-        #toastContainer .toast {
-            pointer-events: auto;
-        }
-        .detail-row {
-            display: flex;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--gray-100);
-            gap: 12px;
-        }
-        .detail-row:last-child {
-            border-bottom: none;
-        }
-        .detail-label {
-            font-weight: 700;
-            color: var(--gray-600);
-            min-width: 120px;
-            flex-shrink: 0;
-            font-size: 14px;
-        }
-        .detail-value {
-            color: var(--gray-800);
-            font-size: 14px;
             line-height: 1.6;
-            word-break: break-word;
         }
-        .detail-badges {
+        .modal-notes-box {
+            background: #f0fdfa;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(13, 148, 136, 0.12);
+            color: #0f766e;
+            white-space: pre-line;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .modal-instructor-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
+            margin-top: 4px;
+        }
+        .modal-instructor-tag {
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-family: var(--font-ui);
+            font-size: 12px;
+            font-weight: 600;
         }
 
-        /* ── Footer ── */
-        .catalog-footer {
-            background: var(--gray-800);
-            color: rgba(255,255,255,.6);
-            text-align: center;
-            padding: 20px;
-            font-size: 13px;
-            margin-top: auto;
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-family: var(--font-ui);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+        }
+        .modal-btn-outline {
+            background: #ffffff;
+            color: var(--gray-600);
+            border: 1.5px solid var(--gray-300);
+        }
+        .modal-btn-outline:hover { background: var(--gray-100); }
+        .modal-btn-print {
+            background: var(--gray-800, #18181b);
+            color: #ffffff;
+        }
+        .modal-btn-print:hover { background: #27272a; transform: translateY(-1px); }
+        .modal-btn--whatsapp {
+            background: linear-gradient(135deg, #25d366, #128c7e);
+            color: #fff;
+        }
+        .modal-btn--whatsapp:hover {
+            box-shadow: 0 6px 18px rgba(37,211,102,.4);
+            transform: translateY(-2px);
+        }
+        .modal-btn-primary {
+            background: var(--primary, #0d9488);
+            color: #ffffff;
+        }
+        .modal-btn-primary:hover {
+            background: #0f766e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
         }
 
-        /* ── Responsive ── */
-        @media (max-width: 1024px) {
-            .catalog-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        @media (max-width: 640px) {
-            .catalog-grid {
-                grid-template-columns: 1fr;
-            }
-            .catalog-header-inner {
-                padding: 12px 16px;
-            }
-            .catalog-content {
-                padding: 16px;
-            }
-            .catalog-page-title {
-                font-size: 22px;
-            }
-            .catalog-filters {
-                grid-template-columns: 1fr;
-            }
-            .modal {
-                max-width: 100%;
-                margin: 8px;
-                max-height: 95vh;
-            }
+        @media (max-width: 768px) {
+            .filter-row { flex-direction: column; align-items: stretch; }
+            .solutions-grid { grid-template-columns: 1fr; }
+            .modal-details-grid { grid-template-columns: 1fr; }
+            .card-top { min-height: 130px; padding: 20px; }
+            .card-title { font-size: 18px; }
+            .modal-footer { flex-direction: column; }
+            .modal-btn { width: 100%; justify-content: center; }
         }
     </style>
 </head>
 <body>
-
-    <!-- Header -->
-    <header class="catalog-header">
-        <div class="catalog-header-inner">
-            <a class="catalog-logo" href="./index.html">
-                <span class="catalog-logo-icon" id="globalHeaderLogo">🧭</span>
-                <span class="catalog-logo-text">
-                    <span class="name-ar" id="globalHeaderNameAr">بوصلة نت</span>
-                    <span class="name-he" id="globalHeaderNameHe">מצפן נט</span>
-                </span>
-            </a>
+    <header class="custom-page-header">
+        <div class="header-inner">
+            <h1 class="page-main-title">كتالوج حلول التعلم</h1>
+            <a href="./index.html" class="btn-back">← العودة للرئيسية</a>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="catalog-content">
-        <h1 class="catalog-page-title" id="pageTitle"></h1>
+    <main class="custom-page-content">
+        <div class="catalog-container">
+            <div class="catalog-filters">
+                <div class="filter-row">
+                    <div class="search-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="filterSearch" class="search-input" placeholder="ابحث عن اسم الحل أو الوصف...">
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <select id="filterDomain" class="filter-select">
+                        <option value="">جميع المجالات</option>
+                    </select>
+                    <select id="filterStage" class="filter-select">
+                        <option value="">جميع الفئات العمرية</option>
+                    </select>
+                    <select id="filterDay" class="filter-select">
+                        <option value="">جميع أيام اللقاء</option>
+                    </select>
+                    <button id="resetFilters" class="btn btn-outline btn-reset">🔄 إعادة تعيين</button>
+                </div>
+            </div>
 
-        <!-- Search -->
-        <div class="catalog-search">
-            <input type="text" id="searchInput" class="form-input" autocomplete="off">
-            <span class="catalog-search-icon">🔍</span>
+            <div id="catalogGrid" class="solutions-grid">
+                <div class="loading-state">
+                    <div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#0d9488;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
+                    <p>جاري تحميل الكتالوج...</p>
+                </div>
+            </div>
         </div>
-
-        <!-- Filters -->
-        <div class="catalog-filters">
-            <select id="filterTopicType" class="form-select"></select>
-            <select id="filterEducationStage" class="form-select"></select>
-            <select id="filterMeetingType" class="form-select"></select>
-        </div>
-
-        <!-- Card Grid -->
-        <div class="catalog-grid" id="catalogGrid"></div>
     </main>
 
-    <!-- Detail Modal -->
-    <div class="modal-overlay" id="detailModal">
-        <div class="modal" role="dialog" aria-modal="true">
+    <footer class="custom-page-footer">
+        بوصلة نت © <span id="footerYear"></span> | مركز تطوير طواقم التربية والتعليم
+    </footer>
+
+    <div id="solutionModal" class="modal-overlay" onclick="closeSolutionModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <h2 class="modal-title" id="modalTitle"></h2>
-                <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+                <h3 id="modalTitle">تفاصيل الحل</h3>
+                <button class="modal-close" onclick="closeSolutionModal()">✕</button>
             </div>
-            <div class="modal-body" id="modalBody"></div>
-            <div class="modal-footer" id="modalFooter"></div>
+            <div id="modalBody" class="modal-body"></div>
+            <div id="modalFooter" class="modal-footer"></div>
         </div>
     </div>
 
-    <!-- Toast Container — hidden from pointer events when empty -->
-    <div class="toast-container" id="toastContainer" style="pointer-events:none;"></div>
+    <script>
+        document.getElementById('footerYear').textContent = new Date().getFullYear();
+    </script>
 
-    <!-- Footer -->
-    <footer class="catalog-footer" id="globalFooterText"></footer>
+    <script src="./js/data.js?v=4.6.0"></script>
+    
+    <script>
+        let allSolutions = [];
 
-    <!-- Scripts -->
-    <script src="./js/data.js?v=4.4.0"></script>
-    <script src="./js/global-ui.js?v=1.0.0"></script>
-    <script src="./js/catalog.js?v=4.9.0"></script>
+        // ==========================================
+        // 1. פונקציית זיהוי שפה (עברית vs ערבית)
+        // ==========================================
+        function isHebrew(text) {
+            if (!text) return false;
+            const str = String(text).trim();
+            const hebrewChars = (str.match(/[\u0590-\u05FF]/g) || []).length;
+            const arabicChars = (str.match(/[\u0600-\u06FF]/g) || []).length;
+            return hebrewChars > arabicChars && hebrewChars > 0;
+        }
+
+        function isArabic(text) {
+            if (!text) return false;
+            const str = String(text).trim();
+            const arabicChars = (str.match(/[\u0600-\u06FF]/g) || []).length;
+            return arabicChars > 0;
+        }
+
+        // ==========================================
+        // 2. פונקציית תרגום חכמה - ערך בודד או מרובה
+        // ==========================================
+        function translateToArabic(lookupKey, value) {
+            if (!value) return '';
+            const items = DataStore.getAll(lookupKey) || [];
+            if (!items.length) return value;
+
+            const valuesArray = String(value).split(/[,،]/).map(v => v.trim()).filter(v => v);
+            
+            const translated = valuesArray.map(v => {
+                const item = items.find(i => 
+                    i.value === v || i.id === v || i.label === v || i.labelHe === v
+                );
+                
+                if (item) {
+                    return item.labelAr || item.label || v;
+                }
+                return v;
+            });
+
+            return translated.join('، ');
+        }
+
+        // ==========================================
+        // 3. פונקציה חכמה לטיפול בכל שדה לפי הלוגיקה שביקשת
+        // ==========================================
+        function getTranslatedField(fieldName, value, solution) {
+            if (!value) return 'غير محدد';
+
+            if (isArabic(value) && !isHebrew(value)) {
+                return value;
+            }
+
+            switch (fieldName) {
+                case 'domain':
+                    return translateToArabic(DataStore.KEYS.LOOKUP_DOMAINS, value);
+                
+                case 'topic':
+                    const domainValue = solution.domain || '';
+                    if (domainValue === 'תחום דעת' || (isArabic(domainValue) && domainValue.includes('مجال المعرفة'))) {
+                        return translateToArabic(DataStore.KEYS.LOOKUP_FIELD_KNOWLEDGE, value);
+                    } else if (domainValue === 'בעלי תפקידים' || (isArabic(domainValue) && domainValue.includes('أصحاب المناصب'))) {
+                        return translateToArabic(DataStore.KEYS.LOOKUP_ROLE_HOLDERS, value);
+                    } else {
+                        return translateToArabic(DataStore.KEYS.LOOKUP_BROAD_TOPICS, value);
+                    }
+                
+                case 'educationStage':
+                    return translateToArabic(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, value);
+                
+                case 'educationType':
+                    return translateToArabic(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, value);
+                
+                case 'weekDay':
+                    return translateToArabic(DataStore.KEYS.LOOKUP_WEEK_DAYS, value);
+                
+                case 'meetingType':
+                    return translateToArabic(DataStore.KEYS.LOOKUP_MEETING_TYPES, value);
+                
+                default:
+                    return value;
+            }
+        }
+
+        // ==========================================
+        // 4. פונקציית תרגום חכמה למנחים (מתוקן לפי שמות השדות המדויקים ב-mentors.json)
+        // ==========================================
+        function getInstructorNameAr(instructorValue) {
+            if (!instructorValue) return [];
+            const names = String(instructorValue).split(/,|،/).map(n => n.trim()).filter(n => n);
+            
+            return names.map(name => {
+                const mentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+                
+                // 🔑 חיפוש מדויק לפי id, idNumber, fullNameHe או fullNameAr
+                const match = mentors.find(i => 
+                    i.id === name || 
+                    i.idNumber === name || 
+                    i.fullNameHe === name || 
+                    i.fullNameAr === name
+                );
+                
+                if (match) {
+                    // 🔑 סדר עדיפות מוחלט: שם מרצה (ערבית) -> שם מרצה (עברית) -> הערך המקורי
+                    return match.fullNameAr || match.fullNameHe || name;
+                }
+                
+                // אם לא נמצא במאגר, נחזיר את השם כפי שהוא
+                return name;
+            });
+        }
+
+        function getGuideNameAr(guideValue) {
+            if (!guideValue) return 'غير محدد';
+            const mentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+            
+            // 🔑 חיפוש מדויק גם כאן
+            const match = mentors.find(i => 
+                i.id === guideValue || 
+                i.idNumber === guideValue || 
+                i.fullNameHe === guideValue || 
+                i.fullNameAr === guideValue
+            );
+            
+            return match ? (match.fullNameAr || match.fullNameHe || guideValue) : guideValue;
+        }
+
+        function getDomainColor(domainName) {
+            const colors = ['#0d9488', '#3b82f6', '#7c3aed', '#059669', '#d97706', '#1e1b4b'];
+            let hash = 0;
+            const str = domainName || 'default';
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return colors[Math.abs(hash) % colors.length];
+        }
+
+        // ==========================================
+        // 5. רינדור הכרטיסיות
+        // ==========================================
+        function renderCards(solutionsToRender) {
+            const grid = document.getElementById('catalogGrid');
+            
+            if (solutionsToRender.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size:56px; margin-bottom:16px; opacity:0.6;">🔍</div>
+                        <h3 style="font-family:var(--font-heading); color:var(--gray-700);">لا توجد نتائج مطابقة</h3>
+                        <p>يرجى تعديل معايير البحث أو إعادة تعيين الفلاتر.</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = solutionsToRender.map(sol => {
+                const domainAr = getTranslatedField('domain', sol.domain, sol);
+                const topicAr = getTranslatedField('topic', sol.topic, sol);
+                const weekDayAr = getTranslatedField('weekDay', sol.weekDay, sol);
+                const stageAr = getTranslatedField('educationStage', sol.educationStage, sol);
+                const meetingTypeAr = getTranslatedField('meetingType', sol.meetingType, sol);
+                
+                // שימוש בפונקציה המתוקנת למנחים
+                const instructorNames = getInstructorNameAr(sol.instructors);
+
+                const instructorTagsHtml = instructorNames.length > 0
+                    ? `<div class="instructor-tags">${instructorNames.map(n => `<span class="instructor-tag">${n}</span>`).join('')}</div>`
+                    : '<span style="color:#999;font-size:13px;">غير محدد</span>';
+
+                const bgColor = getDomainColor(sol.domain);
+                const regLink = `./registration.html?solutionId=${sol.id}`;
+                
+                // בדיקה אם קיים מספר פתרון לפני הצגת התגית
+                const solutionNumberTag = sol.solutionNumber ? `<span class="card-tag">🔢 ${sol.solutionNumber}</span>` : '';
+
+                return `
+                    <div class="solution-card">
+                        <div class="card-top" style="background-color:${bgColor};">
+                            <h3 class="card-title">${sol.solutionNameAr || sol.solutionName || 'حل تعليمي'}</h3>
+                            <div class="card-tags">
+                                ${solutionNumberTag}
+                                <span class="card-tag">📌 ${domainAr}</span>
+                                ${topicAr && topicAr !== 'غير محدد' ? `<span class="card-tag">🏷️ ${topicAr}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="card-middle">
+                            <div class="info-row"><span class="info-icon">🎓</span><div style="flex:1"><span class="info-label">محاضر/ة:</span>${instructorTagsHtml}</div></div>
+                            <div class="info-row"><span class="info-icon">📅</span><div><span class="info-label">يوم:</span> ${weekDayAr}</div></div>
+                            <div class="info-row"><span class="info-icon">👥</span><div><span class="info-label">الفئة العمرية:</span> ${stageAr}</div></div>
+                            <div class="info-row"><span class="info-icon">⏱️</span><div><span class="info-label">ساعات الاستحقاق:</span> ${sol.academicHours || '0'} ساعة</div></div>
+                            <div class="info-row"><span class="info-icon">🤝</span><div><span class="info-label">نوع اللقاء:</span> ${meetingTypeAr}</div></div>
+                        </div>
+                        <div class="card-bottom">
+                            <button class="btn-card btn-card-outline" onclick="openSolutionDetailsModal('${sol.id}')">🔍 لمزيد من التفاصيل</button>
+                            <a href="${regLink}" target="_blank" class="btn-card btn-card-primary">📝 للتسجيل المسبق</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // 6. סינון
+        // ==========================================
+        function applyFilters() {
+            const q = document.getElementById('filterSearch').value.toLowerCase().trim();
+            const d = document.getElementById('filterDomain').value;
+            const s = document.getElementById('filterStage').value;
+            const w = document.getElementById('filterDay').value;
+
+            renderCards(allSolutions.filter(sol => {
+                const matchText = !q || (sol.solutionName && sol.solutionName.toLowerCase().includes(q)) || (sol.description && sol.description.toLowerCase().includes(q));
+                const matchDomain = !d || (sol.domain && sol.domain.includes(d));
+                const matchStage = !s || (sol.educationStage && sol.educationStage.includes(s));
+                const matchDay = !w || (sol.weekDay && sol.weekDay.includes(w));
+                return matchText && matchDomain && matchStage && matchDay;
+            }));
+        }
+
+        // ==========================================
+        // 7. מודאל פרטי פתרון
+        // ==========================================
+        function openSolutionDetailsModal(id) {
+            const sol = allSolutions.find(s => s.id === id);
+            if (!sol) return;
+
+            const domainAr = getTranslatedField('domain', sol.domain, sol);
+            const topicAr = getTranslatedField('topic', sol.topic, sol);
+            const stageAr = getTranslatedField('educationStage', sol.educationStage, sol);
+            const typeAr = getTranslatedField('educationType', sol.educationType, sol);
+            const meetingTypeAr = getTranslatedField('meetingType', sol.meetingType, sol);
+            const weekDayAr = getTranslatedField('weekDay', sol.weekDay, sol);
+            
+            // שימוש בפונקציה המתוקנת למנחים גם במודאל
+            const instructorNames = getInstructorNameAr(sol.instructors);
+            const guideNameAr = getGuideNameAr(sol.guideId);
+
+            document.getElementById('modalTitle').textContent = sol.solutionNameAr || sol.solutionName || 'تفاصيل الحل';
+
+            document.getElementById('modalBody').innerHTML = `
+                <div class="modal-details-grid">
+                    <div class="modal-detail-item full-width">
+                        <span class="modal-detail-label">الوصف</span>
+                        <span class="modal-detail-value">${sol.descriptionAr || sol.description || 'لا يوجد وصف'}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">رقم الحل</span>
+                        <span class="modal-detail-value" dir="ltr">${sol.solutionNumber || 'غير محدد'}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">المرشد المسؤول</span>
+                        <span class="modal-detail-value">${guideNameAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">المجال</span>
+                        <span class="modal-detail-value">${domainAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">الموضوع</span>
+                        <span class="modal-detail-value">${topicAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">الفئة العمرية</span>
+                        <span class="modal-detail-value">${stageAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">نوع التعليم</span>
+                        <span class="modal-detail-value">${typeAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">تاريخ البداية</span>
+                        <span class="modal-detail-value">${sol.startDate || 'غير محدد'}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">تاريخ الانتهاء</span>
+                        <span class="modal-detail-value">${sol.endDate || 'غير محدد'}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">يوم اللقاء</span>
+                        <span class="modal-detail-value">${weekDayAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">نوع اللقاء</span>
+                        <span class="modal-detail-value">${meetingTypeAr}</span>
+                    </div>
+                    <div class="modal-detail-item">
+                        <span class="modal-detail-label">ساعات الاستحقاق</span>
+                        <span class="modal-detail-value">${sol.academicHours || '0'} ساعة</span>
+                    </div>
+                    <div class="modal-detail-item full-width">
+                        <span class="modal-detail-label">المحاضرون / المرشدون</span>
+                        ${instructorNames.length > 0 
+                            ? `<div class="modal-instructor-tags">${instructorNames.map(n => `<span class="modal-instructor-tag">${n}</span>`).join('')}</div>`
+                            : '<span class="modal-detail-value">غير محدد</span>'
+                        }
+                    </div>
+                    ${sol.generalNote ? `
+                    <div class="modal-detail-item full-width">
+                        <span class="modal-detail-label">ملاحظة عامة</span>
+                        <div class="modal-notes-box">${sol.generalNoteAr || sol.generalNote}</div>
+                    </div>` : ''}
+                </div>
+            `;
+
+            const waLink = sol.whatsappLink ? sol.whatsappLink.trim() : '';
+            const regLink = `./registration.html?solutionId=${sol.id}`;
+
+            let footerHtml = `
+                <button class="modal-btn modal-btn-outline" onclick="closeSolutionModal()">إغلاق</button>
+                <button class="modal-btn modal-btn-print" onclick="printSolutionDetails('${sol.id}')">🖨️ طباعة</button>
+            `;
+
+            if (waLink) {
+                footerHtml += `<a href="${waLink}" target="_blank" class="modal-btn modal-btn--whatsapp">💬 للانضمام لمجموعة الواتساب</a>`;
+            }
+
+            footerHtml += `<a href="${regLink}" target="_blank" class="modal-btn modal-btn-primary">📝 للتسجيل المسبق</a>`;
+
+            document.getElementById('modalFooter').innerHTML = footerHtml;
+            document.getElementById('solutionModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSolutionModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('solutionModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ==========================================
+        // 8. הדפסה
+        // ==========================================
+        function printSolutionDetails(id) {
+            const sol = allSolutions.find(s => s.id === id);
+            if (!sol) return;
+
+            const domainAr = getTranslatedField('domain', sol.domain, sol);
+            const topicAr = getTranslatedField('topic', sol.topic, sol);
+            const stageAr = getTranslatedField('educationStage', sol.educationStage, sol);
+            const typeAr = getTranslatedField('educationType', sol.educationType, sol);
+            const meetingTypeAr = getTranslatedField('meetingType', sol.meetingType, sol);
+            const weekDayAr = getTranslatedField('weekDay', sol.weekDay, sol);
+            const instructorNames = getInstructorNameAr(sol.instructors);
+            const guideNameAr = getGuideNameAr(sol.guideId);
+
+            const pw = window.open('', '_blank');
+            pw.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+            <title>${sol.solutionNameAr || sol.solutionName}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+            <style>
+                body{font-family:'Noto Sans Arabic','Cairo',sans-serif;padding:40px;color:#333;line-height:1.8;}
+                h1{color:#0d9488;border-bottom:3px solid #0d9488;padding-bottom:12px;margin-bottom:24px;font-size:22px;}
+                .row{display:flex;margin-bottom:12px;border-bottom:1px dashed #ddd;padding-bottom:8px;}
+                .lbl{font-weight:700;width:160px;color:#555;flex-shrink:0;}
+                .val{flex:1;}
+                .notes{background:#f0fdfa;padding:16px;border-radius:8px;margin-top:20px;border:1px solid #ccfbf1;color:#0f766e;white-space:pre-line;}
+                .footer{margin-top:40px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:12px;}
+                @media print{body{padding:20px;}.footer{display:none;}}
+            </style></head><body>
+            <h1>📚 ${sol.solutionNameAr || sol.solutionName}</h1>
+            <div class="row"><span class="lbl">رقم الحل:</span><span class="val">${sol.solutionNumber || '-'}</span></div>
+            <div class="row"><span class="lbl">المرشد المسؤول:</span><span class="val">${guideNameAr}</span></div>
+            <div class="row"><span class="lbl">المجال:</span><span class="val">${domainAr}</span></div>
+            <div class="row"><span class="lbl">الموضوع:</span><span class="val">${topicAr}</span></div>
+            <div class="row"><span class="lbl">الفئة العمرية:</span><span class="val">${stageAr}</span></div>
+            <div class="row"><span class="lbl">نوع التعليم:</span><span class="val">${typeAr}</span></div>
+            <div class="row"><span class="lbl">تاريخ البداية:</span><span class="val">${sol.startDate || '-'}</span></div>
+            <div class="row"><span class="lbl">تاريخ الانتهاء:</span><span class="val">${sol.endDate || '-'}</span></div>
+            <div class="row"><span class="lbl">يوم اللقاء:</span><span class="val">${weekDayAr}</span></div>
+            <div class="row"><span class="lbl">نوع اللقاء:</span><span class="val">${meetingTypeAr}</span></div>
+            <div class="row"><span class="lbl">ساعات الاستحقاق:</span><span class="val">${sol.academicHours || '0'} ساعة</span></div>
+            <div class="row"><span class="lbl">المحاضرون:</span><span class="val">${instructorNames.join('، ') || 'غير محدد'}</span></div>
+            <div class="row"><span class="lbl">الوصف:</span><span class="val">${sol.descriptionAr || sol.description || '-'}</span></div>
+            ${sol.generalNote ? `<div class="notes"><strong>ملاحظة عامة:</strong><br>${sol.generalNoteAr || sol.generalNote}</div>` : ''}
+            <div class="footer">بوصلة نت | ${new Date().toLocaleDateString('ar-IL')}</div>
+            <script>window.onload=function(){window.print();}<\/script>
+            </body></html>`);
+            pw.document.close();
+        }
+
+        // ==========================================
+        // 9. אתחול הדף
+        // ==========================================
+        async function initCatalog() {
+            try {
+                await DataStore.init(false);
+                
+                allSolutions = (DataStore.getAll(DataStore.KEYS.SOLUTIONS) || []).filter(s => s.isActive !== false && s.showInCatalog !== 'לא');
+                
+                const populate = (id, list) => {
+                    const sel = document.getElementById(id);
+                    (list || []).forEach(item => {
+                        const opt = document.createElement('option');
+                        opt.value = item.value || item.id;
+                        opt.textContent = item.labelAr || item.label || '-';
+                        sel.appendChild(opt);
+                    });
+                };
+
+                populate('filterDomain', DataStore.getAll(DataStore.KEYS.LOOKUP_DOMAINS));
+                populate('filterStage', DataStore.getAll(DataStore.KEYS.LOOKUP_EDUCATION_STAGES));
+                populate('filterDay', DataStore.getAll(DataStore.KEYS.LOOKUP_WEEK_DAYS));
+
+                document.getElementById('filterSearch').addEventListener('input', applyFilters);
+                document.getElementById('filterDomain').addEventListener('change', applyFilters);
+                document.getElementById('filterStage').addEventListener('change', applyFilters);
+                document.getElementById('filterDay').addEventListener('change', applyFilters);
+                document.getElementById('resetFilters').addEventListener('click', () => {
+                    document.getElementById('filterSearch').value = '';
+                    document.getElementById('filterDomain').value = '';
+                    document.getElementById('filterStage').value = '';
+                    document.getElementById('filterDay').value = '';
+                    applyFilters();
+                });
+
+                window.openSolutionDetailsModal = openSolutionDetailsModal;
+                window.closeSolutionModal = closeSolutionModal;
+                window.printSolutionDetails = printSolutionDetails;
+
+                renderCards(allSolutions);
+            } catch (err) {
+                console.error('خطأ:', err);
+                document.getElementById('catalogGrid').innerHTML = `<div class="empty-state"><h3>حدث خطأ أثناء تحميل البيانات</h3></div>`;
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCatalog);
+        } else {
+            initCatalog();
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSolutionModal(); });
+    </script>
 </body>
 </html>

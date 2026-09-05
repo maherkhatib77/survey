@@ -57,26 +57,52 @@ const Auth = (() => {
         return str.normalize('NFC').replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, '');
     }
 
-    function login(username, password) {
-        const users = DataStore.getAll(DataStore.KEYS.USERS);
-        const cleanUser = _sanitizeInput(username);
-        const cleanPass = _sanitizeInput(password);
-        const user = users.find(u => _sanitizeInput(u.username) === cleanUser && _sanitizeInput(u.password) === cleanPass);
-        if (!user) {
-            return { success: false, message: 'שם משתמש או סיסמה שגויים' };
+	async function login(username, password) {
+        // 1. Try server-side authentication first
+        try {
+            const res = await fetch('./api/auth.php?action=login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.user) {
+                    const session = DataStore.setSession(data.user);
+                    return { success: true, user: data.user, session: session };
+                } else if (data.message) {
+                    return { success: false, message: data.message };
+                }
+            }
+        } catch (e) {
+            console.warn('[Auth] קריאת שרת נכשלה, מעבר לאימות מקומי:', e);
         }
-        
-        // 🛡️ SECURITY FIX: Log failed login attempts for security monitoring
-        // In production, this should be sent to a secure audit log
-        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            console.warn('[Security] Login attempt for user: ' + cleanUser);
-        }
-        
-        const session = DataStore.setSession(user);
-        return { success: true, user: { ...user }, session };
-    }
 
-    function logout() {
+        // 2. Fallback to local DataStore
+		const users = DataStore.getAll(DataStore.KEYS.USERS) || [];
+		
+		if (!Array.isArray(users) || users.length === 0) {
+			return { success: false, message: 'אין משתמשים במערכת. נא ליצור קשר עם מנהל המערכת.' };
+		}
+		
+		const user = users.find(u => 
+			u.username === username && 
+			u.password === password && 
+			u.isActive !== false
+		);
+		
+		if (user) {
+			const session = DataStore.setSession(user);
+			return { success: true, user: user, session: session };
+		}
+		
+		return { success: false, message: 'שם משתמש או סיסמה שגויים' };
+	}
+
+    async function logout() {
+        try {
+            await fetch('./api/auth.php?action=logout');
+        } catch (e) {}
         DataStore.clearSession();
         window.location.href = './login.html';
     }

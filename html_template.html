@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{PAGE_TITLE}}</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800;900&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
+            min-height: 100vh;
+            background: var(--gray-50, #f3f3f3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Page Header (Standardized) ── */
+        .custom-page-header {
+            background: linear-gradient(135deg, var(--primary, #0ca7aa) 0%, var(--primary-dark, #09787a) 100%);
+            padding: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,.06);
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .page-main-title {
+            color: #fff;
+            font-size: 28px;
+            font-weight: 800;
+            margin: 0;
+            font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
+        }
+        .btn-back {
+            background: rgba(255,255,255,.18);
+            border: 1px solid rgba(255,255,255,.3);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-back:hover { background: rgba(255,255,255,.3); }
+
+        /* ── Main Content ── */
+        .custom-page-content {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        /* ── Footer ── */
+        .custom-page-footer {
+            text-align: center;
+            padding: 18px;
+            color: var(--gray-300, #999999);
+            font-size: 12px;
+            border-top: 1px solid var(--gray-100, #f2f2f2);
+            background: rgba(255,255,255,.7);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .header-inner { flex-wrap: wrap; }
+            .page-main-title { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="custom-page-header">
+        <div class="header-inner">
+            <h1 class="page-main-title">{{PAGE_TITLE_AR}}</h1>
+            <a href="./index.html" class="btn-back">← الرئيسية</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="custom-page-content">
+        {{PAGE_CONTENT}}
+    </main>
+
+    <!-- Footer -->
+    <footer class="custom-page-footer">
+        بوصلة نت © <span id="footerYear"></span> | وزارة التربية والتعليم
+    </footer>
+
+    <script>
+        document.getElementById('footerYear').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>

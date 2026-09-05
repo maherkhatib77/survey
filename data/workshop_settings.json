@@ -1,0 +1,86 @@
+[
+    {
+        "id": "workshop_settings_main",
+        "workshops": [
+            {
+                "name": "القيادة التربوية وقيادة التغيير"
+            },
+            {
+                "name": "الممارسات التربوية"
+            },
+            {
+                "name": "المهارات المرتبطة بمنهاج البجروت"
+            },
+            {
+                "name": "الحداثة التربوية"
+            },
+            {
+                "name": "التنور اللغوي وتعليم القراءة والكتابة"
+            },
+            {
+                "name": "تطوير مهارات التفكير الإبداعي والناقد"
+            },
+            {
+                "name": "الذكاء الاصطناعي والتكنوبيداغوجيا"
+            },
+            {
+                "name": "التعلم الاجتماعي العاطفي (SEL)"
+            },
+            {
+                "name": "الرفاه النفسي والحصانة النفسية"
+            },
+            {
+                "name": "بناء مناخ صفي إيجابي وداعم"
+            },
+            {
+                "name": "أدوات التقييم الحديثة"
+            }
+        ],
+        "createdAt": "2026-08-28T17:49:37.559Z",
+        "updatedAt": "2026-09-01T18:43:46.732Z",
+        "labels": {
+            "institutionCode": {
+                "he": "סמל מוסד",
+                "ar": "رمز المدرسة (سيميل)"
+            },
+            "contactPerson": {
+                "he": "שם איש קשר",
+                "ar": "اسم المسؤول عن التواصل"
+            },
+            "mobile": {
+                "he": "מספר נייד",
+                "ar": "رقم الهاتف المحمول"
+            },
+            "email": {
+                "he": "דואר אלקטרוני",
+                "ar": "البريد الإلكتروني"
+            },
+            "meetingDate": {
+                "he": "תאריך המפגש",
+                "ar": "تاريخ اللقاء"
+            },
+            "meetingTime": {
+                "he": "שעת המפגש",
+                "ar": "ساعات اللقاء"
+            },
+            "workshopName": {
+                "he": "שם הסדנה",
+                "ar": "عنوان الورشة"
+            },
+            "notes": {
+                "he": "הערות",
+                "ar": "ملاحظات إضافية"
+            }
+        },
+        "allowedDays": [
+            "א"
+        ],
+        "responsible": {
+            "id": "mtg6bqxbpjd0gujf0_11",
+            "name": "ח'טיב מאהר",
+            "phone": "054-762-3280",
+            "email": "maher.khatib@gmail.com"
+        },
+        "introText": "<p class=\"MsoNormal\" dir=\"RTL\" style=\"text-align: center; direction: rtl; unicode-bidi: embed;\" align=\"center\"><strong><span lang=\"AR-SA\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif;\">تمكين المعلمين... ورشات تعليمية نوعية...<\/span><\/strong><\/p>\n<p class=\"MsoNormal\" dir=\"RTL\" style=\"text-align: justify; direction: rtl; unicode-bidi: embed;\"><span dir=\"LTR\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif; mso-bidi-language: AR-JO;\"><br><\/span><span lang=\"AR-SA\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif;\">في مركز تطوير طواقم التربية والتعليم &ndash; شرقي القدس، الواقع في باب الخليل، ندرك أن النهوض بالعملية التعليمية يبدأ من تمكين القائمين عليها؛ لذلك نضع بين أيديكم فرصةً فريدةً لتنظيم يوم تعليمي متكامل، يُصمم خصيصاً وفق رؤية مدرستكم واحتياجاتها الميدانية، ويُقدم على أيدي ثُلّةٍ من مرشدينا ذوي الخبرة الواسعة في مختلف المجالات التربوية والتعليمية، ما يضمن تلبية متطلباتكم بأفضل صورة ممكنة<\/span><span dir=\"LTR\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif; mso-bidi-language: AR-JO;\">.<\/span><\/p>\n<p class=\"MsoNormal\" dir=\"RTL\" style=\"text-align: justify; direction: rtl; unicode-bidi: embed;\"><span lang=\"AR-SA\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif;\">نُتيح لكم حرية اختيار المسار الأنسب لأولوياتكم، سواء في القيادة التربوية، أو الممارسات الصفية، أو مهارات البجروت، أو الحداثة التربوية، أو التنور اللغوي وتعليم القراءة والكتابة، أو تطوير التفكير الإبداعي والناقد، أو الذكاء الاصطناعي والتكنوبيداغوجيا، أو التعلم الاجتماعي العاطفي، أو الرفاه النفسي، أو بناء المناخ الصفي الداعم، أو أدوات التقييم الحديثة<\/span><span dir=\"LTR\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif; mso-bidi-language: AR-JO;\">.<\/span><\/p>\n<p class=\"MsoNormal\" dir=\"RTL\" style=\"text-align: justify; direction: rtl; unicode-bidi: embed;\"><span lang=\"AR-SA\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif;\">تُعقد هذه الأيام التعليمية أيام الأحد، ابتداءً من الأول من 11.2026، وسنعمل على التنسيق المسبق مع مدرستكم لوضع برنامج تفصيلي يُلبي طموحاتكم، ويُراعي خصوصية مرحلتكم التعليمية<\/span><span dir=\"LTR\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif; mso-bidi-language: AR-JO;\">.<\/span><\/p>\n<p class=\"MsoNormal\" dir=\"RTL\" style=\"text-align: justify; direction: rtl; unicode-bidi: embed;\"><span lang=\"AR-SA\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif;\">انضموا إلينا في هذه التجربة النوعية التي نضمن فيها تقديم إضافة حقيقية للمعلمين، تنعكس إيجاباً على أدائهم وتنعكس بدورها على تحصيل طلابهم<\/span><span dir=\"LTR\" style=\"font-size: 16.0pt; line-height: 115%; font-family: 'Calibri',sans-serif; mso-bidi-language: AR-JO;\">.<\/span><\/p>"
+    }
+]

@@ -1,22 +1,72 @@
 [
-  {
-    "value": "תקציב רגיל",
-    "label": "תקציב רגיל",
-    "labelAr": "ميزانية عادية",
-    "order": 1,
-    "isActive": true,
-    "id": "ms4yrr2klatxjqjmc",
-    "createdAt": "2026-07-28T18:03:01.965Z",
-    "updatedAt": "2026-07-28T18:03:01.965Z"
-  },
-  {
-    "value": "חומש",
-    "label": "חומש",
-    "labelAr": "خمسي",
-    "order": 2,
-    "isActive": true,
-    "id": "ms4yrr2mcd0z9ambe",
-    "createdAt": "2026-07-28T18:03:01.966Z",
-    "updatedAt": "2026-07-28T18:03:01.966Z"
-  }
+    {
+        "value": "תקציב רגיל",
+        "label": "תקציב רגיל",
+        "labelAr": "ميزانية عادية",
+        "order": 1,
+        "isActive": true,
+        "id": "mt61ghs67skbdyg8s",
+        "createdAt": "2026-08-23T16:45:44.070Z",
+        "updatedAt": "2026-08-25T05:42:11.833Z"
+    },
+    {
+        "value": "חומש",
+        "label": "חומש",
+        "labelAr": "حومش",
+        "order": 2,
+        "isActive": true,
+        "id": "mt61ghs7uriion0k4",
+        "createdAt": "2026-08-23T16:45:44.071Z",
+        "updatedAt": "2026-08-26T19:15:11.733Z"
+    },
+    {
+        "value": "לא מתוקצב",
+        "label": "לא מתוקצב",
+        "labelAr": "غير ممول",
+        "order": 3,
+        "isActive": true,
+        "id": "mt61ghs7a6bc51qk5",
+        "createdAt": "2026-08-23T16:45:44.071Z",
+        "updatedAt": "2026-08-25T05:42:11.834Z"
+    },
+    {
+        "value": "מטה",
+        "label": "מטה",
+        "labelAr": "מטה",
+        "order": 4,
+        "isActive": true,
+        "id": "mt61ghs7fkb9njbcz",
+        "createdAt": "2026-08-23T16:45:44.071Z",
+        "updatedAt": "2026-08-26T19:17:41.281Z"
+    },
+    {
+        "value": "קרן ליאון",
+        "label": "קרן ליאון",
+        "labelAr": "קרן ליאון",
+        "order": 5,
+        "isActive": true,
+        "id": "mt61ghs7ubbeaq5yc",
+        "createdAt": "2026-08-23T16:45:44.071Z",
+        "updatedAt": "2026-08-26T19:17:13.265Z"
+    },
+    {
+        "value": "אבני ראשה",
+        "label": "אבני ראשה",
+        "labelAr": "אבני ראשה",
+        "order": 6,
+        "isActive": true,
+        "id": "mt61ghs8inr1ih8dr",
+        "createdAt": "2026-08-23T16:45:44.072Z",
+        "updatedAt": "2026-08-26T19:17:23.037Z"
+    },
+    {
+        "value": "תקציב בית ספרי",
+        "label": "תקציב בית ספרי",
+        "labelAr": "תקציב בית ספרי",
+        "order": 7,
+        "isActive": true,
+        "id": "mt61ghs841oa3qaz9",
+        "createdAt": "2026-08-23T16:45:44.072Z",
+        "updatedAt": "2026-08-26T19:17:32.157Z"
+    }
 ]

@@ -1,52 +1,74 @@
 [
-  {
-    "value": "חשיבה ביקורתית",
-    "label": "חשיבה ביקורתית",
-    "labelAr": "التفكير النقدي",
-    "order": 1,
-    "isActive": true,
-    "id": "ms4ytvipa80wirkru",
-    "createdAt": "2026-07-28T18:04:41.041Z",
-    "updatedAt": "2026-07-28T18:04:41.041Z"
-  },
-  {
-    "value": "אוריינות דיגיטלית",
-    "label": "אוריינות דיגיטלית",
-    "labelAr": "القراءة الرقمية",
-    "order": 2,
-    "isActive": true,
-    "id": "ms4ytviqu9hechuat",
-    "createdAt": "2026-07-28T18:04:41.042Z",
-    "updatedAt": "2026-07-28T18:04:41.042Z"
-  },
-  {
-    "value": "מיומנויות חברתיות-רגשיות",
-    "label": "מיומנויות חברתיות-רגשיות",
-    "labelAr": "المهارات الاجتماعية والعاطفية",
-    "order": 3,
-    "isActive": true,
-    "id": "ms4ytvir5dw0ocigi",
-    "createdAt": "2026-07-28T18:04:41.043Z",
-    "updatedAt": "2026-07-28T18:04:41.043Z"
-  },
-  {
-    "value": "למידה מבוססת חקר",
-    "label": "למידה מבוססת חקר",
-    "labelAr": "التعلم القائم على البحث",
-    "order": 4,
-    "isActive": true,
-    "id": "ms4ytviriwkfjfel5",
-    "createdAt": "2026-07-28T18:04:41.043Z",
-    "updatedAt": "2026-07-28T18:04:41.043Z"
-  },
-  {
-    "value": "הוראה מקומית דיפרנציאלית",
-    "label": "הוראה מקומית דיפרנציאלית",
-    "labelAr": "التدريس المحلي التفريقي",
-    "order": 5,
-    "isActive": true,
-    "id": "ms4ytvis28oq8c8ko",
-    "createdAt": "2026-07-28T18:04:41.044Z",
-    "updatedAt": "2026-07-28T18:04:41.044Z"
-  }
+    {
+        "value": "חשיבה ביקורתית",
+        "label": "חשיבה ביקורתית",
+        "labelAr": "التفكير النقدي",
+        "isActive": true,
+        "id": "mtmznuyw51cppx953",
+        "createdAt": "2026-09-04T13:27:33.512Z",
+        "updatedAt": "2026-09-04T13:27:33.512Z"
+    },
+    {
+        "value": "אוריינות דיגיטלית",
+        "label": "אוריינות דיגיטלית",
+        "labelAr": "القراءة الرقمية",
+        "isActive": true,
+        "id": "mtmznuyxdy1iwin54",
+        "createdAt": "2026-09-04T13:27:33.513Z",
+        "updatedAt": "2026-09-04T13:27:33.513Z"
+    },
+    {
+        "value": "מיומנויות חברתיות-רגשיות",
+        "label": "מיומנויות חברתיות-רגשיות",
+        "labelAr": "المهارات الاجتماعية والعاطفية",
+        "isActive": true,
+        "id": "mtmznuyxcb6f5dg40",
+        "createdAt": "2026-09-04T13:27:33.513Z",
+        "updatedAt": "2026-09-04T13:27:33.513Z"
+    },
+    {
+        "value": "למידה מבוססת חקר",
+        "label": "למידה מבוססת חקר",
+        "labelAr": "التعلم القائم على البحث",
+        "isActive": true,
+        "id": "mtmznuyx8xzil3c9x",
+        "createdAt": "2026-09-04T13:27:33.513Z",
+        "updatedAt": "2026-09-04T13:27:33.513Z"
+    },
+    {
+        "value": "הוראה מקומית דיפרנציאלית",
+        "label": "הוראה מקומית דיפרנציאלית",
+        "labelAr": "التدريس المحلي التفريقي",
+        "isActive": true,
+        "id": "mtmznuyxovsl3etou",
+        "createdAt": "2026-09-04T13:27:33.513Z",
+        "updatedAt": "2026-09-04T13:27:33.513Z"
+    },
+    {
+        "value": "הערכה למידתית",
+        "label": "הערכה למידתית",
+        "labelAr": "التقييم التكويني",
+        "isActive": true,
+        "id": "mtmznuyy0vivb114z",
+        "createdAt": "2026-09-04T13:27:33.514Z",
+        "updatedAt": "2026-09-04T13:27:33.514Z"
+    },
+    {
+        "value": "חינוך לערכים",
+        "label": "חינוך לערכים",
+        "labelAr": "التربية على القيم",
+        "isActive": true,
+        "id": "mtmznuyy0ncdpd8nu",
+        "createdAt": "2026-09-04T13:27:33.514Z",
+        "updatedAt": "2026-09-04T13:27:33.514Z"
+    },
+    {
+        "value": "מנהיגות חינוכית",
+        "label": "מנהיגות חינוכית",
+        "labelAr": "القيادة التربوية",
+        "isActive": true,
+        "id": "mtmznuyyuzx96otpw",
+        "createdAt": "2026-09-04T13:27:33.514Z",
+        "updatedAt": "2026-09-04T13:27:33.514Z"
+    }
 ]

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج العناقيد - التسجيل المسبق | מצפן נט</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800;900&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
+    <style>
+        :root {
+            --primary: #0ca7aa;
+            --primary-dark: #09787a;
+            --primary-bg: #e9f6fb;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+            --border-radius: 8px;
+            --border-radius-lg: 12px;
+            --border-radius-xl: 16px;
+            --transition: all 0.2s ease;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif; min-height: 100vh; background: #f8f9fa; display: flex; flex-direction: column; }
+        
+        .custom-page-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); padding: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+        .header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .page-main-title { color: #fff; font-size: 26px; font-weight: 800; margin: 0; }
+        .btn-back { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4); color: #fff; padding: 8px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
+        .btn-back:hover { background: rgba(255,255,255,.3); }
+        .custom-page-content { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 32px 24px; }
+        .custom-page-footer { text-align: center; padding: 18px; color: var(--gray-500); font-size: 12px; border-top: 1px solid var(--gray-200); background: #fff; }
+        
+        .intro-box { background: #fff; padding: 28px; border-radius: var(--border-radius-lg); box-shadow: 0 2px 12px rgba(0,0,0,0.04); margin-bottom: 28px; line-height: 1.8; color: var(--gray-600); border-right: 5px solid var(--primary); }
+        .intro-box h2 { color: var(--primary); margin-bottom: 16px; font-size: 22px; }
+        
+        .filters-bar { background: #fff; padding: 20px; border-radius: var(--border-radius-lg); box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
+        .filter-input { flex: 1; min-width: 200px; padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: var(--border-radius); font-family: inherit; font-size: 15px; }
+        .filter-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(12, 167, 170, 0.1); }
+        
+        .clusters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px; }
+        .cluster-card { background: #fff; border-radius: var(--border-radius-lg); padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: var(--transition); border: 1px solid var(--gray-200); display: flex; flex-direction: column; }
+        .cluster-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); border-color: var(--primary); }
+        .cluster-title { font-size: 19px; font-weight: 700; color: var(--gray-800); margin-bottom: 12px; line-height: 1.4; }
+        .cluster-domain { display: inline-block; background: var(--primary-bg); color: var(--primary-dark); padding: 6px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 16px; width: fit-content; }
+        .cluster-info { font-size: 14px; color: var(--gray-500); line-height: 1.7; margin-bottom: 20px; flex-grow: 1; }
+        .cluster-info strong { color: var(--gray-600); }
+        .cluster-status { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+        .cluster-status.open { color: #28a745; }
+        .btn-register { width: 100%; padding: 12px; background: var(--primary); color: #fff; border: none; border-radius: var(--border-radius); font-size: 16px; font-weight: 700; cursor: pointer; transition: var(--transition); font-family: inherit; }
+        .btn-register:hover { background: var(--primary-dark); }
+
+        /* 🔑 תיקון קריטי לגלילה במודאל */
+        .modal-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); z-index: 99999; 
+            display: none; 
+            overflow-y: auto; /* מאפשר גלילה של הדף כולו אם צריך */
+            padding: 24px; 
+            backdrop-filter: blur(4px); 
+        }
+        .modal-overlay.active { display: block; /* שינוי ל-block כדי ש-margin: auto יעבוד בצורה מושלמת */ }
+        
+        .modal-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: var(--border-radius-xl);
+            box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.25);
+            padding: 36px 32px;
+            width: 100%;
+            max-width: 560px;
+            max-height: 90vh; /* 🔑 מגביל את הגובה ל-90% מגובה המסך */
+            overflow-y: auto; /* 🔑 מאפשר גלילה בתוך הכרטיסייה עצמה */
+            margin: 40px auto; /* 🔑 ממרכז את הכרטיסייה בצורה מושלמת, גם בגלילה */
+            position: relative;
+            animation: modalEnter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* עיצוב פס הגלילה הייחודי למודאל */
+        .modal-card::-webkit-scrollbar { width: 6px; }
+        .modal-card::-webkit-scrollbar-track { background: transparent; }
+        .modal-card::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+        .modal-card::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+        @keyframes modalEnter { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .modal-header { text-align: center; margin-bottom: 28px; }
+        .modal-title { font-size: 22px; font-weight: 800; color: var(--gray-800); margin-bottom: 8px; }
+        .modal-subtitle { font-size: 14px; color: var(--gray-500); }
+        .cluster-badge {
+            display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--primary-bg), #d0f0f0);
+            color: var(--primary-dark); padding: 10px 20px; border-radius: 50px; font-size: 14px; font-weight: 600; margin-bottom: 24px;
+            border: 1.5px solid rgba(12, 167, 170, 0.25);
+        }
+
+        .form-group { margin-bottom: 20px; text-align: right; position: relative; }
+        .form-label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--gray-600); font-size: 14px; }
+        .label-ar { display: block; font-size: 12px; font-weight: 400; color: var(--gray-400); margin-top: 2px; direction: rtl; }
+        
+        .form-input, .form-select {
+            width: 100%; padding: 12px 14px; border: 1.5px solid var(--gray-200);
+            border-radius: var(--border-radius); font-family: inherit; font-size: 15px; background: #fff; transition: var(--transition);
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(12, 167, 170, 0.1); }
+
+        .autocomplete-wrapper {
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 46px;
+            background: #fff; border: 1.5px solid var(--gray-200); border-radius: var(--border-radius);
+            padding: 4px 8px; cursor: text; transition: var(--transition);
+        }
+        .autocomplete-wrapper:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(12, 167, 170, 0.1); }
+        .autocomplete-wrapper .form-input { border: none; box-shadow: none; padding: 6px 4px; flex: 1; min-width: 100px; background: transparent; }
+        .autocomplete-wrapper .form-input:focus { box-shadow: none; outline: none; }
+        
+        .institution-tag {
+            display: inline-flex; align-items: center; gap: 6px; background: var(--primary-bg); color: var(--primary-dark);
+            padding: 5px 8px 5px 12px; border-radius: 50px; font-size: 13px; font-weight: 500; white-space: nowrap; max-width: 100%;
+        }
+        .tag-remove {
+            display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+            background: var(--primary); border: none; color: #fff; font-size: 14px; line-height: 1;
+            cursor: pointer; border-radius: 50%; flex-shrink: 0; transition: opacity 0.2s; opacity: 0.75;
+        }
+        .tag-remove:hover { opacity: 1; }
+        
+        .autocomplete-dropdown {
+            display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+            max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid var(--gray-200);
+            border-radius: var(--border-radius); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); margin-top: 4px;
+        }
+        .suggestion-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--gray-100); font-size: 14px; transition: background 0.15s; }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover { background: var(--gray-50); }
+        .suggestion-item .sug-header { display: flex; align-items: center; gap: 8px; }
+        .suggestion-item .sug-code { font-weight: 600; direction: ltr; display: inline-block; font-size: 12px; color: var(--gray-500); background: var(--gray-100); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+        .suggestion-item .sug-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .hours-indicator { background: var(--primary-bg); border: 1.5px solid rgba(12, 167, 170, 0.2); padding: 20px; border-radius: var(--border-radius-lg); margin: 24px 0; text-align: center; }
+        .hours-count { font-size: 36px; font-weight: 800; color: var(--primary); line-height: 1; }
+        .hours-label { font-size: 14px; color: var(--primary-dark); margin-top: 6px; font-weight: 600; }
+        .hours-complete .hours-count { color: #16a34a; }
+        .hours-complete .hours-label { color: #15803d; }
+
+        .fixed-module { background: #fffbeb; padding: 16px; border-radius: var(--border-radius); border-right: 4px solid #f59e0b; margin-bottom: 24px; }
+        .fixed-module-title { font-weight: 700; color: #92400e; margin-bottom: 6px; font-size: 14px; }
+
+        .modal-buttons { display: flex; gap: 12px; margin-top: 28px; }
+        .btn-submit { flex: 1; background: var(--primary); color: #fff; border: none; padding: 14px 24px; border-radius: var(--border-radius); font-size: 16px; font-weight: 700; cursor: pointer; transition: var(--transition); font-family: inherit; }
+        .btn-submit:hover { background: var(--primary-dark); }
+        .btn-submit:disabled { background: var(--gray-200); color: var(--gray-400); cursor: not-allowed; }
+        .btn-cancel { background: transparent; color: var(--gray-500); border: 1.5px solid var(--gray-200); padding: 14px 24px; border-radius: var(--border-radius); font-size: 15px; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: inherit; }
+        .btn-cancel:hover { background: var(--gray-50); color: var(--gray-800); }
+
+        .success-message { display: none; text-align: center; padding: 24px 16px; }
+        .success-icon { width: 72px; height: 72px; background: linear-gradient(135deg, #dcfce7, #22c55e); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 36px; box-shadow: 0 8px 24px -6px rgba(34, 197, 94, 0.4); }
+        .success-message h2 { font-size: 22px; font-weight: 700; color: var(--gray-800); margin-bottom: 8px; }
+        .success-message p { color: var(--gray-500); font-size: 15px; margin-bottom: 4px; }
+
+        @media (max-width: 768px) {
+            .header-inner { flex-wrap: wrap; } .page-main-title { font-size: 20px; }
+            .clusters-grid { grid-template-columns: 1fr; } .filters-bar { flex-direction: column; }
+            .modal-card { padding: 24px 20px; margin: 20px auto; }
+        }
+    </style>
+</head>
+<body>
+    <header class="custom-page-header">
+        <div class="header-inner">
+            <h1 class="page-main-title">🧩 برنامج العناقيد - التسجيل المسبق</h1>
+            <a href="./index.html" class="btn-back">→ العودة للرئيسية</a>
+        </div>
+    </header>
+
+    <main class="custom-page-content">
+        <div id="introBox" class="intro-box"></div>
+        <div class="filters-bar">
+            <input type="text" id="searchInput" class="filter-input" placeholder="🔍 بحث حر عن عنوان العنقود...">
+            <select id="domainFilter" class="filter-input" style="max-width:300px;">
+                <option value="">-- جميع مجالات التخصص --</option>
+            </select>
+        </div>
+        <div id="clustersContainer" class="clusters-grid"></div>
+    </main>
+
+    <footer class="custom-page-footer">
+        بوصلة نت © <span id="footerYear"></span> | مركز تطوير طواقم التربية والتعليم - شرقي القدس
+    </footer>
+
+    <div id="regModal" class="modal-overlay">
+        <div class="modal-card">
+            <div id="regFormContainer">
+                <div class="modal-header">
+                    <div class="cluster-badge">
+                        <span>📚</span>
+                        <span id="modalClusterName">اسم العنقود</span>
+                    </div>
+                    <h2 class="modal-title">التسجيل المسبق</h2>
+                    <p class="modal-subtitle">يرجى تعبئة جميع الحقول المطلوبة بدقة</p>
+                </div>
+
+                <form id="clusterRegForm" onsubmit="event.preventDefault(); submitReg();">
+                    <div class="form-group">
+                        <label class="form-label">الاسم الكامل <span class="label-ar">שם מלא</span></label>
+                        <input type="text" id="reg_fullName" class="form-input" placeholder="أدخل الاسم الكامل" required autocomplete="name">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">رقم الجوال <span class="label-ar">מספר נייד</span></label>
+                        <input type="tel" id="reg_phone" class="form-input" placeholder="05X-XXXXXXX" required autocomplete="tel" dir="ltr" style="text-align: right;">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">البريد الإلكتروني <span class="label-ar">כתובת דוא"ל</span></label>
+                        <input type="email" id="reg_email" class="form-input" placeholder="example@mail.com" required autocomplete="email" dir="ltr" style="text-align: right;">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">رمز المؤسسة / اسم المدرسة <span class="label-ar">סמל מוסד / שם בית ספר</span></label>
+                        <div class="autocomplete-wrapper" id="schoolWrapper">
+                            <div id="schoolTags"></div>
+                            <input type="text" id="schoolSearch" class="form-input" placeholder="🔍 ابحث برمز أو اسم المدرسة..." autocomplete="off">
+                        </div>
+                        <input type="hidden" id="reg_schoolCode">
+                        <input type="hidden" id="reg_schoolName">
+                        <div id="schoolSuggestions" class="autocomplete-dropdown"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">المنصب / الدور <span class="label-ar">תפקיד</span></label>
+                        <select id="reg_role" class="form-select" required>
+                            <option value="">-- اختر المنصب / בחר תפקיד --</option>
+                        </select>
+                    </div>
+
+                    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--gray-200);">
+
+                    <div class="fixed-module">
+                        <div class="fixed-module-title">📌 العنقود الثابت (10 ساعات أكاديمية)</div>
+                        <div id="fixedThemeDisplay" style="color: var(--gray-600); font-size: 14px;"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">📚 الخيار الأول من مجال التخصص (10 ساعات) * <span class="label-ar">אפשרות ראשונה</span></label>
+                        <select id="reg_choice1" class="form-select" onchange="updateHours()" required>
+                            <option value="">-- اختر العنقود --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">📚 الخيار الثاني من مجال التخصص (10 ساعات) * <span class="label-ar">אפשרות שנייה</span></label>
+                        <select id="reg_choice2" class="form-select" onchange="updateHours()" required>
+                            <option value="">-- اختر العنقود --</option>
+                        </select>
+                    </div>
+
+                    <div class="hours-indicator" id="hoursIndicatorBox">
+                        <div class="hours-count" id="hoursCount">10</div>
+                        <div class="hours-label">ساعات أكاديمية من أصل 30</div>
+                    </div>
+
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-submit" id="submitBtn" disabled>إرسال التسجيل | שליחה</button>
+                        <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء | ביטול</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="successMessage" class="success-message">
+                <div class="success-icon">✅</div>
+                <h2>تم إرسال التسجيل بنجاح!</h2>
+                <p>הרישום נשלח בהצלחה!</p>
+                <p style="margin-top:12px; font-size:14px; color: var(--gray-500);">سنعود إليك في أقرب وقت ممكن للتأكيد النهائي.</p>
+                <button class="btn-submit" style="margin-top: 24px; width: auto; padding: 12px 32px;" onclick="closeModal()">إغلاق | סגירה</button>
+            </div>
+        </div>
+    </div>
+
+    <script>document.getElementById('footerYear').textContent = new Date().getFullYear();</script>
+    <script src="./js/data.js?v=30.8.0"></script>
+    
+    <script>
+        let allClusters = [];
+        let solutionsData = [];
+        let schoolsData = [];
+        let rolesData = [];
+        let clustersIntroText = '';
+        let currentClusterId = '';
+        let selectedSchool = null;
+
+        async function init() {
+            await DataStore.init(false);
+            allClusters = DataStore.getAll('clusters') || [];
+            solutionsData = DataStore.getAll('solutions') || [];
+            schoolsData = DataStore.getAll('lookup_schools') || [];
+            rolesData = DataStore.getAll('lookup_role_holders') || [];
+            
+            const settings = (DataStore.getAll('clusters_settings') || [])[0] || {};
+            clustersIntroText = settings.introText || '';
+            
+            renderIntro();
+            populateDomainFilter();
+            populateRolesDropdown();
+            renderClusters();
+            
+            document.getElementById('searchInput').addEventListener('input', renderClusters);
+            document.getElementById('domainFilter').addEventListener('change', renderClusters);
+            setupSchoolAutocomplete();
+        }
+
+        function renderIntro() {
+            const box = document.getElementById('introBox');
+            if (clustersIntroText && clustersIntroText.trim() !== '') {
+                box.innerHTML = clustersIntroText;
+            } else {
+                box.innerHTML = `<h2>مرحباً بكم في برنامج العناقيد</h2><p>تتيح لكم الأشكال التعلمية بناء مسار تطوير مهني مخصص يتكون من 30 ساعة أكاديمية:</p><ul style="margin-top:12px; padding-right:20px;"><li><strong>10 ساعات ثابتة</strong> في مجال الذكاء الاصطناعي ودمج اللغة العبرية في التدريس</li><li><strong>20 ساعة اختيارية</strong> من مجال التخصص (اختر مقررين من القائمة)</li></ul>`;
+            }
+        }
+
+        function populateDomainFilter() {
+            const domains = [...new Set(allClusters.map(c => c.fieldKnowledgeId).filter(d => d))];
+            const select = document.getElementById('domainFilter');
+            domains.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d; option.textContent = d; select.appendChild(option);
+            });
+        }
+
+        function populateRolesDropdown() {
+            const roleSelect = document.getElementById('reg_role');
+            roleSelect.innerHTML = '<option value="">-- اختر المنصب / בחר תפקיד --</option>';
+            rolesData.filter(r => r.isActive).forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.value;
+                opt.textContent = r.labelAr;
+                roleSelect.appendChild(opt);
+            });
+        }
+
+        function renderClusters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const domainFilter = document.getElementById('domainFilter').value;
+            let filtered = allClusters.filter(c => {
+                return (!searchTerm || c.title.toLowerCase().includes(searchTerm)) && (!domainFilter || c.fieldKnowledgeId === domainFilter);
+            });
+            const container = document.getElementById('clustersContainer');
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--gray-500); grid-column:1/-1;">لا توجد أشكال مطابقة للبحث</p>';
+                return;
+            }
+            container.innerHTML = filtered.map(cluster => {
+                const isActive = String(cluster.isActive).toLowerCase() === 'true';
+                return `
+                    <div class="cluster-card">
+                        <div class="cluster-title">${cluster.title}</div>
+                        <div class="cluster-domain">${cluster.fieldKnowledgeId}</div>
+                        <div class="cluster-info">
+                            <div style="margin-bottom:8px;"><strong>📌 العنقود الثابت:</strong> ${cluster.fixedTheme}</div>
+                            <div><strong>📚 خيارات الاختيار:</strong> ${cluster.choiceModules ? cluster.choiceModules.length : 0} مقررات متاحة</div>
+                        </div>
+                        <div class="cluster-status open">${isActive ? '🟢 مفتوح للتسجيل' : '🔴 مغلق حالياً'}</div>
+                        <button class="btn-register" onclick="openReg('${cluster.id}')">📝 سجل الآن</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setupSchoolAutocomplete() {
+            const searchInput = document.getElementById('schoolSearch');
+            const suggestionsBox = document.getElementById('schoolSuggestions');
+            const tagsContainer = document.getElementById('schoolTags');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                if (query.length < 2 || selectedSchool) {
+                    suggestionsBox.style.display = 'none';
+                    return;
+                }
+
+                const matches = schoolsData.filter(s => 
+                    (s.code && String(s.code).includes(query)) || 
+                    (s.name && s.name.toLowerCase().includes(query))
+                ).slice(0, 10);
+
+                if (matches.length === 0) {
+                    suggestionsBox.innerHTML = '<div class="suggestion-item" style="color:var(--gray-400); cursor:default;">لا توجد نتائج</div>';
+                } else {
+                    suggestionsBox.innerHTML = matches.map(s => `
+                        <div class="suggestion-item" data-code="${s.code}" data-name="${s.name}">
+                            <div class="sug-header">
+                                <span class="sug-code">${s.code}</span>
+                                <span class="sug-name">${s.name}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                suggestionsBox.style.display = 'block';
+            });
+
+            suggestionsBox.addEventListener('click', function(e) {
+                const item = e.target.closest('.suggestion-item');
+                if (!item || item.style.cursor === 'default') return;
+
+                selectedSchool = { code: item.dataset.code, name: item.dataset.name };
+                document.getElementById('reg_schoolCode').value = selectedSchool.code;
+                document.getElementById('reg_schoolName').value = selectedSchool.name;
+
+                tagsContainer.innerHTML = `
+                    <div class="institution-tag">
+                        <span class="tag-text">${selectedSchool.code} - ${selectedSchool.name}</span>
+                        <button type="button" class="tag-remove" onclick="clearSchoolSelection(event)">×</button>
+                    </div>
+                `;
+                searchInput.value = '';
+                suggestionsBox.style.display = 'none';
+                validateForm();
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!document.getElementById('schoolWrapper').contains(e.target)) {
+                    suggestionsBox.style.display = 'none';
+                }
+            });
+        }
+
+        window.clearSchoolSelection = function(e) {
+            if(e) e.stopPropagation();
+            selectedSchool = null;
+            document.getElementById('reg_schoolCode').value = '';
+            document.getElementById('reg_schoolName').value = '';
+            document.getElementById('schoolTags').innerHTML = '';
+            document.getElementById('schoolSearch').value = '';
+            document.getElementById('schoolSearch').focus();
+            validateForm();
+        };
+
+		function openReg(id) {
+			const cluster = allClusters.find(c => c.id === id);
+			if (!cluster) return;
+			currentClusterId = id;
+			
+			document.getElementById('regFormContainer').style.display = 'block';
+			document.getElementById('successMessage').style.display = 'none';
+			document.getElementById('clusterRegForm').reset();
+			clearSchoolSelection(null);
+			
+			document.getElementById('modalClusterName').textContent = cluster.title;
+			document.getElementById('fixedThemeDisplay').textContent = cluster.fixedTheme;
+			
+			const choiceModules = cluster.choiceModules || [];
+			const choice1Select = document.getElementById('reg_choice1');
+			const choice2Select = document.getElementById('reg_choice2');
+			
+			choice1Select.innerHTML = '<option value="">-- اختر مقرر --</option>';
+			choice2Select.innerHTML = '<option value="">-- اختر مقرر --</option>';
+			
+			// 🔑 תיקון: הדפסת דיבאג כדי לראות מה יש ב-solutionsData
+			console.log('🔍 [Debug] solutionsData:', solutionsData);
+			console.log('🔍 [Debug] choiceModules:', choiceModules);
+			
+			choiceModules.forEach(mod => {
+				// 🔑 תיקון: חיפוש גמיש יותר - בודק גם id וגם מזהים אחרים
+				const sol = solutionsData.find(s => 
+					s.id === mod.solutionId || 
+					s.solutionId === mod.solutionId ||
+					String(s.id) === String(mod.solutionId)
+				);
+				
+				console.log('🔍 [Debug] מחפש פתרון:', mod.solutionId, '| נמצא:', sol);
+				
+				// 🔑 תיקון: שימוש בשדה הנכון - solutionName או titleHe או title
+				const solName = sol ? (sol.solutionName || sol.titleHe || sol.title || 'מקצוע ללא שם') : 'مقرر غير موجود';
+				const optionText = solName + ' - ' + mod.theme;
+				
+				const opt1 = document.createElement('option');
+				opt1.value = mod.solutionId; 
+				opt1.textContent = optionText; 
+				opt1.setAttribute('data-theme', mod.theme);
+				choice1Select.appendChild(opt1);
+				
+				const opt2 = opt1.cloneNode(true);
+				choice2Select.appendChild(opt2);
+			});
+			
+			document.getElementById('regModal').classList.add('active');
+			updateHours();
+		}
+
+        function closeModal() {
+            document.getElementById('regModal').classList.remove('active');
+        }
+
+        function updateHours() {
+            const choice1 = document.getElementById('reg_choice1').value;
+            const choice2 = document.getElementById('reg_choice2').value;
+            const select1 = document.getElementById('reg_choice1');
+            const select2 = document.getElementById('reg_choice2');
+            
+            Array.from(select2.options).forEach(opt => { opt.disabled = (opt.value === choice1 && opt.value !== ''); });
+            Array.from(select1.options).forEach(opt => { opt.disabled = (opt.value === choice2 && opt.value !== ''); });
+            
+            let totalHours = 10;
+            if (choice1) totalHours += 10;
+            if (choice2) totalHours += 10;
+            
+            const hoursCount = document.getElementById('hoursCount');
+            const indicatorBox = document.getElementById('hoursIndicatorBox');
+            hoursCount.textContent = totalHours;
+            
+            if (totalHours === 30) { indicatorBox.classList.add('hours-complete'); } 
+            else { indicatorBox.classList.remove('hours-complete'); }
+            
+            validateForm();
+        }
+
+        function validateForm() {
+            const fullName = document.getElementById('reg_fullName').value.trim();
+            const phone = document.getElementById('reg_phone').value.trim();
+            const email = document.getElementById('reg_email').value.trim();
+            const schoolCode = document.getElementById('reg_schoolCode').value;
+            const role = document.getElementById('reg_role').value;
+            const choice1 = document.getElementById('reg_choice1').value;
+            const choice2 = document.getElementById('reg_choice2').value;
+            
+            const isHoursValid = (document.getElementById('hoursCount').textContent === '30');
+            const isFormValid = fullName && phone && email && schoolCode && role && choice1 && choice2 && isHoursValid;
+            
+            document.getElementById('submitBtn').disabled = !isFormValid;
+        }
+
+        ['reg_fullName', 'reg_phone', 'reg_email', 'reg_role', 'reg_choice1', 'reg_choice2'].forEach(id => {
+            document.getElementById(id).addEventListener('input', validateForm);
+            document.getElementById(id).addEventListener('change', validateForm);
+        });
+
+		async function submitReg() {
+			const fullName = document.getElementById('reg_fullName').value.trim();
+			const phone = document.getElementById('reg_phone').value.trim();
+			const email = document.getElementById('reg_email').value.trim();
+			const schoolCode = document.getElementById('reg_schoolCode').value;
+			const schoolName = document.getElementById('reg_schoolName').value;
+			const role = document.getElementById('reg_role').value;
+			const choice1 = document.getElementById('reg_choice1').value;
+			const choice2 = document.getElementById('reg_choice2').value;
+			
+			if (!/^05[0-9]-[0-9]{7}$/.test(phone)) {
+				alert('صيغة رقم الهاتف غير صحيحة. التنسيق: 05X-XXXXXXX');
+				return;
+			}
+			
+			const choice1Select = document.getElementById('reg_choice1');
+			const choice2Select = document.getElementById('reg_choice2');
+			const choice1Theme = choice1Select.options[choice1Select.selectedIndex].getAttribute('data-theme') || '';
+			const choice2Theme = choice2Select.options[choice2Select.selectedIndex].getAttribute('data-theme') || '';
+			
+			const registrationData = {
+				id: 'cluster_reg_' + Date.now(),
+				clusterId: currentClusterId,
+				teacherName: fullName,
+				phone: phone,
+				email: email,
+				schoolSymbol: schoolCode,
+				schoolName: schoolName,
+				role: role,
+				chosenModules: [
+					{ solutionId: choice1, theme: choice1Theme },
+					{ solutionId: choice2, theme: choice2Theme }
+				],
+				totalHours: 30,
+				status: 'pending',
+				createdAt: new Date().toISOString()
+			};
+			
+			const submitBtn = document.getElementById('submitBtn');
+			const originalText = submitBtn.textContent;
+			submitBtn.textContent = '⏳ جاري الإرسال...';
+			submitBtn.disabled = true;
+			
+			try {
+				const response = await fetch('./api/save_cluster_registration.php', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(registrationData)
+				});
+				
+				const result = await response.json();
+				
+				if (result.success) {
+					document.getElementById('regFormContainer').style.display = 'none';
+					document.getElementById('successMessage').style.display = 'block';
+				} else {
+					alert('❌ ' + (result.message || 'حدث خطأ في التسجيل'));
+				}
+			} catch (error) {
+				console.error('Error:', error);
+				alert('❌ حدث خطأ في الشبكة. حاول مرة أخرى');
+			} finally {
+				submitBtn.textContent = originalText;
+				submitBtn.disabled = false;
+			}
+		}
+
+        init();
+    </script>
+</body>
+</html>

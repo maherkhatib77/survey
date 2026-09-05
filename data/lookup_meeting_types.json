@@ -1,42 +1,38 @@
 [
-  {
-    "value": "פנים אל פנים",
-    "label": "פנים אל פנים",
-    "labelAr": "وجاهي",
-    "order": 1,
-    "isActive": true,
-    "id": "ms4yramkyjaomisuw",
-    "createdAt": "2026-07-28T18:02:40.652Z",
-    "updatedAt": "2026-07-28T18:02:40.652Z"
-  },
-  {
-    "value": "סינכרוני",
-    "label": "סינכרוני",
-    "labelAr": "متزامن",
-    "order": 2,
-    "isActive": true,
-    "id": "ms4yramlsovnfgqlm",
-    "createdAt": "2026-07-28T18:02:40.653Z",
-    "updatedAt": "2026-07-28T18:02:40.653Z"
-  },
-  {
-    "value": "א-סינכרוני",
-    "label": "א-סינכרוני",
-    "labelAr": "غير متزامن",
-    "order": 3,
-    "isActive": true,
-    "id": "ms4yramm58o4o6utx",
-    "createdAt": "2026-07-28T18:02:40.654Z",
-    "updatedAt": "2026-07-28T18:02:40.654Z"
-  },
-  {
-    "value": "היברידי",
-    "label": "היברידי",
-    "labelAr": "مدمج",
-    "order": 4,
-    "isActive": true,
-    "id": "ms4yramn1rlx1knth",
-    "createdAt": "2026-07-28T18:02:40.655Z",
-    "updatedAt": "2026-07-28T18:02:40.655Z"
-  }
+    {
+        "value": "פנים אל פנים",
+        "label": "פנים אל פנים",
+        "labelAr": "وجاهي",
+        "isActive": true,
+        "id": "mt7pvybaej28knfvm",
+        "createdAt": "2026-08-24T20:57:22.294Z",
+        "updatedAt": "2026-08-29T19:12:36.222Z"
+    },
+    {
+        "value": "סינכרוני",
+        "label": "סינכרוני",
+        "labelAr": "متزامن",
+        "isActive": true,
+        "id": "mt88mhlcbwg1c21oo",
+        "createdAt": "2026-08-25T05:41:53.424Z",
+        "updatedAt": "2026-08-25T05:41:53.433Z"
+    },
+    {
+        "value": "א-סינכרוני",
+        "label": "א-סינכרוני",
+        "labelAr": "غير متزامن",
+        "isActive": true,
+        "id": "mt88mhldjxp46vw2v",
+        "createdAt": "2026-08-25T05:41:53.425Z",
+        "updatedAt": "2026-08-25T05:41:53.433Z"
+    },
+    {
+        "value": "היברידי",
+        "label": "היברידי",
+        "labelAr": "مدمج",
+        "isActive": true,
+        "id": "mt88mhldqwe8shcxn",
+        "createdAt": "2026-08-25T05:41:53.425Z",
+        "updatedAt": "2026-08-25T05:41:53.433Z"
+    }
 ]

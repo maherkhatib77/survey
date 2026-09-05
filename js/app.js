@@ -11,6 +11,130 @@ const App = (() => {
     let editingItem = null;
     let importWizardData = { type: null, headers: [], rows: [], mappings: {} };
     let _importTargetKey = null;
+	
+// 🔑 מבנה מרכזי להגדרת כל סוגי הייבוא - מונע טעויות סנכרון
+const IMPORT_CONFIGS = {
+    solutions: {
+        fields: [
+            { key: 'responsibilityType', label: 'סוג אחריות', keywords: ['אחריות', 'responsibility', 'סוג', 'פסגה', 'בית ספר'] },
+            { key: 'schoolName', label: 'שם בית הספר', keywords: ['בית ספר', 'school', 'מוסד', 'שם'] },
+            { key: 'solutionName', label: 'שם פתרון למידה', keywords: ['שם', 'פתרון', 'solution', 'name', 'כותרת'] },
+            { key: 'solutionNumber', label: 'מספר פתרון למידה', keywords: ['מספר', 'number', 'קוד', 'מזהה'] },
+            { key: 'description', label: 'תיאור פתרון למידה', keywords: ['תיאור', 'description', 'desc'] },
+            { key: 'guideId', label: 'מדריך אחראי', keywords: ['מדריך', 'guide', 'אחראי', 'mentor'] },
+            { key: 'domain', label: 'תחום', keywords: ['תחום', 'domain', 'field'] },
+            { key: 'topic', label: 'נושא', keywords: ['נושא', 'topic', 'subject'] },
+            { key: 'educationStage', label: 'שלב חינוך', keywords: ['שלב', 'חינוך', 'stage'] },
+            { key: 'educationType', label: 'סוג חינוך', keywords: ['סוג', 'חינוך', 'type'] },
+            { key: 'startDate', label: 'תאריך תחילת ההשתלמות', keywords: ['תחילה', 'start', 'התחלה', 'תאריך'] },
+            { key: 'endDate', label: 'תאריך סיום ההשתלמות', keywords: ['סיום', 'end', 'תאריך'] },
+            { key: 'weekDay', label: 'יום בשבוע', keywords: ['יום', 'שבוע', 'day', 'week'] },
+            { key: 'meetingType', label: 'סוג מפגש', keywords: ['מפגש', 'meeting', 'סוג'] },
+            { key: 'academicHours', label: 'שעות אקדמיות', keywords: ['שעות', 'hours', 'אקדמי', 'גמול'] },
+            { key: 'instructors', label: 'מנחים', keywords: ['מנחה', 'instructor', 'מרצה'] },
+            { key: 'whatsappLink', label: 'קישור וואטסאפ', keywords: ['וואטסאפ', 'whatsapp', 'קישור'] },
+            { key: 'earlyRegistrationLink', label: 'קישור רישום מוקדם', keywords: ['רישום', 'registration', 'מוקדם', 'קישור'] },
+            { key: 'showInCatalog', label: 'הצג בקטלוג הציבורי', keywords: ['הצג', 'show', 'קטלוג', 'ציבורי', 'public'] },
+            { key: 'generalNote', label: 'הערה כללית', keywords: ['הערה', 'note', 'כללי'] }
+        ]
+    },
+
+    mentors: {
+        fields: [
+            { key: 'idNumber', label: 'ת.ז. / מספר זהות', keywords: ['תז', 'זהות', 'id', 'מספר', 'עמית'] },
+            { key: 'fullNameHe', label: 'שם מלא (עברית)', keywords: ['שם', 'עברי', 'hebrew', 'name', 'פרטי'] },
+            { key: 'fullNameAr', label: 'שם מלא (ערבית)', keywords: ['ערבי', 'arabic', 'اسم', 'عربي'] },
+            { key: 'phone', label: 'טלפון', keywords: ['טלפון', 'נייד', 'phone', 'mobile', 'סלולרי'] },
+            { key: 'email', label: 'דוא"ל', keywords: ['דואל', 'email', 'mail', 'אימייל'] },
+            { key: 'isCertifiedLecturer', label: 'מרצה מוסב', keywords: ['מוסב', 'certified', 'הסבה'] },
+            { key: 'expertInField', label: 'מומחה בתחומו', keywords: ['מומחה', 'expert', 'תחום'] },
+            { key: 'lecturerStatus', label: 'סטטוס מרצה', keywords: ['סטטוס', 'status', 'מצב'] }
+        ]
+    },
+    guides_repo: {
+        fields: [
+            { key: 'idNumber', label: 'ת.ז. / מספר זהות', keywords: ['תז', 'זהות', 'id', 'מספר'] },
+            { key: 'fullName', label: 'שם מלא (עברית)', keywords: ['שם', 'עברי', 'hebrew', 'name'] },
+            { key: 'fullNameAr', label: 'שם מלא (ערבית)', keywords: ['ערבי', 'arabic', 'اسم'] },
+            { key: 'position', label: 'תפקיד', keywords: ['תפקיד', 'position', 'role', 'job'] },
+            { key: 'phone', label: 'טלפון', keywords: ['טלפון', 'נייד', 'phone', 'mobile'] },
+            { key: 'email', label: 'דוא"ל', keywords: ['דואל', 'email', 'mail', 'אימייל'] },
+            { key: 'specializations', label: 'תחומי התמחות', keywords: ['התמחות', 'specialization', 'תחום'] }
+        ]
+    },
+    faq: {
+        fields: [
+            { key: 'titleAr', label: 'כותרת (ערבית)', keywords: ['כותרת', 'ערבי', 'arabic', 'عنوان', 'سؤال'] },
+            { key: 'titleHe', label: 'כותרת (עברית)', keywords: ['כותרת', 'עברי', 'hebrew', 'title', 'שאלה'] },
+            { key: 'answerAr', label: 'תשובה (ערבית)', keywords: ['תשובה', 'ערבי', 'arabic', 'إجابة', 'جواب'] },
+            { key: 'answerHe', label: 'תשובה (עברית)', keywords: ['תשובה', 'עברי', 'hebrew', 'answer'] },
+            { key: 'order', label: 'סדר תצוגה', keywords: ['סדר', 'order', 'מספר', 'sequence'] }
+        ]
+    },
+    budgets: {
+        fields: [
+            { key: 'budgetCode', label: 'קוד תקציב', keywords: ['קוד', 'תקציב', 'budget', 'code'] },
+            { key: 'hebrewYear', label: 'שנה עברית', keywords: ['שנה', 'year', 'עברית'] },
+            { key: 'amount', label: 'סכום', keywords: ['סכום', 'amount', 'money'] },
+            { key: 'description', label: 'תיאור', keywords: ['תיאור', 'description', 'desc'] }
+        ]
+    },
+    users: {
+        fields: [
+            { key: 'username', label: 'שם משתמש', keywords: ['משתמש', 'username', 'user', 'login'] },
+            { key: 'fullName', label: 'שם מלא', keywords: ['שם', 'name', 'full'] },
+            { key: 'email', label: 'דוא"ל', keywords: ['דואל', 'email', 'mail'] },
+            { key: 'role', label: 'תפקיד', keywords: ['תפקיד', 'role', 'position'] }
+        ]
+    },
+    pedagogical_executors: {
+        fields: [
+            { key: 'companyNumber', label: 'מספר חברה', keywords: ['חברה', 'company', 'מספר', 'מזהה'] },
+            { key: 'institutionName', label: 'שם מוסד', keywords: ['מוסד', 'institution', 'שם', 'ארגון'] },
+            { key: 'groupName', label: 'שם קבוצה', keywords: ['קבוצה', 'group', 'שם'] },
+            { key: 'hourlyCost', label: 'עלות שעתית', keywords: ['עלות', 'cost', 'שעה', 'hourly', 'שח', '₪'] },
+            { key: 'notes', label: 'הערות', keywords: ['הערה', 'notes', 'description', 'תיאור'] }
+        ]
+    },
+    schools: {
+        fields: [
+            { key: 'code', label: 'סמל מוסד', keywords: ['סמל', 'code', 'מוסד', 'מזהה'] },
+            { key: 'name', label: 'שם מוסד', keywords: ['שם', 'מוסד', 'בית ספר', 'school', 'name'] },
+            { key: 'legalStatus', label: 'מעמד משפטי', keywords: ['מעמד', 'משפטי', 'legal', 'סטטוס'] },
+            { key: 'educationType', label: 'סוג חינוך', keywords: ['סוג', 'חינוך', 'type', 'רשמי', 'מוכר'] },
+            { key: 'educationStage', label: 'שלב חינוך', keywords: ['שלב', 'חינוך', 'stage', 'יסודי', 'על יסודי'] },
+            { key: 'principalName', label: 'שם מנהל', keywords: ['מנהל', 'principal', 'head', 'מנהלת'] },
+            { key: 'inspectorName', label: 'שם מפקח', keywords: ['מפקח', 'inspector', 'מחוז'] }
+        ]
+    },
+    catalog_entries: {
+        fields: [
+            { key: 'title', label: 'כותרת', keywords: ['כותרת', 'title', 'שם', 'name'] },
+            { key: 'description', label: 'תיאור', keywords: ['תיאור', 'description', 'desc'] },
+            { key: 'category', label: 'קטגוריה', keywords: ['קטגוריה', 'category', 'סוג'] },
+            { key: 'targetAudience', label: 'קהל יעד', keywords: ['קהל', 'audience', 'יעד'] },
+            { key: 'duration', label: 'משך', keywords: ['משך', 'duration', 'זמן'] },
+            { key: 'status', label: 'סטטוס', keywords: ['סטטוס', 'status', 'מצב'] }
+        ]
+    },
+    lookup_domains: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_education_stages: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_education_types: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_week_days: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_meeting_types: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_budget_types: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_allocation_status: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_solution_status: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_performer_types: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_lecturer_status: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_certified_lecturer: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_expert_field: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_field_knowledge: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_role_holders: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_broad_topics: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_designated_programs: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] },
+    lookup_responsibility_types: { fields: [{ key: 'value', label: 'ערך', keywords: ['ערך', 'value', 'קוד'] }, { key: 'label', label: 'תווית (עברית)', keywords: ['תווית', 'label', 'hebrew', 'עברי', 'שם'] }, { key: 'labelAr', label: 'תווית (ערבית)', keywords: ['תווית', 'label', 'arabic', 'ערבי', 'اسم'] }] }
+};
 
     // ============ LZ-String (LZ77 compression for localStorage Base64 images) ============
     // Only compressToUTF16 / decompressFromUTF16 — optimal for localStorage (UTF-16 native encoding)
@@ -30,20 +154,37 @@ const App = (() => {
             return (result && result.startsWith('data:')) ? result : '';
         } catch(e) { return ''; }
     }
-    function _getGuideThumb(g) {
-        if (!g) return '';
-        var key = g.id + '_t';
-        if (_guideImgCache[key]) return _guideImgCache[key];
-        _guideImgCache[key] = _decompressImg(g.avatar_thumb || g.profileImage || '');
-        return _guideImgCache[key];
-    }
-    function _getGuideRetina(g) {
-        if (!g) return '';
-        var key = g.id + '_r';
-        if (_guideImgCache[key]) return _guideImgCache[key];
-        _guideImgCache[key] = _decompressImg(g.avatar_retina || g.profileImage || '');
-        return _guideImgCache[key];
-    }
+
+ function _getGuideThumb(g) {
+     if (!g) return '';
+     var key = g.id + '_t';
+     if (_guideImgCache[key]) return _guideImgCache[key];
+     
+     var src = g.avatar_thumb || g.profileImage || '';
+     // 🔑 תאימות לאחור: אם זה נתיב קובץ רגיל, החזר אותו. אם זה Base64 דחוס, פרק אותו.
+     if (src && (src.startsWith('uploads/') || src.startsWith('http') || src.startsWith('data:image'))) {
+         _guideImgCache[key] = src;
+     } else {
+         _guideImgCache[key] = _decompressImg(src) || src;
+     }
+     return _guideImgCache[key];
+ }
+ 
+ function _getGuideRetina(g) {
+     if (!g) return '';
+     var key = g.id + '_r';
+     if (_guideImgCache[key]) return _guideImgCache[key];
+     
+     var src = g.avatar_retina || g.profileImage || '';
+     // 🔑 תאימות לאחור
+     if (src && (src.startsWith('uploads/') || src.startsWith('http') || src.startsWith('data:image'))) {
+         _guideImgCache[key] = src;
+     } else {
+         _guideImgCache[key] = _decompressImg(src) || src;
+     }
+     return _guideImgCache[key];
+ }
+
 
     // ============ IMPORT FIELD MAPS (system fields per type) ============
     const IMPORT_FIELD_MAPS = {
@@ -1378,19 +1519,40 @@ const App = (() => {
     }
 
     // ============ INITIALIZATION ============
-    function init() {
-        currentUser = Auth.requireAuth();
-        if (!currentUser) return;
-        _initTableFeatures();
-        _loadActivePeriod();
-        // רישום כניסה למערכת
-        logActivity('login', 'כניסה למערכת', 'system', currentUser.id);
-        renderSidebar();
-        renderUserInfo();
-        _renderActivePeriodBadge();
-        showSection('dashboard');
-        setupEventListeners();
-    }
+ function init() {
+     currentUser = Auth.requireAuth();
+     if (!currentUser) return;
+     _initTableFeatures();
+     _loadActivePeriod();
+     
+     // רישום כניסה למערכת
+     logActivity('login', 'כניסה למערכת', 'system', currentUser.id);
+     renderSidebar();
+     renderUserInfo();
+     _renderActivePeriodBadge();
+     
+     // 🔄 שחזור המיקום האחרון לפני הרענון (ברירת מחדל: dashboard)
+     let sectionToLoad = 'dashboard';
+     try {
+         const savedSection = sessionStorage.getItem('matspanet_last_section');
+         if (savedSection) {
+             sectionToLoad = savedSection;
+         }
+         
+         // אם חוזרים ל"טבלאות ערכים", נשחזר גם את הטאב האחרון שהיה פתוח
+         if (sectionToLoad === 'lookup-tables') {
+             const savedTab = sessionStorage.getItem('matspanet_last_lookup_tab');
+             if (savedTab !== null) {
+                 _activeLookupTabIndex = parseInt(savedTab, 10);
+             }
+         }
+     } catch(e) {
+         // התעלמות משגיאות אחסון
+     }
+     
+     showSection(sectionToLoad);
+     setupEventListeners();
+ }
 
     // ============ NAVIGATION ============
     let _newSolFlow = { step: 1, responsibilityType: null, editingId: null };
@@ -1399,16 +1561,20 @@ const App = (() => {
     let _msFilteredItems = []; // Current filtered dropdown items
     let _msPrefix = 'nsf_'; // Element ID prefix for the current instance
 
-    function showSection(section) {
-        currentSection = section;
-        // Navigation guard: if user can't view this section, redirect to dashboard
-        // 'new-solution' is a sub-flow of 'solutions' — check 'solutions' permission
-        const permSection = (section === 'new-solution') ? 'solutions' : section;
-        if (permSection !== 'dashboard' && !_canViewSection(permSection)) {
-            section = 'dashboard';
-            currentSection = 'dashboard';
-            showToast('אין לך הרשאה לגשת לחלק זה של המערכת', 'warning');
-        }
+ function showSection(section) {
+     currentSection = section;
+     
+     // 📌 שמירת המיקום הנוכחי כדי לשחזר אותו לאחר רענון הדף
+     try { sessionStorage.setItem('matspanet_last_section', section); } catch(e) {}
+
+     // Navigation guard: if user can't view this section, redirect to dashboard
+     const permSection = (section === 'new-solution') ? 'solutions' : section;
+     if (permSection !== 'dashboard' && !_canViewSection(permSection)) {
+         section = 'dashboard';
+         currentSection = 'dashboard';
+         showToast('אין לך הרשאה לגשת לחלק זה של המערכת', 'warning');
+     }
+     // ... (השאר את שאר הקוד של הפונקציה כמו שהוא)
         document.querySelectorAll('.section-page').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         const sectionEl = document.getElementById('section-' + section);
@@ -1417,18 +1583,23 @@ const App = (() => {
         if (navEl) navEl.classList.add('active');
 
         const titleMap = {
-            'dashboard': '📊 לוח בקרה', 'solutions': '📚 קטלוג פתרונות למידה',
+            'dashboard': '📊 לוח בקרה',
+			'solutions': '📚 קטלוג פתרונות למידה',
             'instructors': '👨‍🏫 מאגר מרצים',
-            'guides': '🧑‍🏫 ניהול משתמשים', 'guides-repo': '📋 מאגר מדריכים',
-            'budgets': '💰 תקציבים', 'periods': '📅 תקופות',
+            'guides': '🧑‍🏫 ניהול משתמשים',
+			'guides-repo': '📋 מאגר מדריכים',
+            'budgets': '💰 תקציבים',
+			'periods': '📅 תקופות',
             'lookup-tables': '🔄 טבלאות ערכים',
-'settings': '⚙️ הגדרות',
+			'settings': '⚙️ הגדרות',
             'registrations': '👥 נרשמים לפתרונות למידה',
             'permissions': '🔐 הרשאות מתקדמות',
             'activity-log': '📊 מעקב והיסטוריה',
             'recycle-bin': '🗑️ סל מחזור',
             'homepage': '🏠 דף שער',
             'faq': '❓ שאלות נפוצות ותשובות',
+            'workshop-bookings': '🏔️ הזמנת סדנאות בפסגה',
+			'workshop-sim-bookings': '🎭 הזמנת סדנאות סימולציה',
             'custom-pages': '📄 יצירת דף חדש',
             'new-solution': '➕ הוספת פתרון למידה חדש לקטלוג'
         };
@@ -1438,6 +1609,7 @@ const App = (() => {
         switch (section) {
             case 'dashboard': renderDashboard(); break;
             case 'solutions': renderSolutions(); break;
+			case 'clusters': renderClusters(); break;
             case 'instructors': renderMentors(); break;
             case 'guides': renderGuides(); break;
             case 'guides-repo': renderGuidesRepo(); break;
@@ -1450,6 +1622,8 @@ const App = (() => {
             case 'recycle-bin': renderRecycleBin(); break;
             case 'homepage': renderHomepage(); break;
             case 'faq': renderFAQ(); break;
+			case 'workshop-bookings': renderWorkshopBookings(); break;
+			case 'workshop-sim-bookings': renderWorkshopSimBookings(); break;
             case 'custom-pages': renderCustomPages(); break;
             case 'settings': renderSettings(); break;
             case 'new-solution': 
@@ -1498,10 +1672,13 @@ const App = (() => {
             { type: 'title', text: 'ראשי' },
             { type: 'item', section: 'dashboard', icon: '📊', label: 'לוח בקרה' },
             { type: 'item', section: 'solutions', icon: '📚', label: 'קטלוג פתרונות למידה', badge: 'solutionsCount' },
+			{ type: 'item', section: 'clusters', icon: '🧩', label: 'אשכולות למידה' },
             { type: 'item', section: 'instructors', icon: '👨‍🏫', label: 'מאגר מרצים' },
             { type: 'item', section: 'guides-repo', icon: '📋', label: 'מאגר מדריכים' },
             { type: 'item', section: 'homepage', icon: '🏠', label: 'דף שער' },
             { type: 'item', section: 'faq', icon: '❓', label: 'שאלות נפוצות ותשובות' },
+			{ type: 'item', section: 'workshop-bookings', icon: '🏔️', label: 'הזמנת סדנאות בפסגה' },
+			{ type: 'item', section: 'workshop-sim-bookings', icon: '🎭', label: 'הזמנת סדנאות סימולציה' },
             { type: 'item', section: 'custom-pages', icon: '📄', label: 'יצירת דף חדש' },
             { type: 'title', text: 'ניהול' },
             { type: 'item', section: 'guides', icon: '🧑‍🏫', label: 'ניהול משתמשים' },
@@ -1598,19 +1775,18 @@ const App = (() => {
     /**
      * Returns solutions visible to the current user (filtered for guides).
      */
-    function _getVisibleSolutions() {
-        var visibleIds = _getGuideVisibleSolutionIds();
-        let items = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
-        if (visibleIds !== null) {
-            items = items.filter(function(s) { return visibleIds.includes(s.id); });
-        }
-        // Filter by display period – hermetic periodId-based separation
-        var displayP = AppContext.displayPeriod;
-        if (displayP) {
-            items = items.filter(function(s) { return s.periodId === displayP.id; });
-        }
-        return items;
+
+function _getVisibleSolutions() {
+    let items = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+    
+    // סינון הרשאות בלבד (ללא סינון תקופה שגורם לבעיה)
+    var visibleIds = _getGuideVisibleSolutionIds();
+    if (visibleIds !== null && Array.isArray(visibleIds) && visibleIds.length > 0) {
+        items = items.filter(function(s) { return visibleIds.includes(s.id); });
     }
+    
+    return items;
+}
 
     function setupEventListeners() {
         const menuBtn = document.getElementById('mobileMenuBtn');
@@ -1640,16 +1816,63 @@ const App = (() => {
     }
 
     // ============ MODAL ============
-    function showModal(title, bodyHtml, footerHtml = '') {
-        document.getElementById('modalTitle').textContent = title;
-        document.getElementById('modalBody').innerHTML = bodyHtml;
-        document.getElementById('modalFooter').innerHTML = footerHtml;
-        document.getElementById('modalOverlay').classList.add('active');
-    }
-    function closeModal() {
-        document.getElementById('modalOverlay').classList.remove('active');
-        _editInstCleanup();
-    }
+	// ==========================================
+	// פונקציות מודאל אוניברסליות (להבטחת יציבות המערכת)
+	// ==========================================
+	function showModal(title, bodyHtml, footerHtml) {
+		// הסרת מודאל קיים אם יש
+		closeModal();
+
+		const overlay = document.createElement('div');
+		overlay.id = 'global_modal_overlay';
+		overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s ease;';
+		
+		overlay.innerHTML = `
+			<div style="background:#fff;border-radius:12px;padding:24px;min-width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:scale(0.95);transition:transform 0.2s ease;" id="global_modal_content">
+				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #eee;padding-bottom:12px;">
+					<h3 style="margin:0;font-size:18px;color:var(--primary, #0ca7aa);">${title}</h3>
+					<button onclick="App.closeModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#666;line-height:1;">&times;</button>
+				</div>
+				<div style="margin-bottom:20px;">
+					${bodyHtml}
+				</div>
+				<div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #eee;padding-top:16px;">
+					${footerHtml || '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>'}
+				</div>
+			</div>
+		`;
+		
+		document.body.appendChild(overlay);
+		
+		// אנימציית כניסה
+		requestAnimationFrame(() => {
+			overlay.style.opacity = '1';
+			const content = document.getElementById('global_modal_content');
+			if (content) content.style.transform = 'scale(1)';
+		});
+
+		// סגירה בלחיצה על הרקע
+		overlay.addEventListener('click', function(e) {
+			if (e.target === overlay) {
+				closeModal();
+			}
+		});
+	}
+
+	function closeModal() {
+		const overlay = document.getElementById('global_modal_overlay');
+		if (overlay) {
+			overlay.style.opacity = '0';
+			const content = document.getElementById('global_modal_content');
+			if (content) content.style.transform = 'scale(0.95)';
+			
+			setTimeout(() => {
+				overlay.remove();
+			}, 200);
+		}
+	}
+
+
     function confirmDialog(message, onConfirm) {
         showModal('אישור פעולה',
             `<div class="confirm-content"><div class="confirm-icon">❓</div><h3>האם אתה בטוח?</h3><p>${message}</p></div>`,
@@ -1660,18 +1883,43 @@ const App = (() => {
     function _doConfirm() { closeModal(); if (App._confirmCb) App._confirmCb(); App._confirmCb = null; }
 
     // ============ ACTIVITY LOGGING ============
-    function logActivity(actionType, description, entityType, entityId) {
-        DataStore.create(DataStore.KEYS.ACTIVITY_LOG, {
-            userId: currentUser ? currentUser.id : null,
-            userName: currentUser ? currentUser.fullName : 'מערכת',
-            userRole: currentUser ? currentUser.role : '',
-            actionType: actionType,
-            description: description,
-            entityType: entityType || '',
-            entityId: entityId || '',
-            timestamp: new Date().toISOString()
-        });
+	
+function logActivity(actionType, description, entityType, entityId) {
+    var MAX_LOG_ENTRIES = 200;
+    var newEntry = {
+        userId: currentUser ? currentUser.id : null,
+        userName: currentUser ? currentUser.fullName : 'מערכת',
+        userRole: currentUser ? currentUser.role : '',
+        actionType: actionType,
+        description: description,
+        entityType: entityType || '',
+        entityId: entityId || '',
+        timestamp: new Date().toISOString()
+    };
+    var allLogs = [];
+    try {
+        allLogs = DataStore.getAll(DataStore.KEYS.ACTIVITY_LOG) || [];
+    } catch (e) {
+        console.warn('[logActivity] Failed to read activity log, starting fresh:', e);
+        allLogs = [];
     }
+    allLogs.push(newEntry);
+    allLogs.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+    if (allLogs.length > MAX_LOG_ENTRIES) {
+        allLogs = allLogs.slice(0, MAX_LOG_ENTRIES);
+    }
+    try {
+        DataStore.saveAll(DataStore.KEYS.ACTIVITY_LOG, allLogs);
+    } catch (e) {
+        console.warn('[logActivity] Save failed, resetting storage:', e);
+        try {
+            localStorage.removeItem('matspanet_activity_log');
+            DataStore.saveAll(DataStore.KEYS.ACTIVITY_LOG, [newEntry]);
+        } catch (e2) {
+            console.error('[logActivity] Cannot save even after reset:', e2);
+        }
+    }
+}
 
     // ================================================================
     //  DASHBOARD
@@ -1756,173 +2004,287 @@ const App = (() => {
     // ================================================================
     //  SOLUTIONS
     // ================================================================
-    function renderSolutions() {
-        let solutions = _getVisibleSolutions();
-        const canFull = _canFullSection('solutions');
+	function renderSolutions() {
+		let solutions = _getVisibleSolutions();
+		const canFull = _canFullSection('solutions');
 
-        // Build action bar with permission-aware add button
-        const clearBtn = (canFull && solutions.length > 0) ? `<button class="btn btn-danger btn-sm" onclick="App.deleteAllSolutions()" style="margin-right:auto;">🗑️ מחק הכל (${solutions.length})</button>` : '';
-        const addBtn = canFull ? `<button class="btn btn-primary btn-sm" onclick="App.startNewSolutionFlow()">➕ הוספה</button>` : '';
-        const actionBar = `<div class="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--gray-50);border-radius:var(--border-radius);border:1px solid var(--gray-100);">
-    <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📥 ייבוא<input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="App.startImport('solutions',this)"></label>
-    <button class="btn btn-outline btn-sm" onclick="App.exportCSV('solutions')">📤 ייצוא CSV</button>
-    <button class="btn btn-outline btn-sm" onclick="App.exportExcel('solutions')">📊 Excel</button>
-    <button class="btn btn-outline btn-sm" onclick="App.printSection()">🖨️ הדפסה</button>
-    ${addBtn}
-    ${clearBtn}
-</div>`;
+		const clearBtn = (canFull && solutions.length > 0) ? `<button class="btn btn-danger btn-sm" onclick="App.deleteAllSolutions()" style="margin-right:auto;">🗑️ מחק הכל (${solutions.length})</button>` : '';
+		const addBtn = canFull ? `<button class="btn btn-primary btn-sm" onclick="App.startNewSolutionFlow()">➕ הוספה</button>` : '';
+		
+		const actionBar = `<div class="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--gray-50);border-radius:var(--border-radius);border:1px solid var(--gray-100);">
+			<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;"> ייבוא<input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="App.startImport('solutions',this)"></label>
+			<button class="btn btn-outline btn-sm" onclick="App.exportCSV('solutions')"> ייצוא CSV</button>
+			<button class="btn btn-outline btn-sm" onclick="App.exportExcel('solutions')">📊 Excel</button>
+			<button class="btn btn-outline btn-sm" onclick="App.printSection()">🖨️ הדפסה</button>
+			${addBtn}
+			${clearBtn}
+		</div>`;
 
-        document.getElementById('section-solutions').innerHTML = `
-            ${_lookupTableHeader('קטלוג פתרונות למידה', solutions.length, '📚')}
-            <div class="card">
-                <div class="card-body">
-                    ${actionBar}
-                    <div class="toolbar">
-                        <input type="text" class="search-input" id="solSearch" placeholder="🔍 חיפוש לפי שם, תיאור..." oninput="App.filterSolutions()">
-                        <select class="filter-select" id="solRespF" onchange="App.filterSolutions()"><option value="">כל סוגי האחריות</option>${getLookupOptions(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES)}</select>
-                        <select class="filter-select" id="solDomainF" onchange="App.filterSolutions()"><option value="">כל התחומים</option>${getLookupOptions(DataStore.KEYS.LOOKUP_DOMAINS)}</select>
-                        <select class="filter-select" id="solMeetingF" onchange="App.filterSolutions()"><option value="">כל סוגי המפגש</option>${getLookupOptions(DataStore.KEYS.LOOKUP_MEETING_TYPES)}</select>
-                        ${_colVisBtnHtml('solutions')}
-                        <button class="btn btn-outline btn-sm" onclick="App._resetColVis('solutions')" title="איפוס תצוגה לברירת מחדל">🔄 איפוס תצוגה</button>
-                    </div>
-                    <div id="solutionsTableDiv">${_renderSolutionsTable(solutions)}</div>
-                </div>
-            </div>`;
-        _applyTableFeatures('solutions');
-    }
+		const targetDiv = document.getElementById('section-solutions');
+		if (!targetDiv) return;
 
-    function _renderSolutionsTable(items) {
-        const canFull = _canFullSection('solutions');
-        if (!items.length) {
-            return `<div class="empty-state"><div class="empty-icon">📚</div><h3>אין רשומות בקטלוג</h3><p style="color:var(--gray-500);margin:8px 0;">הקטלוג ריק – הוסף פתרון למידה חדש</p>${canFull ? '<button class="btn btn-primary" onclick="App.startNewSolutionFlow()">➕ הוספת פתרון למידה חדש לקטלוג</button>' : ''}</div>`;
-        }
-        // Pre-load data for performance
-        var allInstructors = DataStore.getAll(DataStore.KEYS.SOLUTION_INSTRUCTORS) || [];
-        var mentorsBySolution = {};
-        allInstructors.forEach(function(inst) {
-            if (!mentorsBySolution[inst.solutionId]) mentorsBySolution[inst.solutionId] = [];
-            mentorsBySolution[inst.solutionId].push(inst);
-        });
-        var allGuides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
-        var guideMap = {};
-        allGuides.forEach(function(g) { guideMap[g.id] = g; });
+		targetDiv.innerHTML = `
+			${_lookupTableHeader('קטלוג פתרונות למידה', solutions.length, '📚')}
+			<div class="card">
+				<div class="card-body">
+					${actionBar}
+					<div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+						<input type="text" class="search-input" id="solSearch" placeholder="🔍 חיפוש לפי שם, תיאור..." oninput="App.filterSolutions()" style="flex:1;min-width:200px;">
+						<select class="filter-select" id="solRespF" onchange="App.filterSolutions()" style="min-width:150px;">
+							<option value="">כל סוגי האחריות</option>
+							${(typeof getLookupOptions === 'function') ? getLookupOptions(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES) : ''}
+						</select>
+						<select class="filter-select" id="solDomainF" onchange="App.filterSolutions()" style="min-width:150px;">
+							<option value="">כל התחומים</option>
+							${(typeof getLookupOptions === 'function') ? getLookupOptions(DataStore.KEYS.LOOKUP_DOMAINS) : ''}
+						</select>
+						<select class="filter-select" id="solMeetingF" onchange="App.filterSolutions()" style="min-width:150px;">
+							<option value="">כל סוגי המפגש</option>
+							${(typeof getLookupOptions === 'function') ? getLookupOptions(DataStore.KEYS.LOOKUP_MEETING_TYPES) : ''}
+						</select>
+					</div>
+					<div id="solutionsTableDiv">${_renderSolutionsTable(solutions)}</div>
+				</div>
+			</div>`;
+	}
 
-        var sorted = items.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+		// וודא ש-_renderSolutionsTable קיימת (אם לא – הוסף אותה גם)
 
-        var headerHtml = '<tr>' +
-            '<th>סוג האחריות</th>' +
-            '<th>שם בית הספר</th>' +
-            '<th>שם פתרון למידה</th>' +
-            '<th>מספר פתרון</th>' +
-            '<th>תיאור</th>' +
-            '<th>מדריך אחראי</th>' +
-            '<th>תחום</th>' +
-            '<th>נושא</th>' +
-            '<th>שלב חינוך</th>' +
-            '<th>סוג חינוך</th>' +
-            '<th>ת. תחילת ההשתלמות</th>' +
-            '<th>ת. סיום ההשתלמות</th>' +
-            '<th>יום בשבוע</th>' +
-            '<th>סוג מפגש</th>' +
-            '<th>שעות אקדמיות</th>' +
-            '<th>מתוקצב?</th>' +
-            '<th>סה"כ שעות מתוקצבות</th>' +
-            '<th>סוג תקצוב</th>' +
-            '<th>סוג המנחה</th>' +
-            '<th>שם המנחה</th>' +
-            '<th>שעות תקופה ב׳ (09-12)</th>' +
-            '<th>שעות תקופה א׳ (01-08)</th>' +
-            '<th>סה"כ שעות</th>' +
-            '<th>סה"כ שעות ליווי</th>' +
-            '<th>סוג תקצוב ליווי</th>' +
-            '<th>קישור וואטסאפ</th>' +
-            '<th>קישור רישום מוקדם</th>' +
-            '<th>הצג בקטלוג הציבורי</th>' +
-            '<th>הערה כללית</th>' +
-            (canFull ? '<th>פעולות</th>' : '') +
-            '</tr>';
+	function _renderSolutionsTable(items) {
+		const canFull = (typeof _canFullSection === 'function') ? _canFullSection('solutions') : true;
+		if (!items || !items.length) {
+			return `<div class="empty-state"><div class="empty-icon">📚</div><h3>אין רשומות בקטלוג</h3></div>`;
+		}
+		
+		// טעינת נתוני עזר
+		var allInstructors = (typeof DataStore !== 'undefined') ? (DataStore.getAll(DataStore.KEYS.SOLUTION_INSTRUCTORS) || []) : [];
+		var mentorsBySolution = {};
+		allInstructors.forEach(function(inst) {
+			if (!mentorsBySolution[inst.solutionId]) mentorsBySolution[inst.solutionId] = [];
+			mentorsBySolution[inst.solutionId].push(inst);
+		});
+		var allGuides = (typeof DataStore !== 'undefined') ? (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || []) : [];
+		var guideMap = {};
+		allGuides.forEach(function(g) { guideMap[g.id] = g; });
 
-        var rowsHtml = sorted.map(function(s) {
-            var guide = guideMap[s.guideId];
-            var insts = mentorsBySolution[s.id] || [];
-            // Classify mentors by type
-            var regular = [], internal = [], accompaniments = [];
-            for (var i = 0; i < insts.length; i++) {
-                var m = insts[i];
-                var mt = _getMentorType(m);
-                if (mt === 'כוח פנים') { internal.push(m); }
-                else if (mt === 'שעות ליווי') { accompaniments.push(m); }
-                else { regular.push(m); }
-            }
-            var isBudgeted = s.budgetType === 'כן' || s.budgetType === 'מתוקצב' || (s.budgetedHours || 0) > 0;
-            // Aggregated mentor data for in-app table
-            var allNames = insts.map(function(m) { return escAttr(getMentorName(m)); }).join('; ');
-            var allTypes = insts.map(function(m) { return _getMentorType(m); }).filter(function(t, idx, arr) { return arr.indexOf(t) === idx; }).join(', ');
-            var allP2 = insts.reduce(function(sum, m) { return sum + (m.period1Hours || 0); }, 0);
-            var allP1 = insts.reduce(function(sum, m) { return sum + (m.period2Hours || 0); }, 0);
-            var allTotal = allP2 + allP1;
-            // Col 16: רגיל only sum
-            var regularTotal = regular.reduce(function(sum, m) { return sum + (m.period1Hours || 0) + (m.period2Hours || 0); }, 0);
-            // Col 23: שעות ליווי only sum
-            var accTotal = accompaniments.reduce(function(sum, m) { return sum + (m.period1Hours || 0) + (m.period2Hours || 0); }, 0);
-            // Col 24: derived budget type for accompaniment
-            var _baseBT = getLookupLabel(DataStore.KEYS.LOOKUP_BUDGET_TYPES, s.budgetTypeValue) || '';
-            var accBudgetTypeLabel = '';
-            if (accompaniments.length > 0 && _baseBT) {
-                accBudgetTypeLabel = _baseBT + ' / שעות ליווי';
-            }
+		var sorted = items.slice().sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
 
-            return '<tr>' +
-                '<td>' + (s.responsibilityType ? (getLookupLabel(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, s.responsibilityType) || '—') : '<span style="color:var(--gray-400);font-size:12px;">ישן</span>') + '</td>' +
-                '<td>' + escAttr(s.schoolName || '') + '</td>' +
-                '<td><strong>' + escAttr(s.name || '') + '</strong></td>' +
-                '<td>' + escAttr(s.solutionNumber || '') + '</td>' +
-                '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escAttr(s.description || '') + '">' + escAttr(s.description || '') + '</td>' +
-                '<td>' + (guide ? escAttr(guide.fullName) : '—') + '</td>' +
-                '<td>' + escAttr(getLookupLabel(DataStore.KEYS.LOOKUP_DOMAINS, s.topicType) || '') + '</td>' +
-                '<td>' + escAttr(getTopicLabel(s.topicType, s.topic)) + '</td>' +
-                '<td>' + escAttr(getLookupLabelsJoined(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, s.educationStage)) + '</td>' +
-                '<td>' + escAttr(getLookupLabelsJoined(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, s.educationType)) + '</td>' +
-                '<td style="direction:ltr;text-align:right;font-size:13px;">' + formatDate(s.startDate) + '</td>' +
-                '<td style="direction:ltr;text-align:right;font-size:13px;">' + formatDate(s.endDate) + '</td>' +
-                '<td>' + escAttr(getLookupLabel(DataStore.KEYS.LOOKUP_WEEK_DAYS, s.weekDay) || '') + '</td>' +
-                '<td>' + escAttr(getLookupLabel(DataStore.KEYS.LOOKUP_MEETING_TYPES, s.meetingType) || '') + '</td>' +
-                '<td>' + (s.academicHours || 0) + ' שע\'</td>' +
-                '<td>' + (isBudgeted ? 'כן' : 'לא') + '</td>' +
-                '<td>' + (regularTotal || 0) + '</td>' +
-                '<td>' + escAttr(_baseBT || '—') + '</td>' +
-                '<td>' + (allTypes || '—') + '</td>' +
-                '<td>' + (allNames || '—') + '</td>' +
-                '<td>' + (allP2 || 0) + '</td>' +
-                '<td>' + (allP1 || 0) + '</td>' +
-                '<td>' + (allTotal || 0) + '</td>' +
-                '<td>' + (accTotal || 0) + '</td>' +
-                '<td>' + (accBudgetTypeLabel || '—') + '</td>' +
-                '<td>' + (s.whatsappLink ? '<a href="' + escAttr(s.whatsappLink) + '" target="_blank" rel="noopener" style="color:var(--success, #16a34a);text-decoration:none;">📱</a>' : '—') + '</td>' +
-                '<td>' + ((s.earlyRegistrationLink || s.registrationLink) ? '<a href="' + escAttr(s.earlyRegistrationLink || s.registrationLink) + '" target="_blank" rel="noopener" title="' + escAttr(s.earlyRegistrationLink || s.registrationLink) + '">🔗</a>' : '—') + '</td>' +
-                '<td>' + ((s.showInCatalog || s.showInPublicCatalog) ? '✅' : '❌') + '</td>' +
-                '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escAttr(s.notes || '') + '">' + escAttr(s.notes || '') + '</td>' +
-                (canFull ? '<td><div style="display:flex;gap:4px;"><button class="btn btn-outline btn-sm" onclick="App.viewSolution(\'' + s.id + '\')" title="צפייה">👁️</button><button class="btn btn-outline btn-sm" onclick="App.editSolutionPopulated(\'' + s.id + '\')" title="עריכה">✏️</button><button class="btn btn-outline btn-sm" onclick="App.openCompleteDataModal(\'' + s.id + '\')" title="השלמת נתונים" style="color:var(--primary);">📋</button><button class="btn btn-danger btn-sm" onclick="App.deleteSolution(\'' + s.id + '\')" title="מחיקה">🗑️</button></div></td>' : '') +
-                '</tr>';
-        }).join('');
+		// 🔑 1. כל העמודות האפשריות
+		const allCols = [
+			{ key: 'respType', label: 'סוג האחריות' },
+			{ key: 'schoolName', label: 'שם בית הספר' },
+			{ key: 'solName', label: 'שם פתרון למידה' },
+			{ key: 'solNum', label: 'מספר פתרון' },
+			{ key: 'description', label: 'תיאור' },
+			{ key: 'guide', label: 'מדריך אחראי' },
+			{ key: 'domain', label: 'תחום' },
+			{ key: 'topic', label: 'נושא' },
+			{ key: 'eduStage', label: 'שלב חינוך' },
+			{ key: 'eduType', label: 'סוג חינוך' },
+			{ key: 'startDate', label: 'תאריך תחילה' },
+			{ key: 'endDate', label: 'תאריך סיום' },
+			{ key: 'weekDay', label: 'יום בשבוע' },
+			{ key: 'meetingType', label: 'סוג מפגש' },
+			{ key: 'academicHours', label: 'שעות אקדמיות' },
+			{ key: 'instructors', label: 'מנחים' },
+			{ key: 'whatsapp', label: 'וואטסאפ' },
+			{ key: 'regLink', label: 'רישום מוקדם' },
+			{ key: 'showPublic', label: 'הצגה בציבורי' },
+			{ key: 'notes', label: 'הערה כללית' }
+		];
 
-        return '<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead>' + headerHtml + '</thead><tbody>' + rowsHtml + '</tbody></table></div>';
-    }
+		// 🔑 2. ברירת מחדל חדשה + תמיד מציגים את עמודת הפעולות
+		const defaultVisible = ['solName', 'solNum', 'guide', 'domain', 'eduStage', 'eduType', 'weekDay', 'meetingType'];
+		
+		let visibleKeys = JSON.parse(localStorage.getItem('matspanet_sol_cols') || 'null');
+		if (!visibleKeys || !Array.isArray(visibleKeys)) {
+			visibleKeys = [...defaultVisible];
+		}
+		// תמיד מוסיפים את עמודת הפעולות אם יש הרשאה
+		if (canFull && !visibleKeys.includes('actions')) {
+			visibleKeys.push('actions');
+		}
 
-    function filterSolutions() {
-        const search = document.getElementById('solSearch').value.toLowerCase();
-        const respType = document.getElementById('solRespF') ? document.getElementById('solRespF').value : '';
-        const domain = document.getElementById('solDomainF').value;
-        const meetingType = document.getElementById('solMeetingF').value;
-        let items = _getVisibleSolutions();
-        if (search) items = items.filter(s => (s.name||'').toLowerCase().includes(search) || (s.description||'').toLowerCase().includes(search));
-        if (respType) items = items.filter(s => s.responsibilityType === respType);
-        if (domain) items = items.filter(s => s.topicType === domain);
-        if (meetingType) items = items.filter(s => s.meetingType === meetingType);
-        _resetPagination('solutions');
-        document.getElementById('solutionsTableDiv').innerHTML = _renderSolutionsTable(items);
-        _applyTableFeatures('solutions');
-    }
+		const colsToShow = allCols.filter(c => visibleKeys.includes(c.key));
+
+		// 🔑 3. פונקציות עזר משוריינות
+		function safeVal(v) { if (v === undefined || v === null || String(v).trim() === '') return '—'; return (typeof escAttr === 'function') ? escAttr(String(v).trim()) : String(v).trim(); }
+		function safeNum(v) { if (v === undefined || v === null || String(v).trim() === '') return '—'; return v; }
+		function safeLookup(key, val) { if (typeof getLookupLabel === 'function' && val) { var res = getLookupLabel(key, val); return res ? res : safeVal(val); } return safeVal(val); }
+		function safeLookupsJoined(key, val) { if (typeof getLookupLabelsJoined === 'function' && val) { var res = getLookupLabelsJoined(key, val); return res ? res : safeVal(val); } return safeVal(val); }
+		function safeDate(v) { if (typeof formatDate === 'function' && v) return formatDate(v); return safeVal(v); }
+		function safeMentorName(m) { if (typeof getMentorName === 'function') return getMentorName(m); return (m && (m.fullName || m.name)) ? (m.fullName || m.name) : 'לא ידוע'; }
+
+		// 🔑 4. כותרת הטבלה
+		let headerHtml = '<tr>';
+		colsToShow.forEach(c => { headerHtml += `<th class="col-${c.key}" style="white-space:nowrap;">${c.label}</th>`; });
+		if (canFull) headerHtml += '<th style="white-space:nowrap;">פעולות</th>';
+		headerHtml += '</tr>';
+
+		// 🔑 5. בניית השורות
+		let rowsHtml = sorted.map(function(s) {
+			try {
+				var guide = guideMap[s.guideId] || (allGuides.find(function(g) { return g.fullName === s.guideId || g.fullNameAr === s.guideId; }) || null);
+				var insts = mentorsBySolution[s.id] || [];
+				var allNames = insts.map(function(m) { return safeVal(safeMentorName(m)); }).join('; ') || '—';
+				
+				let rowHtml = '<tr>';
+				colsToShow.forEach(c => {
+					rowHtml += `<td class="col-${c.key}">`;
+					switch(c.key) {
+						case 'respType': rowHtml += safeLookup(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, s.responsibilityType); break;
+						case 'schoolName': rowHtml += safeVal(s.schoolName); break;
+						case 'solName': rowHtml += '<strong>' + safeVal(s.solutionName || s.name) + '</strong>'; break;
+						case 'solNum': rowHtml += safeVal(s.solutionNumber); break;
+						case 'description': rowHtml += `<div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safeVal(s.description)}">${safeVal(s.description)}</div>`; break;
+						case 'guide': rowHtml += (guide ? safeVal(guide.fullName) : safeVal(s.guideId)); break;
+						case 'domain': rowHtml += safeLookup(DataStore.KEYS.LOOKUP_DOMAINS, s.domain); break;
+						case 'topic': rowHtml += safeVal(s.topic); break;
+						case 'eduStage': rowHtml += safeLookupsJoined(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, s.educationStage); break;
+						case 'eduType': rowHtml += safeLookupsJoined(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, s.educationType); break;
+						case 'startDate': rowHtml += `<span style="direction:ltr;display:inline-block;">${safeDate(s.startDate)}</span>`; break;
+						case 'endDate': rowHtml += `<span style="direction:ltr;display:inline-block;">${safeDate(s.endDate)}</span>`; break;
+						case 'weekDay': rowHtml += safeLookup(DataStore.KEYS.LOOKUP_WEEK_DAYS, s.weekDay); break;
+						case 'meetingType': rowHtml += safeLookup(DataStore.KEYS.LOOKUP_MEETING_TYPES, s.meetingType); break;
+						case 'academicHours': rowHtml += safeNum(s.academicHours) + (s.academicHours ? "'" : ''); break;
+						case 'instructors': rowHtml += allNames; break;
+						case 'whatsapp': rowHtml += (s.whatsappLink ? `<a href="${safeVal(s.whatsappLink)}" target="_blank" style="color:var(--success,#16a34a)">📱 קישור</a>` : '—'); break;
+						case 'regLink': rowHtml += ((s.earlyRegistrationLink || s.registrationLink) ? `<a href="${safeVal(s.earlyRegistrationLink || s.registrationLink)}" target="_blank">🔗 קישור</a>` : '—'); break;
+						case 'showPublic': rowHtml += ((s.showInCatalog === 'כן' || s.showInCatalog === true) ? '✅ כן' : '❌ לא'); break;
+						case 'notes': rowHtml += `<div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safeVal(s.generalNote || s.notes)}">${safeVal(s.generalNote || s.notes)}</div>`; break;
+					}
+					rowHtml += '</td>';
+				});
+				// עמודת פעולות - תמיד בסוף
+				if (canFull) {
+					rowHtml += `<td><div style="display:flex;gap:4px;flex-wrap:nowrap;">
+						<button class="btn btn-outline btn-sm" onclick="App.viewSolution('${s.id}')" title="צפייה">👁️</button>
+						<button class="btn btn-outline btn-sm" onclick="App.editSolutionPopulated('${s.id}')" title="עריכה">✏️</button>
+						<button class="btn btn-outline btn-sm" onclick="App.openCompleteDataModal('${s.id}')" title="השלמת פרטים" style="color:var(--primary);">📋</button>
+						<button class="btn btn-danger btn-sm" onclick="App.deleteSolution('${s.id}')" title="מחיקה">🗑️</button>
+					</div></td>`;
+				}
+				rowHtml += '</tr>';
+				return rowHtml;
+			} catch (err) {
+				console.error('שגיאה בעיבוד שורה', s.id, err);
+				return `<tr><td colspan="${colsToShow.length + (canFull ? 1 : 0)}" style="color:red;background:#fee2e2">שגיאה בעיבוד שורה</td></tr>`;
+			}
+		}).join('');
+
+		// 🔑 6. כפתור תצוגת עמודות
+		const colVisBtn = `
+			<div style="position:relative; display:inline-block;">
+				<button class="btn btn-outline btn-sm" onclick="App.toggleSolDropdown(event)" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+					️ תצוגת עמודות
+				</button>
+				<div id="solColVisDropdown" style="display:none; position:absolute; top:100%; left:0; background:white; border:1px solid #ddd; border-radius:8px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1000; min-width:220px; max-height:400px; overflow-y:auto; direction:rtl; text-align:right;" onclick="event.stopPropagation()">
+					<div style="font-weight:bold; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:6px; font-size:14px;">בחר עמודות להצגה:</div>
+					${allCols.map(c => `
+						<label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; font-size:13px;">
+							<input type="checkbox" value="${c.key}" ${visibleKeys.includes(c.key) ? 'checked' : ''} onchange="App.toggleSolColumn('${c.key}', this.checked)" style="cursor:pointer;">
+							${c.label}
+						</label>
+					`).join('')}
+					<button class="btn btn-sm btn-primary" style="width:100%; margin-top:12px;" onclick="App.resetSolColumns()">🔄 איפוס לברירת מחדל</button>
+				</div>
+			</div>
+		`;
+
+		return `
+			<div style="margin-bottom:12px; display:flex; justify-content:flex-end;">
+				${colVisBtn}
+			</div>
+			<div class="table-wrapper" style="box-shadow:none; overflow-x:auto;">
+				<table class="data-table" style="width:100%; border-collapse:collapse; font-size:14px;">
+					<thead style="background:var(--gray-50);">${headerHtml}</thead>
+					<tbody>${rowsHtml}</tbody>
+				</table>
+			</div>
+		`;
+	}
+
+	function filterSolutions() {
+		const search = (document.getElementById('solSearch')?.value || '').toLowerCase().trim();
+		const respFilter = (document.getElementById('solRespF')?.value || '').trim();
+		const domainFilter = (document.getElementById('solDomainF')?.value || '').trim();
+		const meetingFilter = (document.getElementById('solMeetingF')?.value || '').trim();
+
+		console.log("🔍 פילטרים פעילים:", { search, respFilter, domainFilter, meetingFilter });
+
+		let items = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+
+		// סינון הרשאות
+		var visibleIds = _getGuideVisibleSolutionIds();
+		if (visibleIds !== null && Array.isArray(visibleIds) && visibleIds.length > 0) {
+			items = items.filter(function(s) { return visibleIds.includes(s.id); });
+		}
+
+		// סינון חיפוש חופשי
+		if (search) {
+			items = items.filter(function(s) {
+				var text = [s.solutionName, s.name, s.description, s.solutionNumber, s.schoolName, s.guideId]
+					.filter(Boolean).join(' ').toLowerCase();
+				return text.includes(search);
+			});
+		}
+
+		// 🔑 פונקציית עזר דו-לשונית: שולפת את כל הערכים האפשריים (value + עברית + ערבית)
+		function getAllLookupValues(key, filterValue) {
+			if (!filterValue) return [];
+			const lookupItems = DataStore.getAll(key) || [];
+			const matchingItem = lookupItems.find(function(item) { 
+				return String(item.value).trim() === filterValue; 
+			});
+			if (!matchingItem) return [filterValue];
+			return [
+				String(matchingItem.value || '').trim(),
+				String(matchingItem.label || '').trim(),
+				String(matchingItem.labelAr || '').trim()
+			].filter(function(v) { return v !== ''; });
+		}
+
+		// 🔑 סינון סוג אחריות - בדיקה מול value + label עברי + label ערבי
+		if (respFilter) {
+			const validValues = getAllLookupValues(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, respFilter);
+			console.log(" ערכים תקינים לסוג אחריות:", validValues);
+			
+			items = items.filter(function(s) { 
+				const itemResp = String(s.responsibilityType || '').trim();
+				return validValues.includes(itemResp);
+			});
+		}
+
+		// 🔑 סינון תחום - בדיקה מול value + label עברי + label ערבי
+		if (domainFilter) {
+			const validValues = getAllLookupValues(DataStore.KEYS.LOOKUP_DOMAINS, domainFilter);
+			items = items.filter(function(s) { 
+				const itemDomain = String(s.domain || s.topicType || '').trim();
+				return validValues.includes(itemDomain);
+			});
+		}
+
+		// 🔑 סינון סוג מפגש - בדיקה מול value + label עברי + label ערבי
+		if (meetingFilter) {
+			const validValues = getAllLookupValues(DataStore.KEYS.LOOKUP_MEETING_TYPES, meetingFilter);
+			items = items.filter(function(s) { 
+				const itemMeeting = String(s.meetingType || '').trim();
+				return validValues.includes(itemMeeting);
+			});
+		}
+
+		// עדכון כותרת הטבלה
+		var header = document.querySelector('#section-solutions .card-title');
+		if (header) {
+			header.innerHTML = `קטלוג פתרונות למידה <span style="color:var(--primary); font-size:14px;">(${items.length} רשומות)</span>`;
+		}
+
+		// רינדור מחדש של הטבלה
+		var tableDiv = document.getElementById('solutionsTableDiv');
+		if (tableDiv) {
+			tableDiv.innerHTML = _renderSolutionsTable(items);
+		}
+	}
 
     function openSolutionModal(id = null) {
         const s = id ? DataStore.getById(DataStore.KEYS.SOLUTIONS, id) : null;
@@ -2788,6 +3150,7 @@ const App = (() => {
         return g.fullName || g.fullNameAr || '';
     }
 
+
     // ================================================================
     //  MULTI-SELECT AUTOCOMPLETE (Mentors)
     // ================================================================
@@ -3511,228 +3874,287 @@ const App = (() => {
         });
     }
 
-    function deleteAllSolutions() {
-        const items = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
-        if (!items.length) { showToast('אין רשומות למחיקה', 'warning'); return; }
-        confirmDialog('למחוק את כל ' + items.length + ' פתרונות הלמידה? פעולה זו בלתי הפיכה!', function() {
-            _moveAllToRecycleBin(DataStore.KEYS.SOLUTIONS);
-            DataStore.saveAll(DataStore.KEYS.SOLUTION_INSTRUCTORS, []);
-            showToast('כל פתרונות הלמידה נמחקו', 'success');
-            renderSolutions(); updateSolutionsCount();
-        });
+function deleteAllSolutions() {
+    if (!confirm('⚠️ האם אתה בטוח שברצונך למחוק את כל הרשומות בקטלוג?\n\nפעולה זו אינה הפיכה וכל הנתונים יאבדו!')) return;
+    if (!confirm('אישור סופי: למחוק את כל ' + (DataStore.getAll(DataStore.KEYS.SOLUTIONS) || []).length + ' הרשומות?')) return;
+    
+    console.log("🗑️ מתחיל מחיקה גורפת של קטלוג פתרונות למידה...");
+    
+    // 🔑 שלב 1: מחיקה מהזיכרון הפנימי
+    if (DataStore._memoryCache) {
+        DataStore._memoryCache[DataStore.KEYS.SOLUTIONS] = [];
+        console.log("✅ נמחק מהזיכרון הפנימי");
     }
+    
+    // 🔑 שלב 2: מחיקה מ-localStorage
+    try {
+        localStorage.removeItem('matspanet_' + DataStore.KEYS.SOLUTIONS);
+        console.log("✅ נמחק מ-localStorage");
+    } catch (e) {
+        console.warn("⚠️ לא הצלחנו למחוק מ-localStorage:", e);
+    }
+    
+    // 🔑 שלב 3: מחיקה מהשרת (חשוב!)
+    const currentSession = DataStore.getSession();
+    if (currentSession && currentSession.userId) {
+        const pathParts = window.location.pathname.split('/');
+        pathParts.pop();
+        const basePath = pathParts.join('/') + '/';
+        const url = basePath + 'api/data-save.php';
+        
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                filename: 'solutions.json', 
+                data: [],
+                session: currentSession 
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            console.log("✅ נמחק מהשרת בהצלחה:", result);
+            // 🔑 שלב 4: רענון מיידי של התצוגה
+            if (typeof renderSolutions === 'function') renderSolutions();
+            showToast('כל הרשומות נמחקו בהצלחה (שרת + זיכרון)', 'success');
+        })
+        .catch(err => {
+            console.error("❌ שגיאה בשליחה לשרת:", err);
+            showToast('נמחק מהזיכרון, אך שגיאה במחיקה מהשרת', 'warning');
+        });
+    } else {
+        console.warn("⚠️ אין session פעיל");
+        if (typeof renderSolutions === 'function') renderSolutions();
+        showToast('נמחק מהזיכרון (אין session לשליחה לשרת)', 'warning');
+    }
+}
 
     // ================================================================
     //  EDIT SOLUTION — All Fields (filled + empty)
     // ================================================================
-    function editSolutionPopulated(id) {
-        const s = DataStore.getById(DataStore.KEYS.SOLUTIONS, id);
-        if (!s) return;
-        editingItem = s;
+    
+function editSolutionPopulated(id) {
+    const s = DataStore.getById(DataStore.KEYS.SOLUTIONS, id);
+    if (!s) {
+        showToast('רשומה לא נמצאה', 'error');
+        return;
+    }
+    
+    // 🔑 לוג אבחון ספציפי לשדות הבעייתיים
+    console.log("🔍 בדיקת שדות ספציפיים ברשומה:", {
+        instructors: s.instructors,
+        mentorNames: s.mentorNames,
+        instructorNames: s.instructorNames,
+        earlyRegistrationLink: s.earlyRegistrationLink,
+        registrationLink: s.registrationLink,
+        regLink: s.regLink
+    });
 
-        const respType = s.responsibilityType || '';
-        const isSchool = (respType === 'school' || respType === 'school_managed');
-        const guides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
-        const mentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+    editingItem = s;
+    const respType = String(s.responsibilityType || '').trim();
+    const isSchool = (respType === 'school' || respType === 'school_managed');
+    
+    function normalizeArray(val) {
+        if (!val) return [];
+        if (Array.isArray(val)) return val.map(String).map(v => v.trim());
+        return String(val).split(',').map(v => v.trim()).filter(v => v !== '');
+    }
+    
+    function normalizeDate(dateStr) {
+        if (!dateStr) return '';
+        const str = String(dateStr).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        const parts = str.split(/[\/\-\.]/);
+        if (parts.length === 3 && parts[0].length <= 2) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        return str;
+    }
 
-        const guideOpts = guides.filter(g => g.isActive !== false).map(g =>
-            `<option value="${g.id}" ${s.guideId === g.id ? 'selected' : ''}>${escAttr(_guideDisplayName(g))}</option>`
-        ).join('');
+    const guides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
+    const guideOpts = guides.filter(g => g.isActive !== false).map(g => {
+        const isSelected = (s.guideId === g.id) || (s.guideId === g.fullName) || (s.guideId === g.fullNameAr);
+        return `<option value="${g.id}" ${isSelected ? 'selected' : ''}>${escAttr(_guideDisplayName(g))}</option>`;
+    }).join('');
 
-        // Build mentor checkboxes (pre-checked from SOLUTION_INSTRUCTORS)
-        const existingInst = (DataStore.getAll(DataStore.KEYS.SOLUTION_INSTRUCTORS) || []).filter(i => i.solutionId === id);
-        // Extract mentor IDs - handle both mentorRepoId and legacy mentorId fields
-        // Also collect mentors that only have fullName (from Excel import without mentorId)
-        const existingMentorIds = [];
-        const existingMentorNames = [];
-        existingInst.forEach(i => {
-            if (i.mentorRepoId || i.mentorId) {
-                existingMentorIds.push(i.mentorRepoId || i.mentorId);
-            } else if (i.fullName || i.fullNameHe) {
-                // Mentor imported from Excel without mentorId - store the name
-                existingMentorNames.push(i.fullName || i.fullNameHe);
+    // 🔑 טיפול כפול במנחים: גם מהטבלה הנפרדת, וגם ממחרוזת מופרדת בפסיק
+    const existingInst = (DataStore.getAll(DataStore.KEYS.SOLUTION_INSTRUCTORS) || []).filter(i => i.solutionId === id);
+    const existingMentorIds = [];
+    const existingMentorNames = [];
+    
+    // 1. שליפה מהטבלה הנפרדת
+    existingInst.forEach(i => {
+        if (i.mentorRepoId || i.mentorId) {
+            existingMentorIds.push(String(i.mentorRepoId || i.mentorId).trim());
+        } else if (i.fullName || i.fullNameHe) {
+            existingMentorNames.push(String(i.fullName || i.fullNameHe).trim());
+        }
+    });
+
+    // 2. 🔑 קריטי: שליפה ממחרוזת מופרדת בפסיק בשדה הראשי
+    const rawInstructors = s.instructors || s.mentorNames || s.instructorNames || '';
+    if (rawInstructors && typeof rawInstructors === 'string') {
+        const namesArray = rawInstructors.split(',').map(n => n.trim()).filter(n => n !== '');
+        namesArray.forEach(name => {
+            if (!existingMentorNames.includes(name)) {
+                existingMentorNames.push(name);
             }
         });
+    }
 
-        const respOpts = getLookupOptions(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, respType);
+    const solName = s.solutionName || s.name || '';
+    const solNumber = s.solutionNumber || s.number || '';
+    const solDesc = s.description || s.desc || '';
+    const solDomain = String(s.domain || s.topicType || '').trim();
+    const solTopic = String(s.topic || '').trim();
+    
+    const eduStages = normalizeArray(s.educationStage);
+    const eduTypes = normalizeArray(s.educationType);
 
-        const schoolFieldHtml = `
-            <div class="form-group full-width" id="esp_schoolGroup" style="display:${isSchool ? '' : 'none'};">
-                <label>1. שם בית הספר (שדה חובה) *</label>
-                <div class="ms-autocomplete" id="ess_ssAutocomplete">
-                    <div class="ms-container" id="ess_ssContainer" onclick="document.getElementById('ess_ssInput').focus()">
-                        <span class="ms-placeholder" id="ess_ssPlaceholder">🔍 הקלד שם בית ספר או סמל מוסד...</span>
-                    </div>
-                </div>
-            </div>`;
-
-        // Determine topic dropdown state
-        const topicDisabled = (!s.topicType || s.topicType === 'בית ספרי') ? 'disabled' : '';
-        const topicDefaultOpt = s.topicType === 'בית ספרי' ? '<option value="">לא רלוונטי</option>' : '<option value="">בחר תחום קודם</option>';
-
-        // Build weekDay options with fallback for values not in lookup
-        let espWeekDayOpts = getLookupOptions(DataStore.KEYS.LOOKUP_WEEK_DAYS, s.weekDay || '');
-        if (s.weekDay && !espWeekDayOpts.includes('selected')) {
-            espWeekDayOpts += `<option value="${escAttr(s.weekDay)}" selected>${escAttr(s.weekDay)}</option>`;
+    function getSafeLookupOptions(key, savedValue) {
+        if (!savedValue) return `<option value="">בחר</option>`;
+        let opts = getLookupOptions(key, savedValue);
+        if (savedValue && !opts.includes('selected')) {
+            opts += `<option value="${escAttr(savedValue)}" selected>${escAttr(savedValue)}</option>`;
         }
+        return opts;
+    }
 
-        showModal('✏️ עריכת פתרון למידה', `
-            <div class="form-grid">
-                <!-- 0. Responsibility Type -->
-                <div class="form-group full-width">
-                    <label>סוג האחריות</label>
-                    <select id="esp_respType" class="form-select" onchange="App._essOnRespTypeChange()">
-                        <option value="">בחר סוג אחריות</option>
-                        ${respOpts}
-                    </select>
+    const respOpts = getSafeLookupOptions(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, respType);
+    const weekDayOpts = getSafeLookupOptions(DataStore.KEYS.LOOKUP_WEEK_DAYS, String(s.weekDay || '').trim());
+    const meetingTypeOpts = getSafeLookupOptions(DataStore.KEYS.LOOKUP_MEETING_TYPES, String(s.meetingType || '').trim());
+    const domainOpts = getSafeLookupOptions(DataStore.KEYS.LOOKUP_DOMAINS, solDomain);
+
+    // 🔑 נרמול מקיף לקישור רישום
+    const regLink = s.earlyRegistrationLink || s.registrationLink || s.regLink || s.reg_link || '';
+
+    const schoolFieldHtml = `
+        <div class="form-group full-width" id="esp_schoolGroup" style="display:${isSchool ? '' : 'none'};">
+            <label>1. שם בית הספר (שדה חובה) *</label>
+            <div class="ms-autocomplete" id="ess_ssAutocomplete">
+                <div class="ms-container" id="ess_ssContainer" onclick="document.getElementById('ess_ssInput').focus()">
+                    <span class="ms-placeholder" id="ess_ssPlaceholder">🔍 הקלד שם בית ספר או סמל מוסד...</span>
                 </div>
+            </div>
+        </div>`;
 
-                ${schoolFieldHtml}
+    const topicDisabled = (!solDomain || solDomain === 'בית ספרי') ? 'disabled' : '';
+    const topicDefaultOpt = solDomain === 'בית ספרי' ? '<option value="">לא רלוונטי</option>' : '<option value="">בחר תחום קודם</option>';
 
-                <!-- 1. Name (required) -->
-                <div class="form-group full-width">
-                    <label>${isSchool ? '2' : '1'}. שם פתרון למידה (שדה חובה) *</label>
-                    <input type="text" id="esp_name" class="form-input" value="${escAttr(s.name || '')}" required>
-                </div>
-
-                <!-- 2. Number -->
-                <div class="form-group">
-                    <label>${isSchool ? '3' : '2'}. מספר פתרון למידה</label>
-                    <input type="text" id="esp_number" class="form-input" value="${escAttr(s.solutionNumber || '')}">
-                </div>
-
-                <!-- 3. Description -->
-                <div class="form-group full-width">
-                    <label>${isSchool ? '4' : '3'}. תיאור פתרון למידה</label>
-                    <textarea id="esp_desc" class="form-textarea">${escAttr(s.description || '')}</textarea>
-                </div>
-
-                <!-- 4. Guide -->
-                <div class="form-group">
-                    <label>${isSchool ? '5' : '4'}. מדריך אחראי *</label>
-                    <select id="esp_guide" class="form-select" required>
-                        <option value="">בחר מדריך</option>
-                        ${guideOpts}
-                    </select>
-                </div>
-
-                <!-- 5. Domain -->
-                <div class="form-group">
-                    <label>${isSchool ? '6' : '5'}. תחום</label>
-                    <select id="esp_topicType" class="form-select" onchange="App._espOnTopicTypeChange()">
-                        <option value="">בחר</option>
-                        ${getLookupOptions(DataStore.KEYS.LOOKUP_DOMAINS, s.topicType || '')}
-                    </select>
-                </div>
-
-                <!-- 6. Topic -->
-                <div class="form-group">
-                    <label>${isSchool ? '7' : '6'}. נושא</label>
-                    <select id="esp_topic" class="form-select" ${topicDisabled}>
-                        ${topicDefaultOpt}
-                    </select>
-                </div>
-
-                <!-- 7. Education Stage (multi) -->
-                <div class="form-group">
-                    <label>${isSchool ? '8' : '7'}. שלב חינוך (רב-ברירה)</label>
-                    <div style="padding:6px 0;">${buildCheckboxes(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, s.educationStage || [])}</div>
-                </div>
-
-                <!-- 8. Education Type (multi) -->
-                <div class="form-group">
-                    <label>${isSchool ? '9' : '8'}. סוג חינוך (רב-ברירה)</label>
-                    <div style="padding:6px 0;">${buildCheckboxes(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, s.educationType || [])}</div>
-                </div>
-
-                <!-- 9. Start Date -->
-                <div class="form-group">
-                    <label>${isSchool ? '10' : '9'}. תאריך תחילת ההשתלמות</label>
-                    <input type="date" id="esp_startDate" class="form-input" value="${s.startDate || ''}">
-                </div>
-
-                <!-- 10. End Date -->
-                <div class="form-group">
-                    <label>${isSchool ? '11' : '10'}. תאריך סיום ההשתלמות</label>
-                    <input type="date" id="esp_endDate" class="form-input" value="${s.endDate || ''}">
-                </div>
-
-                <!-- 11. Week Day -->
-                <div class="form-group">
-                    <label>${isSchool ? '12' : '11'}. יום בשבוע</label>
-                    <select id="esp_weekDay" class="form-select">
-                        <option value="">בחר</option>
-                        ${espWeekDayOpts}
-                    </select>
-                </div>
-
-                <!-- 12. Meeting Type -->
-                <div class="form-group">
-                    <label>${isSchool ? '13' : '12'}. סוג מפגש</label>
-                    <select id="esp_meetingType" class="form-select">
-                        <option value="">בחר</option>
-                        ${getLookupOptions(DataStore.KEYS.LOOKUP_MEETING_TYPES, s.meetingType || '')}
-                    </select>
-                </div>
-
-                <!-- 13. Academic Hours -->
-                <div class="form-group">
-                    <label>${isSchool ? '14' : '13'}. שעות אקדמיות מוכרות לגמול</label>
-                    <input type="number" id="esp_hours" class="form-input" value="${s.academicHours || 0}" min="0" step="0.5">
-                </div>
-
-                <!-- 14. Mentors (multi-select autocomplete) -->
-                <div class="form-group full-width">
-                    <label>${isSchool ? '15' : '14'}. מנחים (רב-ברירה)</label>
-                    <div class="ms-autocomplete" id="esp_msAutocomplete">
-                        <div class="ms-container" id="esp_msContainer" onclick="document.getElementById('esp_msInput').focus()">
-                            <span class="ms-placeholder" id="esp_msPlaceholder">🔍 הקלד לחיפוש מנחה...</span>
-                        </div>
+    showModal('✏️ עריכת פתרון למידה', `
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label>סוג האחריות</label>
+                <select id="esp_respType" class="form-select" onchange="App._essOnRespTypeChange()">
+                    <option value="">בחר סוג אחריות</option>
+                    ${respOpts}
+                </select>
+            </div>
+            ${schoolFieldHtml}
+            <div class="form-group full-width">
+                <label>${isSchool ? '2' : '1'}. שם פתרון למידה (שדה חובה) *</label>
+                <input type="text" id="esp_name" class="form-input" value="${escAttr(solName)}" required>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '3' : '2'}. מספר פתרון למידה</label>
+                <input type="text" id="esp_number" class="form-input" value="${escAttr(solNumber)}">
+            </div>
+            <div class="form-group full-width">
+                <label>${isSchool ? '4' : '3'}. תיאור פתרון למידה</label>
+                <textarea id="esp_desc" class="form-textarea">${escAttr(solDesc)}</textarea>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '5' : '4'}. מדריך אחראי *</label>
+                <select id="esp_guide" class="form-select" required>
+                    <option value="">בחר מדריך</option>
+                    ${guideOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '6' : '5'}. תחום</label>
+                <select id="esp_topicType" class="form-select" onchange="App._espOnTopicTypeChange()">
+                    <option value="">בחר</option>
+                    ${domainOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '7' : '6'}. נושא</label>
+                <select id="esp_topic" class="form-select" ${topicDisabled}>
+                    ${topicDefaultOpt}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '8' : '7'}. שלב חינוך (רב-ברירה)</label>
+                <div style="padding:6px 0;">${buildCheckboxes(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, eduStages)}</div>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '9' : '8'}. סוג חינוך (רב-ברירה)</label>
+                <div style="padding:6px 0;">${buildCheckboxes(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, eduTypes)}</div>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '10' : '9'}. תאריך תחילת ההשתלמות</label>
+                <input type="date" id="esp_startDate" class="form-input" value="${normalizeDate(s.startDate)}">
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '11' : '10'}. תאריך סיום ההשתלמות</label>
+                <input type="date" id="esp_endDate" class="form-input" value="${normalizeDate(s.endDate)}">
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '12' : '11'}. יום בשבוע</label>
+                <select id="esp_weekDay" class="form-select">
+                    <option value="">בחר</option>
+                    ${weekDayOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '13' : '12'}. סוג מפגש</label>
+                <select id="esp_meetingType" class="form-select">
+                    <option value="">בחר</option>
+                    ${meetingTypeOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '14' : '13'}. שעות אקדמיות מוכרות לגמול</label>
+                <input type="number" id="esp_hours" class="form-input" value="${s.academicHours || 0}" min="0" step="0.5">
+            </div>
+            <div class="form-group full-width">
+                <label>${isSchool ? '15' : '14'}. מנחים (רב-ברירה)</label>
+                <div class="ms-autocomplete" id="esp_msAutocomplete">
+                    <div class="ms-container" id="esp_msContainer" onclick="document.getElementById('esp_msInput').focus()">
+                        <span class="ms-placeholder" id="esp_msPlaceholder">🔍 הקלד לחיפוש מנחה...</span>
                     </div>
                 </div>
-
-                <!-- 15. WhatsApp Link -->
-                <div class="form-group">
-                    <label>${isSchool ? '16' : '15'}. קישור וואטסאפ</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="password" id="esp_whatsapp" class="form-input" value="${escAttr(s.whatsappLink || '')}" dir="ltr" style="text-align:left;flex:1;">
-                        <button type="button" class="btn btn-outline btn-sm" onclick="App._toggleLinkVis('esp_whatsapp',this)" title="הצג/הסתר">👁️</button>
-                    </div>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '16' : '15'}. קישור וואטסאפ</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="password" id="esp_whatsapp" class="form-input" value="${escAttr(s.whatsappLink || '')}" dir="ltr" style="text-align:left;flex:1;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="App._toggleLinkVis('esp_whatsapp',this)">👁️</button>
                 </div>
-
-                <!-- 16. Registration Link -->
-                <div class="form-group">
-                    <label>${isSchool ? '17' : '16'}. קישור רישום מוקדם</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="password" id="esp_regLink" class="form-input" value="${escAttr(s.registrationLink || '')}" dir="ltr" style="text-align:left;flex:1;">
-                        <button type="button" class="btn btn-outline btn-sm" onclick="App._toggleLinkVis('esp_regLink',this)" title="הצג/הסתר">👁️</button>
-                    </div>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '17' : '16'}. קישור רישום מוקדם</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="password" id="esp_regLink" class="form-input" value="${escAttr(regLink)}" dir="ltr" style="text-align:left;flex:1;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="App._toggleLinkVis('esp_regLink',this)">👁️</button>
                 </div>
-
-                <!-- 17. Show in Catalog -->
-                <div class="form-group">
-                    <label>${isSchool ? '18' : '17'}. הצג בקטלוג הציבורי</label>
-                    <div style="display:flex;align-items:center;gap:10px;padding-top:8px;">
-                        <label class="toggle-switch"><input type="checkbox" id="esp_showInCatalog" ${s.showInCatalog !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
-                        <span style="font-size:13px;color:var(--gray-500);" id="esp_catalogLabel">${s.showInCatalog !== false ? 'מוצג' : 'מוסתר'}</span>
-                    </div>
+            </div>
+            <div class="form-group">
+                <label>${isSchool ? '18' : '17'}. הצג בקטלוג הציבורי</label>
+                <div style="display:flex;align-items:center;gap:10px;padding-top:8px;">
+                    <label class="toggle-switch"><input type="checkbox" id="esp_showInCatalog" ${s.showInCatalog !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                    <span style="font-size:13px;color:var(--gray-500);" id="esp_catalogLabel">${s.showInCatalog !== false ? 'מוצג' : 'מוסתר'}</span>
                 </div>
+            </div>
+            <div class="form-group full-width">
+                <label>${isSchool ? '19' : '18'}. הערה כללית</label>
+                <textarea id="esp_notes" class="form-textarea">${escAttr(s.notes || s.generalNote || '')}</textarea>
+            </div>
+        </div>`,
+        `<button class="btn btn-primary" onclick="App._saveEditPopulated()">💾 שמור שינויים</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`
+    );
 
-                <!-- 18. Notes -->
-                <div class="form-group full-width">
-                    <label>${isSchool ? '19' : '18'}. הערה כללית</label>
-                    <textarea id="esp_notes" class="form-textarea">${escAttr(s.notes || '')}</textarea>
-                </div>
-            </div>`,
-            `<button class="btn btn-primary" onclick="App._saveEditPopulated()">💾 שמור שינויים</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`
-        );
-
-        // Init topic dropdown for edit
-        if (s.topicType && s.topicType !== 'בית ספרי') {
-            setTimeout(function() { App._espOnTopicTypeChange(s.topic); }, 50);
-        }
-
-        // Toggle label
+    setTimeout(() => {
         const toggleEl = document.getElementById('esp_showInCatalog');
         if (toggleEl) {
             toggleEl.addEventListener('change', function() {
@@ -3740,16 +4162,23 @@ const App = (() => {
                 if (lbl) lbl.textContent = this.checked ? 'מוצג' : 'מוסתר';
             });
         }
-        // Init multi-select autocomplete with pre-selected mentors
+        
+        if (solDomain && solDomain !== 'בית ספרי') {
+            App._espOnTopicTypeChange(solTopic);
+        }
+        
+        // 🔑 אתחול המנחים עם כל השמות שנאספו (גם מהטבלה הנפרדת וגם מהמחרוזת המופרדת בפסיק)
         _msInit({ prefix: 'esp_', preSelectedIds: existingMentorIds, preSelectedNames: existingMentorNames });
-        // Init single-select school autocomplete for edit form
+        
         if (isSchool) {
             _essSelectedSchool = (s.schoolId && s.schoolName) ? { id: s.schoolId, name: s.schoolName, code: s.schoolCode || '' } : null;
             _essSchoolInit();
             if (_essSelectedSchool) _essRenderTag();
         }
-    }
+    }, 150);
+}
 
+	
     function _espOnTopicTypeChange(preSelectValue) {
         const sel = document.getElementById('esp_topicType');
         const topicSelect = document.getElementById('esp_topic');
@@ -4987,126 +5416,869 @@ function _saveCompleteData(solutionId) {
     }
 
 
+	// ==========================================
+	// ניהול אשכולות למידה (Clusters) - גרסה סופית ומדויקת
+	// ==========================================
+	function renderClusters() {
+		const container = document.getElementById('section-clusters');
+		if (!container) return;
+
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		const clustersSettings = (DataStore.getAll(DataStore.KEYS.CLUSTERS_SETTINGS) || [])[0] || {};
+		const introText = clustersSettings.introText || '';
+		const activeTab = window._clustersActiveTab || 'management';
+
+		container.innerHTML = `
+			<div class="card" style="margin-bottom:24px;">
+				<div class="card-header"><span class="card-title">📝 טקסט הקדמה לדף האשכולות הציבורי</span></div>
+				<div class="card-body">
+					<div class="hp-editor-wrapper" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+						<textarea id="clustersIntroText">${escHtml(introText)}</textarea>
+					</div>
+					<div style="margin-top:12px; display:flex; gap:8px;">
+						<button class="btn btn-primary btn-sm" onclick="App.saveClustersIntroText()">💾 שמור הקדמה</button>
+						<button class="btn btn-outline btn-sm" onclick="App._initClustersIntroTinyMCE()">🔄 אתחל עורך</button>
+					</div>
+				</div>
+			</div>
+			
+			<div class="card">
+				<div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+					<h3 class="card-title">🧩 ניהול אשכולות למידה</h3>
+					<div style="display:flex; gap:8px;">
+						<button class="btn ${activeTab === 'management' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchClustersTab('management')">⚙️ ניהול אשכולות</button>
+						<button class="btn ${activeTab === 'registrations' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchClustersTab('registrations')">📋 נרשמים</button>
+					</div>
+				</div>
+				<div class="card-body">
+					<div id="clustersTabContent"></div>
+				</div>
+			</div>
+		`;
+
+		if (activeTab === 'management') {
+			_renderClustersManagementTab();
+		} else {
+			_renderClustersRegistrationsTab();
+		}
+
+		setTimeout(() => {
+			if (typeof App._initClustersIntroTinyMCE === 'function') {
+				App._initClustersIntroTinyMCE();
+			}
+		}, 150);
+	}
+
+	function _switchClustersTab(tab) {
+		window._clustersActiveTab = tab;
+		renderClusters();
+	}
+
+	function _renderClustersManagementTab() {
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		
+		document.getElementById('clustersTabContent').innerHTML = `
+			<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+				<h4>רשימת אשכולות</h4>
+				<button class="btn btn-primary" onclick="App.openClusterModal()">➕ יצירת אשכול חדש</button>
+			</div>
+			${clusters.length === 0 ? 
+				'<p style="text-align:center; padding:20px; color:var(--text-secondary);">אין אשכולות מוגדרים עדיין.</p>' : 
+				`<table class="data-table">
+					<thead>
+						<tr>
+							<th>כותרת האשכול</th>
+							<th>תחום דעת</th>
+							<th>מס' אפשרויות בחירה</th>
+							<th>סטטוס</th>
+							<th style="width:150px; text-align:center;">פעולות</th>
+						</tr>
+					</thead>
+					<tbody>
+						${clusters.map(c => {
+							const statusBadge = c.isActive ? 
+								'<span style="color:#28a745; font-weight:bold;">🟢 פתוח לרישום</span>' : 
+								'<span style="color:#dc3545; font-weight:bold;">🔴 סגור לרישום</span>';
+							return `
+							<tr>
+								<td>${escAttr(c.title)}</td>
+								<td>${escAttr(c.fieldKnowledgeId)}</td>
+								<td style="text-align:center;">${c.choiceModules ? c.choiceModules.length : 0}</td>
+								<td>${statusBadge}</td>
+								<td style="text-align:center; white-space:nowrap;">
+									<button class="btn btn-sm btn-outline" onclick="App.openClusterModal('${c.id}')" title="עריכה">✏️</button>
+									<button class="btn btn-sm btn-danger" onclick="App.deleteCluster('${c.id}')" title="מחיקה">🗑️</button>
+								</td>
+							</tr>
+							`;
+						}).join('')}
+					</tbody>
+				</table>`
+			}
+		`;
+	}
+
+	function _renderClustersRegistrationsTab() {
+		const registrations = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		
+		document.getElementById('clustersTabContent').innerHTML = `
+			<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+				<h4>רשימת נרשמים (${registrations.length})</h4>
+				<div style="display:flex; gap:8px; flex-wrap:wrap;">
+					<button class="btn btn-sm btn-success" onclick="App.exportClusterRegistrationsExcel()">📊 ייצוא לאקסל</button>
+					<button class="btn btn-sm btn-info" onclick="App.exportClusterRegistrationsCSV()">📄 ייצוא ל-CSV</button>
+					<button class="btn btn-sm btn-primary" onclick="App.importClusterRegistrationsExcel()">📥 ייבוא מאקסל</button>
+					<button class="btn btn-sm btn-outline" onclick="App.printClusterRegistrations()">🖨️ הדפסה</button>
+					<button class="btn btn-sm btn-danger" onclick="App.deleteAllClusterRegistrations()">🗑️ מחיקה גורפת</button>
+				</div>
+			</div>
+			${registrations.length === 0 ? 
+				'<p style="text-align:center; padding:40px; color:var(--text-secondary);">אין נרשמים עדיין.</p>' : 
+				`<div style="overflow-x:auto;">
+					<table class="data-table">
+						<thead>
+							<tr>
+								<th>תאריך רישום</th>
+								<th>שם מלא</th>
+								<th>טלפון</th>
+								<th>דוא"ל</th>
+								<th>בית ספר</th>
+								<th>תפקיד</th>
+								<th>אשכול</th>
+								<th>שעות</th>
+								<th>סטטוס</th>
+								<th style="width:120px; text-align:center;">פעולות</th>
+							</tr>
+						</thead>
+						<tbody>
+							${registrations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(r => {
+								const cluster = clusters.find(c => c.id === r.clusterId);
+								const clusterName = cluster ? cluster.title : 'לא ידוע';
+								return `
+								<tr>
+									<td style="white-space:nowrap;">${new Date(r.createdAt).toLocaleDateString('he-IL')}</td>
+									<td>${escAttr(r.teacherName)}</td>
+									<td dir="ltr">${escAttr(r.phone)}</td>
+									<td dir="ltr">${escAttr(r.email)}</td>
+									<td>${escAttr(r.schoolName)}<br><small style="color:#888;">(${escAttr(r.schoolSymbol)})</small></td>
+									<td>${escAttr(r.role)}</td>
+									<td>${escAttr(clusterName)}</td>
+									<td style="text-align:center;">${r.totalHours || 30}</td>
+									<td style="text-align:center;">
+										<select class="form-select" style="padding:4px 8px; font-size:12px;" onchange="App.updateClusterRegistrationStatus('${r.id}', this.value)">
+											<option value="pending" ${r.status === 'pending' ? 'selected' : ''}>⏳ ממתין</option>
+											<option value="approved" ${r.status === 'approved' ? 'selected' : ''}>✅ אושר</option>
+											<option value="rejected" ${r.status === 'rejected' ? 'selected' : ''}>❌ נדחה</option>
+											<option value="completed" ${r.status === 'completed' ? 'selected' : ''}>🏁 הושלם</option>
+										</select>
+									</td>
+									<td style="text-align:center; white-space:nowrap;">
+										<button class="btn btn-sm btn-outline" onclick="App.viewClusterRegistration('${r.id}')" title="צפייה">👁️</button>
+										<button class="btn btn-sm btn-danger" onclick="App.deleteClusterRegistration('${r.id}')" title="מחיקה">🗑️</button>
+									</td>
+								</tr>
+								`;
+							}).join('')}
+						</tbody>
+					</table>
+				</div>`
+			}
+		`;
+		
+		// אתחול TinyMCE להקדמה
+		setTimeout(() => {
+			if (typeof App._initClustersIntroTinyMCE === 'function') {
+				App._initClustersIntroTinyMCE();
+			}
+		}, 150);
+	}
+
+	// 🔑 פונקציה חדשה: שמירת טקסט ההקדמה
+	function saveClustersIntroText() {
+		if (typeof tinymce !== 'undefined') {
+			const editor = tinymce.get('clustersIntroText');
+			if (editor) editor.save();
+		}
+		
+		const introText = document.getElementById('clustersIntroText')?.value || '';
+		
+		let settings = (DataStore.getAll('clusters_settings') || [])[0];
+		if (!settings) {
+			settings = {
+				id: 'clusters_settings_main',
+				introText: introText,
+				updatedAt: new Date().toISOString()
+			};
+			DataStore.create(DataStore.KEYS.CLUSTERS_SETTINGS, settings);
+		} else {
+			settings.introText = introText;
+			settings.updatedAt = new Date().toISOString();
+			DataStore.update('clusters_settings', settings.id, settings);
+		}
+		
+		showToast('טקסט ההקדמה נשמר בהצלחה!', 'success');
+	}
+
+	// 🔑 פונקציה חדשה: אתחול TinyMCE להקדמה
+	var _clustersIntroTinyMCEInit = false;
+	function _initClustersIntroTinyMCE() {
+		if (typeof tinymce === 'undefined') {
+			console.warn('[Clusters Intro] TinyMCE לא נטען');
+			setTimeout(_initClustersIntroTinyMCE, 300);
+			return;
+		}
+		
+		const textarea = document.getElementById('clustersIntroText');
+		if (!textarea) {
+			console.warn('[Clusters Intro] textarea לא נמצא');
+			setTimeout(_initClustersIntroTinyMCE, 300);
+			return;
+		}
+		
+		if (_clustersIntroTinyMCEInit) {
+			try {
+				const existing = tinymce.get('clustersIntroText');
+				if (existing) existing.remove();
+			} catch(e) {}
+			_clustersIntroTinyMCEInit = false;
+		}
+		
+		try {
+			tinymce.init({
+				selector: '#clustersIntroText',
+				base_url: './tinymce',
+				suffix: '.min',
+				height: 350,
+				directionality: 'rtl',
+				language: 'he_IL',
+				plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table wordcount help directionality',
+				toolbar: 'undo redo | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link image | code',
+				content_style: 'body { font-family: "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; }',
+				branding: false,
+				promotion: false,
+				setup: function(editor) {
+					editor.on('init', function() {
+						_clustersIntroTinyMCEInit = true;
+						console.log('✅ [Clusters Intro] TinyMCE אותחל');
+					});
+				}
+			});
+		} catch(e) {
+			console.error('[Clusters Intro] שגיאה:', e);
+		}
+	}
+
+	function openClusterModal(clusterId = null) {
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		const solutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+		const uniqueDomains = [...new Set(solutions.map(s => s.domain).filter(d => d && d.trim() !== ''))].sort();
+		
+		const isEdit = !!clusterId;
+		const cluster = isEdit ? clusters.find(c => c.id === clusterId) : null;
+		
+		if (isEdit && !cluster) {
+			showToast('אשכול לא נמצא', 'error');
+			return;
+		}
+		
+		const clusterData = isEdit ? cluster : {
+			title: '',
+			fieldKnowledgeId: '',
+			fixedTheme: '',
+			choiceModules: [{ solutionId: '', theme: '' }, { solutionId: '', theme: '' }],
+			isActive: true
+		};
+
+		const domainOptions = uniqueDomains.map(d => 
+			`<option value="${escAttr(d)}" ${clusterData.fieldKnowledgeId === d ? 'selected' : ''}>${escAttr(d)}</option>`
+		).join('');
+		
+		const availableSolutions = clusterData.fieldKnowledgeId ? 
+			solutions.filter(s => s.domain === clusterData.fieldKnowledgeId) : [];
+
+		let overlay = document.getElementById('cluster_modal_overlay');
+		if (overlay) overlay.remove();
+		
+		overlay = document.createElement('div');
+		overlay.id = 'cluster_modal_overlay';
+		overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto; padding: 20px;';
+		
+		overlay.innerHTML = `
+			<div style="background:#fff;border-radius:12px;padding:32px;width:100%;max-width:700px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+				<h3 style="margin:0 0 24px 0;color:var(--primary);">${isEdit ? 'עריכת אשכול' : 'יצירת אשכול חדש'}</h3>
+				
+				<div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+					<div class="form-group">
+						<label>כותרת האשכול *</label>
+						<input type="text" id="c_title" class="form-input" value="${escAttr(clusterData.title)}" required>
+					</div>
+					<div class="form-group">
+						<label>תחום דעת *</label>
+						<select id="c_fieldKnowledgeId" class="form-input" onchange="App.updateClusterSolutionsList(this.value)">
+							<option value="">-- בחר תחום דעת --</option>
+							${domainOptions}
+						</select>
+					</div>
+				</div>
+
+				<div class="form-group" style="margin-bottom:24px; padding:16px; background:#f8f9fa; border-radius:8px;">
+					<label style="font-weight:600; display:block; margin-bottom:8px;">📌 חלק קבוע (10 שעות אקדמיות)</label>
+					<input type="text" id="c_fixedTheme" class="form-input" value="${escAttr(clusterData.fixedTheme)}" placeholder="לדוגמה: שילוב עברית בהוראה + בינה מלאכותית">
+				</div>
+
+				<div style="margin-bottom:24px;">
+					<label style="font-weight:600; display:block; margin-bottom:12px;">📚 אפשרויות בחירה (יש לבחור 2, כל אחת 10 שעות)</label>
+					<div id="c_choiceModules_container">
+						${clusterData.choiceModules.map((mod, idx) => `
+							<div class="form-grid" style="grid-template-columns: 2fr 1fr auto; gap:12px; margin-bottom:12px; align-items:end;">
+								<div class="form-group">
+									<label>פתרון למידה (מתוך הקטלוג)</label>
+									<select class="form-input c_choice_solution" data-idx="${idx}">
+										<option value="">-- בחר פתרון --</option>
+										${availableSolutions.map(s => `<option value="${s.id}" ${mod.solutionId === s.id ? 'selected' : ''}>${escAttr(s.solutionName || 'ללא שם')}</option>`).join('')}
+									</select>
+								</div>
+								<div class="form-group">
+									<label>נושא מרכזי באשכול</label>
+									<input type="text" class="form-input c_choice_theme" data-idx="${idx}" value="${escAttr(mod.theme)}" placeholder="לדוגמה: אוריינות מתמטית">
+								</div>
+								<button class="btn btn-sm btn-outline" onclick="this.parentElement.remove()" style="margin-bottom:0; height:42px;">🗑️</button>
+							</div>
+						`).join('')}
+					</div>
+					<button class="btn btn-sm btn-outline" onclick="App.addClusterChoiceModule()" style="margin-top:8px;">➕ הוסף אפשרות בחירה נוספת</button>
+				</div>
+
+				<div class="form-group" style="margin-bottom:24px; display:flex; align-items:center; gap:12px;">
+					<input type="checkbox" id="c_isActive" ${clusterData.isActive ? 'checked' : ''} style="width:20px; height:20px;">
+					<label for="c_isActive" style="margin:0; font-weight:600; cursor:pointer;">האשכול פתוח לרישום כעת</label>
+				</div>
+
+				<div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px; border-top:1px solid #eee; padding-top:20px;">
+					<button class="btn btn-primary" onclick="App.saveCluster('${clusterId || ''}')">💾 שמור אשכול</button>
+					<button class="btn btn-outline" onclick="document.getElementById('cluster_modal_overlay').remove()">ביטול</button>
+				</div>
+			</div>
+		`;
+		document.body.appendChild(overlay);
+	}
+
+	function updateClusterSolutionsList(fieldKnowledgeId) {
+		const solutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+		
+		// 🔑 סינון מדויק לפי הטקסט בערבית ששמור ב-domain
+		const filtered = fieldKnowledgeId ? 
+			solutions.filter(s => s.domain === fieldKnowledgeId) : [];
+		
+		console.log('✅ [Clusters] נמצאו', filtered.length, 'פתרונות לתחום:', fieldKnowledgeId);
+		
+		document.querySelectorAll('.c_choice_solution').forEach(select => {
+			const currentVal = select.value;
+			const optionsHtml = filtered.map(s => {
+				const displayName = s.solutionName || 'ללא שם';
+				return `<option value="${s.id}" ${currentVal === s.id ? 'selected' : ''}>${escAttr(displayName)}</option>`;
+			}).join('');
+			
+			select.innerHTML = '<option value="">-- בחר פתרון --</option>' + optionsHtml;
+		});
+	}
+
+	function addClusterChoiceModule() {
+		const container = document.getElementById('c_choiceModules_container');
+		const idx = container.children.length;
+		const div = document.createElement('div');
+		div.className = 'form-grid';
+		div.style.cssText = 'grid-template-columns: 2fr 1fr auto; gap:12px; margin-bottom:12px; align-items:end;';
+		div.innerHTML = `
+			<div class="form-group">
+				<label>פתרון למידה (מתוך הקטלוג)</label>
+				<select class="form-input c_choice_solution" data-idx="${idx}">
+					<option value="">-- בחר פתרון --</option>
+				</select>
+			</div>
+			<div class="form-group">
+				<label>נושא מרכזי באשכול</label>
+				<input type="text" class="form-input c_choice_theme" data-idx="${idx}" placeholder="לדוגמה: אוריינות מתמטית">
+			</div>
+			<button class="btn btn-sm btn-outline" onclick="this.parentElement.remove()" style="margin-bottom:0; height:42px;">🗑️</button>
+		`;
+		container.appendChild(div);
+		
+		const fieldKnowledgeId = document.getElementById('c_fieldKnowledgeId').value;
+		if (fieldKnowledgeId) updateClusterSolutionsList(fieldKnowledgeId);
+	}
+
+	function saveCluster(clusterId) {
+		const title = document.getElementById('c_title').value.trim();
+		const fieldKnowledgeId = document.getElementById('c_fieldKnowledgeId').value;
+		const fixedTheme = document.getElementById('c_fixedTheme').value.trim();
+		const isActive = document.getElementById('c_isActive').checked;
+
+		if (!title || !fieldKnowledgeId || !fixedTheme) {
+			showToast('יש למלא את כל שדות החובה (כותרת, תחום דעת, נושא קבוע)', 'error');
+			return;
+		}
+
+		const choiceModules = [];
+		document.querySelectorAll('#c_choiceModules_container > div').forEach(div => {
+			const solId = div.querySelector('.c_choice_solution').value;
+			const theme = div.querySelector('.c_choice_theme').value.trim();
+			if (solId && theme) {
+				choiceModules.push({ solutionId: solId, theme: theme });
+			}
+		});
+
+		if (choiceModules.length < 2) {
+			showToast('יש להגדיר לפחות 2 אפשרויות בחירה תקינות', 'error');
+			return;
+		}
+
+		const clusterData = {
+			title,
+			fieldKnowledgeId,
+			fixedTheme,
+			choiceModules,
+			isActive,
+			updatedAt: new Date().toISOString()
+		};
+
+		if (clusterId) {
+			DataStore.update(DataStore.KEYS.CLUSTERS, clusterId, clusterData);
+			showToast('האשכול עודכן בהצלחה!', 'success');
+		} else {
+			clusterData.id = 'cluster_' + Date.now();
+			clusterData.createdAt = new Date().toISOString();
+			DataStore.create(DataStore.KEYS.CLUSTERS, clusterData);
+			showToast('האשכול נוצר בהצלחה!', 'success');
+		}
+
+		document.getElementById('cluster_modal_overlay').remove();
+		renderClusters();
+	}
+
+	function deleteCluster(id) {
+		if (!confirm('האם אתה בטוח שברצונך למחוק אשכול זה? פעולה זו תמחק גם את כל הרישומים המשויכים אליו.')) return;
+		DataStore.remove(DataStore.KEYS.CLUSTERS, id);
+		
+		const regs = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const filteredRegs = regs.filter(r => r.clusterId !== id);
+		DataStore.saveAll(DataStore.KEYS.CLUSTER_REGISTRATIONS, filteredRegs);
+		
+		showToast('האשכול נמחק בהצלחה', 'success');
+		renderClusters();
+	}
+
+	function updateClusterRegistrationStatus(id, newStatus) {
+		const registrations = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const index = registrations.findIndex(r => r.id === id);
+		if (index === -1) return;
+		
+		registrations[index].status = newStatus;
+		registrations[index].updatedAt = new Date().toISOString();
+		DataStore.saveAll(DataStore.KEYS.CLUSTER_REGISTRATIONS, registrations);
+		
+		showToast('סטטוס הנרשם עודכן', 'success');
+		_renderClustersRegistrationsTab();
+	}
+
+	function viewClusterRegistration(id) {
+		const registrations = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		const r = registrations.find(reg => reg.id === id);
+		if (!r) return;
+		
+		const cluster = clusters.find(c => c.id === r.clusterId);
+		const clusterName = cluster ? cluster.title : 'לא ידוע';
+		
+		const chosenModulesHtml = (r.chosenModules || []).map((mod, idx) => {
+			const sol = DataStore.getAll(DataStore.KEYS.SOLUTIONS).find(s => s.id === mod.solutionId);
+			const solName = sol ? sol.solutionName : 'לא ידוע';
+			return `<div style="margin-bottom:8px;"><strong>אפשרות ${idx + 1}:</strong> ${escAttr(solName)} - ${escAttr(mod.theme)}</div>`;
+		}).join('');
+		
+		const body = `
+			<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:14px; line-height:1.6;">
+				<div><strong>📅 תאריך רישום:</strong><br>${new Date(r.createdAt).toLocaleString('he-IL')}</div>
+				<div><strong>📊 סטטוס:</strong><br>${r.status === 'pending' ? '⏳ ממתין' : r.status === 'approved' ? '✅ אושר' : r.status === 'rejected' ? '❌ נדחה' : '🏁 הושלם'}</div>
+				<div><strong>👤 שם מלא:</strong><br>${escAttr(r.teacherName)}</div>
+				<div><strong>📱 טלפון:</strong><br><span dir="ltr">${escAttr(r.phone)}</span></div>
+				<div><strong>📧 דוא"ל:</strong><br><span dir="ltr">${escAttr(r.email)}</span></div>
+				<div><strong>💼 תפקיד:</strong><br>${escAttr(r.role)}</div>
+				<div><strong>🏫 בית ספר:</strong><br>${escAttr(r.schoolName)}<br><small>(${escAttr(r.schoolSymbol)})</small></div>
+				<div><strong>🧩 אשכול:</strong><br>${escAttr(clusterName)}</div>
+				<div style="grid-column:1/-1; background:#f8f9fa; padding:12px; border-radius:8px;">
+					<strong>📚 אפשרויות בחירה:</strong><br>${chosenModulesHtml}
+				</div>
+				<div style="grid-column:1/-1;"><strong>⏱️ סה"כ שעות:</strong> ${r.totalHours || 30}</div>
+			</div>
+		`;
+		
+		showModal('פרטי נרשם מלאים', body, '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>');
+	}
+
+	function deleteClusterRegistration(id) {
+		if (!confirm('האם אתה בטוח שברצונך למחוק רישום זה?')) return;
+		DataStore.remove(DataStore.KEYS.CLUSTER_REGISTRATIONS, id);
+		showToast('הרישום נמחק', 'success');
+		_renderClustersRegistrationsTab();
+	}
+
+	function deleteAllClusterRegistrations() {
+		if (!confirm('⚠️ האם אתה בטוח שברצונך למחוק את כל הרישומים? פעולה זו בלתי הפיכה!')) return;
+		DataStore.saveAll(DataStore.KEYS.CLUSTER_REGISTRATIONS, []);
+		showToast('כל הרישומים נמחקו', 'success');
+		_renderClustersRegistrationsTab();
+	}
+
+	function exportClusterRegistrationsExcel() {
+		const registrations = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		const solutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+		
+		if (registrations.length === 0) {
+			showToast('אין נתונים לייצוא', 'warning');
+			return;
+		}
+		
+		const headers = [
+			'תאריך רישום', 
+			'שם מלא', 
+			'טלפון', 
+			'דוא"ל', 
+			'סמל מוסד', 
+			'שם בית ספר', 
+			'תפקיד', 
+			'אשכול', 
+			'שעות', 
+			'אפשרות 1', 
+			'נושא 1', 
+			'אפשרות 2', 
+			'נושא 2',
+			'סטטוס'
+		];
+		
+		const rows = registrations.map(r => {
+			const cluster = clusters.find(c => c.id === r.clusterId);
+			
+			// 🔑 תיקון: חילוץ פרטי האפשרויות שנבחרו
+			const chosenModules = r.chosenModules || [];
+			const mod1 = chosenModules[0];
+			const mod2 = chosenModules[1];
+			
+			const sol1 = mod1 ? solutions.find(s => s.id === mod1.solutionId) : null;
+			const sol2 = mod2 ? solutions.find(s => s.id === mod2.solutionId) : null;
+			
+			const sol1Name = sol1 ? (sol1.solutionName || sol1.titleHe || sol1.title || '') : '';
+			const sol2Name = sol2 ? (sol2.solutionName || sol2.titleHe || sol2.title || '') : '';
+			
+			return [
+				new Date(r.createdAt).toLocaleDateString('he-IL'),
+				r.teacherName,
+				r.phone,
+				r.email,
+				r.schoolSymbol,
+				r.schoolName,
+				r.role,
+				cluster ? cluster.title : '',
+				r.totalHours || 30,
+				sol1Name,
+				mod1 ? mod1.theme : '',
+				sol2Name,
+				mod2 ? mod2.theme : '',
+				r.status === 'pending' ? 'ממתין' : r.status === 'approved' ? 'אושר' : r.status === 'rejected' ? 'נדחה' : 'הושלם'
+			];
+		});
+		
+		const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+		const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(blob);
+		link.download = `cluster_registrations_${new Date().toISOString().split('T')[0]}.csv`;
+		link.click();
+		
+		showToast('הקובץ יוצא בהצלחה', 'success');
+	}
+
+	function exportClusterRegistrationsCSV() {
+		exportClusterRegistrationsExcel(); // אותה פונקציה, שם קובץ שונה
+	}
+
+	function importClusterRegistrationsExcel() {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.csv,.xlsx,.xls';
+		input.onchange = function(e) {
+			const file = e.target.files[0];
+			if (!file) return;
+			
+			const reader = new FileReader();
+			reader.onload = function(event) {
+				try {
+					const content = event.target.result;
+					const rows = content.split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '').trim()));
+					
+					if (rows.length < 2) {
+						showToast('הקובץ ריק או לא תקין', 'error');
+						return;
+					}
+					
+					const headers = rows[0];
+					const dataRows = rows.slice(1).filter(row => row.length > 1);
+					
+					let importCount = 0;
+					dataRows.forEach(row => {
+						const registration = {
+							id: 'cluster_reg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+							createdAt: new Date().toISOString(),
+							teacherName: row[1] || '',
+							phone: row[2] || '',
+							email: row[3] || '',
+							schoolSymbol: row[4] || '',
+							schoolName: row[5] || '',
+							role: row[6] || '',
+							clusterId: '',
+							totalHours: parseInt(row[8]) || 30,
+							status: 'pending',
+							chosenModules: []
+						};
+						DataStore.create(DataStore.KEYS.CLUSTER_REGISTRATIONS, registration);
+						importCount++;
+					});
+					
+					showToast(`${importCount} רשומות יובאו בהצלחה`, 'success');
+					_renderClustersRegistrationsTab();
+				} catch (err) {
+					console.error('שגיאה בייבוא:', err);
+					showToast('שגיאה בייבוא הקובץ', 'error');
+				}
+			};
+			reader.readAsText(file, 'UTF-8');
+		};
+		input.click();
+	}
+
+	function printClusterRegistrations() {
+		const registrations = DataStore.getAll(DataStore.KEYS.CLUSTER_REGISTRATIONS) || [];
+		const clusters = DataStore.getAll(DataStore.KEYS.CLUSTERS) || [];
+		
+		if (registrations.length === 0) {
+			showToast('אין נתונים להדפסה', 'warning');
+			return;
+		}
+		
+		const printWindow = window.open('', '_blank');
+		const html = `
+			<!DOCTYPE html>
+			<html dir="rtl">
+			<head>
+				<meta charset="UTF-8">
+				<title>רשימת נרשמים - אשכולות למידה</title>
+				<style>
+					body { font-family: Arial, sans-serif; padding: 20px; direction: rtl; }
+					h1 { color: #0ca7aa; border-bottom: 2px solid #0ca7aa; padding-bottom: 10px; }
+					table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+					th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+					th { background: #0ca7aa; color: white; }
+					tr:nth-child(even) { background: #f9f9f9; }
+					@media print { body { padding: 0; } }
+				</style>
+			</head>
+			<body>
+				<h1>🧩 רשימת נרשמים - אשכולות למידה</h1>
+				<p>תאריך הדפסה: ${new Date().toLocaleDateString('he-IL')}</p>
+				<p>סה"כ נרשמים: ${registrations.length}</p>
+				<table>
+					<thead>
+						<tr>
+							<th>תאריך</th>
+							<th>שם מלא</th>
+							<th>טלפון</th>
+							<th>דוא"ל</th>
+							<th>בית ספר</th>
+							<th>תפקיד</th>
+							<th>אשכול</th>
+							<th>שעות</th>
+							<th>סטטוס</th>
+						</tr>
+					</thead>
+					<tbody>
+						${registrations.map(r => {
+							const cluster = clusters.find(c => c.id === r.clusterId);
+							return `
+							<tr>
+								<td>${new Date(r.createdAt).toLocaleDateString('he-IL')}</td>
+								<td>${escAttr(r.teacherName)}</td>
+								<td dir="ltr">${escAttr(r.phone)}</td>
+								<td dir="ltr">${escAttr(r.email)}</td>
+								<td>${escAttr(r.schoolName)}</td>
+								<td>${escAttr(r.role)}</td>
+								<td>${cluster ? escAttr(cluster.title) : ''}</td>
+								<td>${r.totalHours || 30}</td>
+								<td>${r.status === 'pending' ? 'ממתין' : r.status === 'approved' ? 'אושר' : r.status === 'rejected' ? 'נדחה' : 'הושלם'}</td>
+							</tr>
+							`;
+						}).join('')}
+					</tbody>
+				</table>
+			</body>
+			</html>
+		`;
+		
+		printWindow.document.write(html);
+		printWindow.document.close();
+		setTimeout(() => { printWindow.print(); }, 500);
+	}
+
     // ================================================================
     //  MENTORS (מאגר מרצים)
     // ================================================================
-    var _mentorKpiFilter = null; // { field: 'lecturerStatus'|'expertInField'|'isCertifiedLecturer', value: string|null }
 
-    function _mentorKpiCounts(items) {
-        var total = items.length;
-        var counts = { total: total, lecturerStatus: {}, expertInField: {}, isCertifiedLecturer: {} };
-        items.forEach(function(m) {
-            var s = m.lecturerStatus || '';
-            if (s) counts.lecturerStatus[s] = (counts.lecturerStatus[s] || 0) + 1;
-            var e = m.expertInField || '';
-            if (e) counts.expertInField[e] = (counts.expertInField[e] || 0) + 1;
-            var c = m.isCertifiedLecturer || '';
-            if (c) counts.isCertifiedLecturer[c] = (counts.isCertifiedLecturer[c] || 0) + 1;
-        });
-        return counts;
-    }
+	var _mentorKpiFilter = null; // { field: 'lecturerStatus'|'expertInField'|'isCertifiedLecturer', value: string|null }
 
-    function _renderMentorsKpi(items) {
-        var c = _mentorKpiCounts(items);
-        var total = c.total || 1;
-        var active = _mentorKpiFilter;
-        function kpiCard(label, count, field, value, color) {
-            var pct = total > 0 ? Math.round((count / total) * 100) : 0;
-            var isActive = active && active.field === field && active.value === value;
-            var borderStyle = isActive ? 'border:2px solid var(--primary);' : '';
-            return '<div onclick="App._mentorSetKpiFilter(\'' + field + '\',\'' + value + '\')" style="cursor:pointer;padding:12px 16px;border-radius:var(--border-radius);background:var(--card-bg, #fff);border:1px solid var(--border-color, var(--gray-200));' + borderStyle + 'min-width:100px;text-align:center;transition:all .15s;" onmouseover="this.style.boxShadow=\'var(--shadow-md, 0 2px 8px rgba(0,0,0,0.08))\'" onmouseout="this.style.boxShadow=\'none\'">' +
-                '<div style="font-size:22px;font-weight:700;color:' + color + ';">' + count + '</div>' +
-                '<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">' + escAttr(label) + '</div>' +
-                '<div style="font-size:10px;color:var(--gray-400);">' + pct + '%</div>' +
-                '</div>';
-        }
-        var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">';
-        // Status KPIs
-        html += kpiCard('סה"כ הרשומות', c.total, '', '', 'var(--gray-700)');
-        var statusColors = { 'אושר': 'var(--success, #16a34a)', 'אושר פדגוגית': 'var(--primary, #2563eb)', 'השלמת פרטים': 'var(--warning, #d97706)', 'נדחה': 'var(--danger, #dc2626)', 'עודכן מרצה': 'var(--info, #0891b2)' };
-        var statusOrder = ['אושר', 'אושר פדגוגית', 'השלמת פרטים', 'נדחה', 'עודכן מרצה'];
-        statusOrder.forEach(function(s) {
-            var cnt = c.lecturerStatus[s] || 0;
-            html += kpiCard(s, cnt, 'lecturerStatus', s, statusColors[s] || 'var(--gray-500)');
-        });
-        // Separator
-        html += '<div style="width:1px;background:var(--gray-200);margin:0 4px;"></div>';
-        // Expert KPIs
-        var expColors = { 'הוגשה בקשה': 'var(--warning, #d97706)', 'מומחה בתחומו': 'var(--success, #16a34a)', 'נדחתה הבקשה': 'var(--danger, #dc2626)' };
-        ['הוגשה בקשה', 'מומחה בתחומו', 'נדחתה הבקשה'].forEach(function(e) {
-            var cnt = c.expertInField[e] || 0;
-            html += kpiCard(e, cnt, 'expertInField', e, expColors[e] || 'var(--gray-500)');
-        });
-        // Separator
-        html += '<div style="width:1px;background:var(--gray-200);margin:0 4px;"></div>';
-        // Certified Lecturer KPI
-        var certCnt = c.isCertifiedLecturer['מוסב'] || 0;
-        html += kpiCard('מוסב', certCnt, 'isCertifiedLecturer', 'מוסב', 'var(--info, #0891b2)');
-        html += '</div>';
-        // Active filter indicator
-        if (active) {
-            html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:var(--primary, #2563eb);color:#fff;border-radius:var(--border-radius);font-size:13px;">';
-            html += '<span>🔍 מסנן פעיל: <strong>' + escAttr(active.value) + '</strong></span>';
-            html += '<button onclick="App._mentorSetKpiFilter(null, null)" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">✕ נקה סינון</button>';
-            html += '</div>';
-        }
-        return html;
-    }
+	function _mentorKpiCounts(items) {
+		var total = items.length;
+		var counts = { total: total, lecturerStatus: {}, expertInField: {}, isCertifiedLecturer: {} };
+		items.forEach(function(m) {
+			var s = m.lecturerStatus || '';
+			if (s) counts.lecturerStatus[s] = (counts.lecturerStatus[s] || 0) + 1;
+			var e = m.expertInField || '';
+			if (e) counts.expertInField[e] = (counts.expertInField[e] || 0) + 1;
+			var c = m.isCertifiedLecturer || '';
+			if (c) counts.isCertifiedLecturer[c] = (counts.isCertifiedLecturer[c] || 0) + 1;
+		});
+		return counts;
+	}
 
-    function _mentorSetKpiFilter(field, value) {
-        if (!field) { _mentorKpiFilter = null; }
-        else if (_mentorKpiFilter && _mentorKpiFilter.field === field && _mentorKpiFilter.value === value) { _mentorKpiFilter = null; }
-        else { _mentorKpiFilter = { field: field, value: value }; }
-        filterMentors();
-    }
+	function _renderMentorsKpi(items) {
+		var c = _mentorKpiCounts(items);
+		var total = c.total || 1;
+		var active = _mentorKpiFilter;
+		function kpiCard(label, count, field, value, color) {
+			var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+			var isActive = active && active.field === field && active.value === value;
+			var borderStyle = isActive ? 'border:2px solid var(--primary);' : '';
+			return '<div onclick="App._mentorSetKpiFilter(\'' + field + '\',\'' + value + '\')" style="cursor:pointer;padding:12px 16px;border-radius:var(--border-radius);background:var(--card-bg, #fff);border:1px solid var(--border-color, var(--gray-200));' + borderStyle + 'min-width:100px;text-align:center;transition:all .15s;" onmouseover="this.style.boxShadow=\'var(--shadow-md, 0 2px 8px rgba(0,0,0,0.08))\'" onmouseout="this.style.boxShadow=\'none\'">' +
+				'<div style="font-size:22px;font-weight:700;color:' + color + ';">' + count + '</div>' +
+				'<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">' + escAttr(label) + '</div>' +
+				'<div style="font-size:10px;color:var(--gray-400);">' + pct + '%</div>' +
+				'</div>';
+		}
+		var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">';
+		// Status KPIs
+		html += kpiCard('סה"כ הרשומות', c.total, '', '', 'var(--gray-700)');
+		var statusColors = { 'אושר': 'var(--success, #16a34a)', 'אושר פדגוגית': 'var(--primary, #2563eb)', 'השלמת פרטים': 'var(--warning, #d97706)', 'נדחה': 'var(--danger, #dc2626)', 'עודכן מרצה': 'var(--info, #0891b2)' };
+		var statusOrder = ['אושר', 'אושר פדגוגית', 'השלמת פרטים', 'נדחה', 'עודכן מרצה'];
+		statusOrder.forEach(function(s) {
+			var cnt = c.lecturerStatus[s] || 0;
+			html += kpiCard(s, cnt, 'lecturerStatus', s, statusColors[s] || 'var(--gray-500)');
+		});
+		// Separator
+		html += '<div style="width:1px;background:var(--gray-200);margin:0 4px;"></div>';
+		// Expert KPIs
+		var expColors = { 'הוגשה בקשה': 'var(--warning, #d97706)', 'מומחה בתחומו': 'var(--success, #16a34a)', 'נדחתה הבקשה': 'var(--danger, #dc2626)' };
+		['הוגשה בקשה', 'מומחה בתחומו', 'נדחתה הבקשה'].forEach(function(e) {
+			var cnt = c.expertInField[e] || 0;
+			html += kpiCard(e, cnt, 'expertInField', e, expColors[e] || 'var(--gray-500)');
+		});
+		// Separator
+		html += '<div style="width:1px;background:var(--gray-200);margin:0 4px;"></div>';
+		// Certified Lecturer KPI
+		var certCnt = c.isCertifiedLecturer['מוסב'] || 0;
+		html += kpiCard('מוסב', certCnt, 'isCertifiedLecturer', 'מוסב', 'var(--info, #0891b2)');
+		html += '</div>';
+		// Active filter indicator
+		if (active) {
+			html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:var(--primary, #2563eb);color:#fff;border-radius:var(--border-radius);font-size:13px;">';
+			html += '<span>🔍 מסנן פעיל: <strong>' + escAttr(active.value) + '</strong></span>';
+			html += '<button onclick="App._mentorSetKpiFilter(null, null)" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">✕ נקה סינון</button>';
+			html += '</div>';
+		}
+		return html;
+	}
 
-    function renderMentors() {
-        const items = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
-        document.getElementById('section-instructors').innerHTML = `
-            ${_lookupTableHeader('מאגר מרצים', items.length, '👨\u200d🏫')}
-            <div class="card"><div class="card-body">
-                ${_buildActionBar('mentors', 'App.openMentorModal()', 'App.clearAllMentors()', items.length)}
-                ${_renderMentorsKpi(items)}
-                <div class="toolbar">
-                    <input type="text" class="search-input" id="mentorSearch" placeholder="🔍 חיפוש..." oninput="App.filterMentors()">
-                    ${_colVisBtnHtml('mentors')}
-                </div>
-                <div id="mentorsTableDiv">${_renderMentorsTable(items)}</div>
-            </div></div>`;
-        _applyTableFeatures('mentors');
-    }
+	function _mentorSetKpiFilter(field, value) {
+		if (!field) { _mentorKpiFilter = null; }
+		else if (_mentorKpiFilter && _mentorKpiFilter.field === field && _mentorKpiFilter.value === value) { _mentorKpiFilter = null; }
+		else { _mentorKpiFilter = { field: field, value: value }; }
+		filterMentors();
+	}
 
-    function filterMentors() {
-        const search = document.getElementById('mentorSearch').value.toLowerCase();
-        let items = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
-        if (search) items = items.filter(m => (m.fullNameHe||m.fullName||'').toLowerCase().includes(search) || (m.fullNameAr||'').toLowerCase().includes(search) || (m.idNumber||'').includes(search) || (m.email||'').toLowerCase().includes(search));
-        // Apply KPI filter
-        if (_mentorKpiFilter) {
-            var f = _mentorKpiFilter;
-            items = items.filter(function(m) {
-                if (f.field === 'lecturerStatus') return (m.lecturerStatus || '') === f.value;
-                if (f.field === 'expertInField') return (m.expertInField || '') === f.value;
-                if (f.field === 'isCertifiedLecturer') return (m.isCertifiedLecturer || '') === f.value;
-                return true;
-            });
-        }
-        _resetPagination('mentors');
-        document.getElementById('mentorsTableDiv').innerHTML = _renderMentorsTable(items);
-        _applyTableFeatures('mentors');
-    }
+	async function renderMentors() {
+		var container = document.getElementById('section-instructors');
+		if (!container) return;
 
-    function _renderMentorsTable(items) {
-        if (!items.length) return `<div class="empty-state"><div class="empty-icon">👨‍🏫</div><h3>אין מרצים</h3><button class="btn btn-primary" onclick="App.openMentorModal()">➕ הוסף מרצה</button></div>`;
-        return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr><th>ת.ז.</th><th>שם מרצה (עברית)</th><th>שם מרצה (ערבית)</th><th>טלפון</th><th>דוא"ל</th><th>מרצה מוסב</th><th>מומחה בתחומו</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody>
-        ${items.sort((a,b) => (a.fullNameHe||a.fullName||'').localeCompare(b.fullNameHe||b.fullName||'','he')).map(m => `<tr>
-            <td style="direction:ltr">${m.idNumber || '—'}</td><td><strong>${escAttr(m.fullNameHe || m.fullName || '—')}</strong></td><td>${m.fullNameAr || '—'}</td>
-            <td style="direction:ltr">${m.phone || '—'}</td><td>${m.email || '—'}</td>
-            <td>${getLookupLabel(DataStore.KEYS.LOOKUP_CERTIFIED_LECTURER, m.isCertifiedLecturer)}</td>
-            <td>${getLookupLabel(DataStore.KEYS.LOOKUP_EXPERT_FIELD, m.expertInField)}</td>
-            <td>${m.lecturerStatus ? getStatusBadge(m.lecturerStatus) : '<span class="badge badge-gray">—</span>'}</td>
-            <td><div style="display:flex;gap:4px;"><button class="btn btn-outline btn-sm" onclick="App.openMentorModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="App.deleteMentor('${m.id}')">🗑️</button></div></td>
-        </tr>`).join('')}</tbody></table></div>`;
-    }
+		var items = DataStore.getAll(DataStore.KEYS.MENTORS);
+		if (!items || items.length === 0) {
+			container.innerHTML = `
+				<div class="card"><div class="card-body" style="text-align:center;padding:48px;">
+					<div style="margin:0 auto 16px;width:36px;height:36px;border:3px solid #f3f3f3;border-top:3px solid var(--primary,#0ca7aa);border-radius:50%;animation:spin 1s linear infinite;"></div>
+					<p style="font-size:16px;color:var(--gray-600,#555);">⏳ טוען מאגר מרצים מהשרת...</p>
+				</div></div>`;
+			await DataStore.ensureLoaded(DataStore.KEYS.MENTORS);
+			items = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+		}
+		
+		// שימוש ברכיבים הגנריים של המערכת כדי לקבל את כל כפתורי הפעולה (ייבוא, ייצוא אקסל, הדפסה, מחיקה)
+		var headerHtml = _lookupTableHeader('מאגר מרצים', items.length, '👨‍🏫');
+		var actionBarHtml = _buildActionBar('mentors', 'App.openMentorModal()', 'App.clearAllMentors()', items.length);
+		
+		container.innerHTML = `
+			${headerHtml}
+			<div class="card"><div class="card-body">
+				${actionBarHtml}
+				<div class="toolbar">
+					<input type="text" class="search-input" id="mentorSearch" placeholder="🔍 חיפוש לפי שם, ת.ז., טלפון או דוא\"ל..." oninput="App.filterMentors()">
+					${_colVisBtnHtml('mentors')}
+				</div>
+				<div id="mentorsTableDiv">${_renderMentorsTable(items)}</div>
+			</div></div>`;
+		
+		// הפעלת תכונות טבלה מתקדמות (דפדוף והסתרת עמודות)
+		_applyTableFeatures('mentors');
+	}
+
+	function filterMentors() {
+		const search = document.getElementById('mentorSearch').value.toLowerCase();
+		let items = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+		if (search) items = items.filter(m => (m.fullNameHe||m.fullName||'').toLowerCase().includes(search) || (m.fullNameAr||'').toLowerCase().includes(search) || (m.idNumber||'').includes(search) || (m.email||'').toLowerCase().includes(search) || (m.phone||'').includes(search));
+		
+		// Apply KPI filter
+		if (_mentorKpiFilter) {
+			var f = _mentorKpiFilter;
+			items = items.filter(function(m) {
+				if (f.field === 'lecturerStatus') return (m.lecturerStatus || '') === f.value;
+				if (f.field === 'expertInField') return (m.expertInField || '') === f.value;
+				if (f.field === 'isCertifiedLecturer') return (m.isCertifiedLecturer || '') === f.value;
+				return true;
+			});
+		}
+		_resetPagination('mentors');
+		document.getElementById('mentorsTableDiv').innerHTML = _renderMentorsTable(items);
+		_applyTableFeatures('mentors');
+	}
+
+	function _renderMentorsTable(items) {
+		if (!items.length) return '<div class="empty-state"><div class="empty-icon">👨‍🏫</div><h3>אין מרצים במאגר</h3><p style="color:var(--gray-500);">הוסף מרצה חדש כדי להתח manage את המאגר</p><button class="btn btn-primary" onclick="App.openMentorModal()">➕ הוסף מרצה</button></div>';
+		
+		var html = '<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr><th>ת.ז.</th><th>שם מרצה (עברית)</th><th>שם מרצה (ערבית)</th><th>טלפון</th><th>דוא"ל</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody>';
+		items.forEach(function(m) {
+			html += '<tr>' +
+				'<td style="direction:ltr;white-space:nowrap;">' + (m.idNumber || '—') + '</td>' +
+				'<td><strong>' + (m.fullNameHe || m.fullName || '—') + '</strong></td>' +
+				'<td style="direction:rtl;">' + (m.fullNameAr || '—') + '</td>' +
+				'<td style="direction:ltr;">' + (m.phone || '—') + '</td>' +
+				'<td style="direction:ltr;">' + (m.email || '—') + '</td>' +
+				'<td>' + (m.lecturerStatus ? getStatusBadge(m.lecturerStatus) : '—') + '</td>' +
+				'<td><div style="display:flex;gap:4px;">' +
+					'<button class="btn btn-outline btn-sm" onclick="App.openMentorModal(\'' + m.id + '\')" title="עריכה">✏️</button>' +
+					'<button class="btn btn-danger btn-sm" onclick="App.deleteMentor(\'' + m.id + '\')" title="מחיקה">🗑️</button>' +
+				'</div></td>' +
+			'</tr>';
+		});
+		html += '</tbody></table></div>';
+		return html;
+	}
 
     function _mentorSelectOpts(options, selected) {
         var html = '<option value="">בחר</option>';
@@ -5139,50 +6311,70 @@ function _saveCompleteData(solutionId) {
         `<button class="btn btn-primary" onclick="App.saveMentor()">${m ? '💾 שמור' : '➕ הוסף'}</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
     }
 
-    function saveMentor() {
-        const nameHe = document.getElementById('fMNameHe').value.trim();
-        const idNum = document.getElementById('fMId').value.trim();
-        if (!nameHe) { showToast('יש להזין שם מרצה (עברית)', 'error'); return; }
-        if (!idNum) { showToast('יש להזין ת.ז. מרצה', 'error'); return; }
-        // Check unique ID number
-        const existing = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
-        const dup = existing.find(function(e) { return e.idNumber === idNum && (!editingItem || e.id !== editingItem.id); });
-        if (dup) { showToast('ת.ז. זו כבר קיימת במאגר', 'error'); return; }
-        // Phone validation - Israeli mobile format: 05X-XXXXXXX
-        const phone = document.getElementById('fMPhone').value.trim();
-        if (phone && !/^05[0-9]-\d{7}$/.test(phone)) { showToast('מספר טלפון לא תקין. הפורמט הנכון: 05X-XXXXXXX (למשל 050-1234567)', 'error'); return; }
-        // Email validation
-        const email = document.getElementById('fMEmail').value.trim();
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('כתובת דוא"ל לא תקינה', 'error'); return; }
-        
-        const nameAr = document.getElementById('fMNameAr').value.trim();
-        const isCertifiedVal = document.getElementById('fMCertified').value;
-        const isExpertVal = document.getElementById('fMExpert').value;
-        const lecturerStatus = document.getElementById('fMStatus').value;
-        
-        const data = {
-            idNumber: idNum,
-            fullNameHe: nameHe,
-            fullNameAr: nameAr || '',
-            phone: phone,
-            email: email,
-            isCertifiedLecturer: isCertifiedVal || null,
-            expertInField: isExpertVal || null,
-            lecturerStatus: lecturerStatus || null
-        };
-        
-        // Preserve removed fields from existing data
-        if (editingItem) {
-            data.performerType = editingItem.performerType || '';
-            data.organization = editingItem.organization || '';
-        } else {
-            data.performerType = '';
-            data.organization = '';
-        }
-        if (editingItem) { DataStore.update(DataStore.KEYS.MENTORS, editingItem.id, data); showToast('המרצה עודכן', 'success'); }
-        else { DataStore.create(DataStore.KEYS.MENTORS, data); showToast('המרצה נוסף', 'success'); }
-        editingItem = null; closeModal(); renderMentors();
+function saveMentor() {
+    const nameHe = document.getElementById('fMNameHe').value.trim();
+    const idNum = document.getElementById('fMId').value.trim();
+    
+    if (!nameHe) { showToast('יש להזין שם מרצה (עברית)', 'error'); return; }
+    if (!idNum) { showToast('יש להזין ת.ז. מרצה', 'error'); return; }
+    
+    // בדיקת ייחודיות ת.ז.
+    const existing = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+    const dup = existing.find(function(e) { 
+        return e.idNumber === idNum && (!editingItem || e.id !== editingItem.id); 
+    });
+    if (dup) { showToast('ת.ז. זו כבר קיימת במאגר', 'error'); return; }
+    
+    // ולידציית טלפון
+    const phone = document.getElementById('fMPhone').value.trim();
+    if (phone && !/^05[0-9]-\d{7}$/.test(phone)) { 
+        showToast('מספר טלפון לא תקין. הפורמט הנכון: 05X-XXXXXXX (למשל 050-1234567)', 'error'); 
+        return; 
     }
+    
+    // ולידציית דוא"ל
+    const email = document.getElementById('fMEmail').value.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { 
+        showToast('כתובת דוא"ל לא תקינה', 'error'); 
+        return; 
+    }
+    
+    const nameAr = document.getElementById('fMNameAr').value.trim();
+    const isCertifiedVal = document.getElementById('fMCertified').value;
+    const isExpertVal = document.getElementById('fMExpert').value;
+    const lecturerStatus = document.getElementById('fMStatus').value;
+    
+    // 🔑 התיקון הקריטי: הוספת שדה 'id' לאובייקט הנתונים כדי ש-DataStore יצליח לשמור ל-JSON
+    const data = {
+        id: editingItem ? editingItem.id : idNum, // <-- זה השדה שחסר וגרם לכשל בשמירה!
+        idNumber: idNum,
+        fullNameHe: nameHe,
+        fullNameAr: nameAr || '',
+        phone: phone,
+        email: email,
+        isCertifiedLecturer: isCertifiedVal || null,
+        expertInField: isExpertVal || null,
+        lecturerStatus: lecturerStatus || null,
+        performerType: editingItem ? (editingItem.performerType || '') : '',
+        organization: editingItem ? (editingItem.organization || '') : '',
+        updatedAt: new Date().toISOString()
+    };
+    
+    // לוג לבדיקה שהנתונים אכן נשלחים כראוי
+    console.log('💾 [Mentor Save] שומר נתונים למאגר:', data);
+
+    if (editingItem) { 
+        DataStore.update(DataStore.KEYS.MENTORS, editingItem.id, data); 
+        showToast('המרצה עודכן בהצלחה', 'success'); 
+    } else { 
+        DataStore.create(DataStore.KEYS.MENTORS, data); 
+        showToast('המרצה נוסף בהצלחה', 'success'); 
+    }
+    
+    editingItem = null; 
+    closeModal(); 
+    renderMentors();
+}
 
     function deleteMentor(id) { confirmDialog('למחוק מרצה?', () => { _moveToRecycleBin(DataStore.KEYS.MENTORS, id); showToast('נמחק', 'success'); renderMentors(); }); }
 
@@ -5325,90 +6517,132 @@ function _saveCompleteData(solutionId) {
         `<button class="btn btn-primary" onclick="App.saveGuideRepo()">${g ? '💾 שמור' : '➕ הוסף'}</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
     }
 
-    function _previewGuideImage(input) {
-        if (!input.files || !input.files[0]) return;
-        const file = input.files[0];
-        if (file.size > 10 * 1024 * 1024) { showToast('גודל קובץ מקסימלי: 10MB', 'error'); return; }
-        const isPng = file.type === 'image/png';
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = function() {
-            try {
-                function _resizeToDataUrl(maxSize, jpegQuality) {
-                    const canvas = document.createElement('canvas');
-                    const scaleFactor = Math.min(maxSize / img.width, maxSize / img.height, 1);
-                    const w = Math.round(img.width * scaleFactor);
-                    const h = Math.round(img.height * scaleFactor);
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingQuality = 'high';
-                    ctx.drawImage(img, 0, 0, w, h);
-                    return isPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', jpegQuality);
-                }
-                const thumbDataUrl = _resizeToDataUrl(200, 0.7);
-                const retinaDataUrl = _resizeToDataUrl(isPng ? 400 : 800, 0.94);
-                const preview = document.getElementById('guideImgPreview');
-                if (preview) preview.innerHTML = `<img src="${retinaDataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
-                input.dataset.thumbdata = _compressImg(thumbDataUrl);
-                input.dataset.retinadata = _compressImg(retinaDataUrl);
-                input.dataset.rawthumb = thumbDataUrl; // backward compat: raw data URL for team.html profileImage
-            } catch (e) {
-                console.error('[GuideImage] Processing error:', e);
-                showToast('שגיאה בעיבוד התמונה', 'error');
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        };
-        img.onerror = function() { URL.revokeObjectURL(url); showToast('שגיאה בטעינת התמונה', 'error'); };
-        img.src = url;
-    }
+ function _previewGuideImage(input) {
+     if (!input.files || !input.files[0]) return;
+     const file = input.files[0];
+     if (file.size > 10 * 1024 * 1024) { showToast('גודל קובץ מקסימלי: 10MB', 'error'); return; }
+     const isPng = file.type === 'image/png';
+     const url = URL.createObjectURL(file);
+     const img = new Image();
+     
+     // הצגת אנימציית טעינה
+     const preview = document.getElementById('guideImgPreview');
+     if (preview) preview.innerHTML = '<div style="font-size:12px;color:var(--gray-500);">מעלה תמונה...</div>';
 
-    function saveGuideRepo() {
-        const name = document.getElementById('fGRName').value.trim();
-        if (!name) { showToast('יש להזין שם בעברית', 'error'); return; }
-        const imgInput = document.getElementById('fGRImage');
-        const newImageData = imgInput && imgInput.dataset.thumbdata ? imgInput.dataset.thumbdata : null;
-        const newRetinaData = imgInput && imgInput.dataset.retinadata ? imgInput.dataset.retinadata : null;
-        const newRawThumb = imgInput && imgInput.dataset.rawthumb ? imgInput.dataset.rawthumb : null;
-        const data = {
-            idNumber: document.getElementById('fGRId').value.trim(),
-            fullName: name,
-            fullNameAr: document.getElementById('fGRNameAr').value.trim(),
-            position: document.getElementById('fGRPos').value.trim(),
-            phone: document.getElementById('fGRPhone').value.trim(),
-            email: document.getElementById('fGREmail').value.trim(),
-            specializations: document.getElementById('fGRSpec').value.trim()
-        };
-        // Handle profile image: new upload takes priority, otherwise keep existing
-        if (newImageData) {
-            data.avatar_thumb = newImageData;          // LZ-compressed (admin use)
-            data.avatar_retina = newRetinaData;        // LZ-compressed (admin use)
-            data.profileImage = newRawThumb || newImageData; // RAW data URL (team.html compat)
-        } else if (editingItem) {
-            if (editingItem.avatar_thumb) data.avatar_thumb = editingItem.avatar_thumb;
-            if (editingItem.avatar_retina) data.avatar_retina = editingItem.avatar_retina;
-            if (editingItem.profileImage) data.profileImage = _decompressImg(editingItem.profileImage) || editingItem.profileImage;
-        }
-        try {
-            if (editingItem) { DataStore.update(DataStore.KEYS.GUIDES_REPO, editingItem.id, data); showToast('המדריך עודכן', 'success'); }
-            else {
-                const existing = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
-                const maxOrder = existing.reduce((max, g) => Math.max(max, g.order || 0), 0);
-                data.order = maxOrder + 1;
-                DataStore.create(DataStore.KEYS.GUIDES_REPO, data); showToast('המדריך נוסף', 'success');
-            }
-            editingItem = null; closeModal(); renderGuidesRepo();
-        } catch (e) {
-            console.error('[GuideRepo] Save error:', e);
-            if (e.name === 'QuotaExceededError' || (e.code && e.code === 22)) {
-                showToast('שטח האחסון מלא — יש למחוק מדריכים ישנים', 'error');
-            } else {
-                showToast('שגיאה בשמירת המדריך', 'error');
-            }
-        }
-    }
+     img.onload = function() {
+         try {
+             function _resizeToDataUrl(maxSize, jpegQuality) {
+                 const canvas = document.createElement('canvas');
+                 const scaleFactor = Math.min(maxSize / img.width, maxSize / img.height, 1);
+                 const w = Math.round(img.width * scaleFactor);
+                 const h = Math.round(img.height * scaleFactor);
+                 canvas.width = w;
+                 canvas.height = h;
+                 const ctx = canvas.getContext('2d');
+                 ctx.imageSmoothingQuality = 'high';
+                 ctx.drawImage(img, 0, 0, w, h);
+                 return isPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', jpegQuality);
+             }
+             const thumbDataUrl = _resizeToDataUrl(200, 0.7);
+             const retinaDataUrl = _resizeToDataUrl(isPng ? 400 : 800, 0.94);
+             
+             // הצגה מקדימה מיידית בדפדפן
+             if (preview) preview.innerHTML = `<img src="${retinaDataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
 
+             // 🔑 זיהוי המדריך (אם בעריכה) או יצירת מזהה זמני
+             const guideId = (editingItem && editingItem.id) ? editingItem.id : ('new_' + Date.now());
+
+             // 🔑 העלאת תמונת ה-Retina לשרת
+             fetch('./api/upload-guide-image.php', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ image: retinaDataUrl, guideId: guideId, type: 'retina' })
+             }).then(r => r.json()).then(data => {
+                 if (data.success) {
+                     input.dataset.retinaUrl = data.url;
+                     input.dataset.profileUrl = data.url; // שמירה גם כפרופיל ראשי
+                 } else {
+                     console.error('Upload retina failed:', data.error);
+                     showToast('שגיאה בהעלאת תמונה לשרת', 'error');
+                 }
+             }).catch(err => console.error('Upload error:', err));
+
+             // 🔑 העלאת תמונת ה-Thumb לשרת
+             fetch('./api/upload-guide-image.php', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ image: thumbDataUrl, guideId: guideId, type: 'thumb' })
+             }).then(r => r.json()).then(data => {
+                 if (data.success) {
+                     input.dataset.thumbUrl = data.url;
+                 } else {
+                     console.error('Upload thumb failed:', data.error);
+                 }
+             }).catch(err => console.error('Upload error:', err));
+
+         } catch (e) {
+             console.error('[GuideImage] Processing error:', e);
+             showToast('שגיאה בעיבוד התמונה', 'error');
+         } finally {
+             URL.revokeObjectURL(url);
+         }
+     };
+     img.onerror = function() { URL.revokeObjectURL(url); showToast('שגיאה בטעינת התמונה', 'error'); };
+     img.src = url;
+ }
+
+ function saveGuideRepo() {
+     const name = document.getElementById('fGRName').value.trim();
+     if (!name) { showToast('יש להזין שם בעברית', 'error'); return; }
+     
+     const imgInput = document.getElementById('fGRImage');
+     // 🔑 קריאת נתיבי הקבצים החדשים מהשרת (במקום Base64)
+     const newThumbUrl = imgInput && imgInput.dataset.thumbUrl ? imgInput.dataset.thumbUrl : null;
+     const newRetinaUrl = imgInput && imgInput.dataset.retinaUrl ? imgInput.dataset.retinaUrl : null;
+     const newProfileUrl = imgInput && imgInput.dataset.profileUrl ? imgInput.dataset.profileUrl : null;
+
+     const data = {
+         idNumber: document.getElementById('fGRId').value.trim(),
+         fullName: name,
+         fullNameAr: document.getElementById('fGRNameAr').value.trim(),
+         position: document.getElementById('fGRPos').value.trim(),
+         phone: document.getElementById('fGRPhone').value.trim(),
+         email: document.getElementById('fGREmail').value.trim(),
+         specializations: document.getElementById('fGRSpec').value.trim()
+     };
+
+     // טיפול בתמונת פרופיל: אם הועלתה תמונה חדשה, שמור את הנתיב. אחרת, שמור את הנתיב הקיים.
+     if (newThumbUrl) {
+         data.avatar_thumb = newThumbUrl;
+         data.avatar_retina = newRetinaUrl || newThumbUrl;
+         data.profileImage = newProfileUrl || newRetinaUrl || newThumbUrl;
+     } else if (editingItem) {
+         // שמירה על תמונות קיימות (תמיכה גם ב-Base64 ישן וגם ב-URL חדש)
+         if (editingItem.avatar_thumb) data.avatar_thumb = editingItem.avatar_thumb;
+         if (editingItem.avatar_retina) data.avatar_retina = editingItem.avatar_retina;
+         if (editingItem.profileImage) data.profileImage = editingItem.profileImage;
+     }
+
+     try {
+         if (editingItem) { 
+             DataStore.update(DataStore.KEYS.GUIDES_REPO, editingItem.id, data); 
+             showToast('המדריך עודכן', 'success'); 
+         } else {
+             const existing = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
+             const maxOrder = existing.reduce((max, g) => Math.max(max, g.order || 0), 0);
+             data.order = maxOrder + 1;
+             DataStore.create(DataStore.KEYS.GUIDES_REPO, data); 
+             showToast('המדריך נוסף', 'success'); 
+         }
+         editingItem = null; 
+         closeModal(); 
+         renderGuidesRepo();
+     } catch (e) {
+         console.error('[GuideRepo] Save error:', e);
+         showToast('שגיאה בשמירת המדריך', 'error');
+     }
+ }
+ 
     function deleteGuideRepo(id) { confirmDialog('למחוק מדריך?', () => { _moveToRecycleBin(DataStore.KEYS.GUIDES_REPO, id); showToast('נמחק', 'success'); renderGuidesRepo(); }); }
 
     function clearAllGuidesRepo() {
@@ -5453,123 +6687,181 @@ function _saveCompleteData(solutionId) {
     // ================================================================
     //  HOMEPAGE (דף שער)
     // ================================================================
-    function renderHomepage() {
-        const hp = DataStore.getHomepage();
-        const container = document.getElementById('section-homepage');
-        if (!container) return;
 
-        // Destroy any existing TinyMCE editor before re-rendering
-        if (typeof tinymce !== 'undefined' && _hpTinyMCEInit) {
-            try {
-                var existingEditor = tinymce.get('hpMainRich');
-                if (existingEditor) {
-                    existingEditor.save();
-                    existingEditor.destroy();
-                }
-            } catch(e) { console.error('[Homepage] Error destroying editor on re-render:', e); }
-            _hpTinyMCEInit = false;
-        }
+	function renderHomepage() {
+		// 1. Define 'hp' safely at the very top to prevent "hp is not defined" errors
+		const hp = DataStore.getHomepage() || {};
+		const container = document.getElementById('section-homepage');
+		if (!container) return;
 
-        container.innerHTML = `
-            ${_lookupTableHeader('ניהול דף שער', 1)}
-            <div style="display:flex;flex-direction:column;gap:24px;">
+		// Destroy any existing TinyMCE editor before re-rendering
+		if (typeof tinymce !== 'undefined' && typeof _hpTinyMCEInit !== 'undefined' && _hpTinyMCEInit) {
+			try {
+				var existingEditor = tinymce.get('hpMainRich');
+				if (existingEditor) {
+					existingEditor.save();
+					existingEditor.destroy();
+				}
+			} catch(e) { console.error('[Homepage] Error destroying editor on re-render:', e); }
+			_hpTinyMCEInit = false;
+		}
 
-                <!-- Card 1: Header Section -->
-                <div class="card">
-                    <div class="card-header"><span class="card-title">🖼️ כותרת עליונה (לוגו + שם אתר)</span></div>
-                    <div class="card-body">
-                        <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
-                            <div style="text-align:center;">
-                                <div id="hpLogoPreview" style="width:100px;height:100px;border-radius:12px;border:2px dashed var(--border-color);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#f8f9fa;" onclick="document.getElementById('hpLogoInput').click()">
-                                    ${hp.logo ? `<img src="${hp.logo}" style="width:100%;height:100%;object-fit:cover;">` : '<span style="font-size:40px;">🧭</span>'}
-                                </div>
-                                <input type="file" id="hpLogoInput" accept="image/*" style="display:none;" onchange="App._previewHomepageLogo(this)">
-                                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">לחץ להעלאה</div>
-                            </div>
-                            <div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:12px;">
-                                <div>
-                                    <label style="font-weight:600;margin-bottom:4px;display:block;">שם האתר (עברית)</label>
-                                    <input type="text" id="hpSiteNameHe" class="form-input" value="${escAttr(hp.siteName?.he || '')}" placeholder="שם האתר בעברית">
-                                </div>
-                                <div>
-                                    <label style="font-weight:600;margin-bottom:4px;display:block;">שם האתר (ערבית)</label>
-                                    <input type="text" id="hpSiteNameAr" class="form-input" value="${escAttr(hp.siteName?.ar || '')}" placeholder="اسم الموقع بالعربية" dir="rtl">
-                                </div>
-                                <button class="btn btn-primary" onclick="App._saveHomepageHeader()" style="align-self:flex-start;">💾 שמור כותרת</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+		container.innerHTML = `
+			${typeof _lookupTableHeader === 'function' ? _lookupTableHeader('ניהול דף שער', 1) : '<h2>ניהול דף שער</h2>'}
+			<div style="display:flex;flex-direction:column;gap:24px;">
 
-                <!-- Card 2: Navigation Bar -->
-                <div class="card">
-                    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                        <span class="card-title">🧭 סרגל ניווט</span>
-                        <button class="btn btn-primary btn-sm" onclick="App.openHomepageNavModal()">➕ הוסף פריט</button>
-                    </div>
-                    <div class="card-body" style="overflow-x:auto;">
-                        ${_renderHomepageNavTable(hp)}
-                    </div>
-                </div>
+				<!-- Card 1: Header Section (UPDATED with Banner & Display Mode) -->
+				<div class="card">
+					<div class="card-header"><span class="card-title">🖼️ כותרת עליונה (לוגו + שם אתר / באנר)</span></div>
+					<div class="card-body">
+						<div style="display:flex;flex-direction:column;gap:16px;">
+							<!-- Display Mode Selector -->
+							<div>
+								<label style="font-weight:600;margin-bottom:4px;display:block;">מה להציג ב-Header של דף הבית</label>
+								<select id="hpDisplayMode" class="form-input" style="max-width: 400px;">
+									<option value="logo" ${(hp.displayMode || 'logo') === 'logo' ? 'selected' : ''}>לוגו + שם אתר (ברירת מחדל)</option>
+									<option value="banner" ${hp.displayMode === 'banner' ? 'selected' : ''}>באנר (תמונה רחבה מעוצבת)</option>
+								</select>
+							</div>
 
-                <!-- Card 3: Sidebar Items -->
-                <div class="card">
-                    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                        <span class="card-title">📌 תוכן צדדי (Sidebar)</span>
-                        <button class="btn btn-primary btn-sm" onclick="App.openHomepageSidebarModal()">➕ הוסף פריט</button>
-                    </div>
-                    <div class="card-body" style="overflow-x:auto;">
-                        ${_renderHomepageSidebarTable(hp)}
-                    </div>
-                </div>
+							<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+								<!-- Logo Section -->
+								<div style="text-align:center;">
+									<div style="font-weight:600;margin-bottom:8px;">לוגו האתר</div>
+									<div id="hpLogoPreview" style="width:100px;height:100px;border-radius:12px;border:2px dashed var(--border-color);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#f8f9fa;" onclick="document.getElementById('hpLogoInput').click()">
+										${hp.logo ? `<img src="${hp.logo}" style="width:100%;height:100%;object-fit:cover;">` : '<span style="font-size:40px;">🧭</span>'}
+									</div>
+									<input type="file" id="hpLogoInput" accept="image/*" style="display:none;" onchange="App._previewHomepageLogo(this)">
+									<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">לחץ להעלאה</div>
+								</div>
 
-                <!-- Card 4: Main Content -->
-                <div class="card">
-                    <div class="card-header"><span class="card-title">📝 תוכן מרכזי (עברי וערבי מאוחד)</span></div>
-                    <div class="card-body">
-                        <div style="display:flex;flex-direction:column;gap:12px;">
-                            <div>
-                                <label style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;display:block;">תוכן עשיר (עברית + ערבית)</label>
-                                <div class="hp-editor-wrapper" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);">
-                                    <textarea id="hpMainRich">${escHtml(hp.mainContent?.combined || hp.mainContent?.he || '')}</textarea>
-                                </div>
-                            </div>
-                            <div style="margin-top:16px;text-align:center;">
-                                <button class="btn btn-primary" onclick="App._saveHomepageContent()">💾 שמור תוכן</button>
-                                <button class="btn btn-outline" onclick="App._initHpTinyMCE()" style="margin-right:8px;">🔄 אתחל עורך</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+								<!-- Banner Section -->								<!-- Banner Section -->
+								<div style="text-align:center; flex:1; min-width: 250px;">
+									<div style="font-weight:600;margin-bottom:8px;">באנר האתר</div>
+									<div id="hpBannerPreview" style="width:100%;max-width:400px;height:80px;margin:0 auto;border-radius:12px;border:2px dashed var(--border-color);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#f8f9fa;" onclick="document.getElementById('hpBannerInput').click()">
+										${hp.banner ? `<img src="${hp.banner}" style="width:100%;height:100%;object-fit:contain;">` : '<span style="font-size:24px;">🖼️</span>'}
+									</div>
+									<input type="file" id="hpBannerInput" accept="image/*" style="display:none;" onchange="App._previewHomepageBanner(this)">
+									<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">לחץ להעלאה</div>
+								</div>
 
-                <!-- Card 5: Footer -->
-                <div class="card">
-                    <div class="card-header"><span class="card-title">🔻 כותרת תחתונה (Footer)</span></div>
-                    <div class="card-body">
-                        <div style="display:flex;flex-direction:column;gap:12px;">
-                            <div>
-                                <label style="font-weight:600;margin-bottom:4px;display:block;">טקסט עברית</label>
-                                <textarea id="hpFooterHe" class="form-input" rows="2" placeholder="טקסט footer בעברית...">${escAttr(hp.footerText?.he || '')}</textarea>
-                            </div>
-                            <div>
-                                <label style="font-weight:600;margin-bottom:4px;display:block;">טקסט ערבית</label>
-                                <textarea id="hpFooterAr" class="form-input" rows="2" placeholder="نص التذييل بالعربية..." dir="rtl">${escAttr(hp.footerText?.ar || '')}</textarea>
-                            </div>
-                            <button class="btn btn-primary" onclick="App._saveHomepageFooter()" style="align-self:flex-start;">💾 שמור Footer</button>
-                        </div>
-                    </div>
-                </div>
+								<!-- Site Names Section -->
+								<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:12px;">
+									<div>
+										<label style="font-weight:600;margin-bottom:4px;display:block;">שם האתר (עברית)</label>
+										<input type="text" id="hpSiteNameHe" class="form-input" value="${escAttr((hp.siteName && hp.siteName.he) ? hp.siteName.he : '')}" placeholder="שם האתר בעברית">
+									</div>
+									<div>
+										<label style="font-weight:600;margin-bottom:4px;display:block;">שם האתר (ערבית)</label>
+										<input type="text" id="hpSiteNameAr" class="form-input" value="${escAttr((hp.siteName && hp.siteName.ar) ? hp.siteName.ar : '')}" placeholder="اسم الموقع بالعربية" dir="rtl">
+									</div>
+									<button class="btn btn-primary" onclick="App._saveHomepageHeader()" style="align-self:flex-start;">💾 שמור כותרת</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            </div>
+				<!-- Card 2: Navigation Bar (ORIGINAL) -->
+				<div class="card">
+					<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+						<span class="card-title">🧭 סרגל ניווט</span>
+						<button class="btn btn-primary btn-sm" onclick="App.openHomepageNavModal()">➕ הוסף פריט</button>
+					</div>
+					<div class="card-body" style="overflow-x:auto;">
+						${typeof _renderHomepageNavTable === 'function' ? _renderHomepageNavTable(hp) : ''}
+					</div>
+				</div>
 
-            <style>
-                @media (max-width: 768px) {
-                    #mainContent [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
-                }
-            </style>
-        `;
-    }
+				<!-- Card 3: Sidebar Items (ORIGINAL) -->
+				<div class="card">
+					<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+						<span class="card-title">📌 תוכן צדדי (Sidebar)</span>
+						<button class="btn btn-primary btn-sm" onclick="App.openHomepageSidebarModal()">➕ הוסף פריט</button>
+					</div>
+					<div class="card-body" style="overflow-x:auto;">
+						${typeof _renderHomepageSidebarTable === 'function' ? _renderHomepageSidebarTable(hp) : ''}
+					</div>
+				</div>
 
+				<!-- Card 4: Main Content (ORIGINAL) -->
+				<div class="card">
+					<div class="card-header"><span class="card-title">📝 תוכן מרכזי (עברי וערבי מאוחד)</span></div>
+					<div class="card-body">
+						<div style="display:flex;flex-direction:column;gap:12px;">
+							<div>
+								<label style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;display:block;">תוכן עשיר (עברית + ערבית)</label>
+								<div class="hp-editor-wrapper" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+									<textarea id="hpMainRich">${escHtml((hp.mainContent && (hp.mainContent.combined || hp.mainContent.he)) ? (hp.mainContent.combined || hp.mainContent.he) : '')}</textarea>
+								</div>
+							</div>
+							<div style="margin-top:16px;text-align:center;">
+								<button class="btn btn-primary" onclick="App._saveHomepageContent()">💾 שמור תוכן</button>
+								<button class="btn btn-outline" onclick="typeof App._initHpTinyMCE === 'function' ? App._initHpTinyMCE() : ''" style="margin-right:8px;">🔄 אתחל עורך</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Card 5: Footer (ORIGINAL) -->
+				<div class="card">
+					<div class="card-header"><span class="card-title">🔻 כותרת תחתונה (Footer)</span></div>
+					<div class="card-body">
+						<div style="display:flex;flex-direction:column;gap:12px;">
+							<div>
+								<label style="font-weight:600;margin-bottom:4px;display:block;">טקסט עברית</label>
+								<textarea id="hpFooterHe" class="form-input" rows="2" placeholder="טקסט footer בעברית...">${escAttr((hp.footerText && hp.footerText.he) ? hp.footerText.he : '')}</textarea>
+							</div>
+							<div>
+								<label style="font-weight:600;margin-bottom:4px;display:block;">טקסט ערבית</label>
+								<textarea id="hpFooterAr" class="form-input" rows="2" placeholder="نص التذييل بالعربية..." dir="rtl">${escAttr((hp.footerText && hp.footerText.ar) ? hp.footerText.ar : '')}</textarea>
+							</div>
+							<button class="btn btn-primary" onclick="App._saveHomepageFooter()" style="align-self:flex-start;">💾 שמור Footer</button>
+						</div>
+					</div>
+				</div>
+
+			</div>
+
+			<style>
+				@media (max-width: 768px) {
+					#mainContent [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+				}
+			</style>
+				<!-- Card 5: Footer (ORIGINAL) -->
+				<div class="card">
+					<div class="card-header"><span class="card-title">🔻 כותרת תחתונה (Footer)</span></div>
+					<div class="card-body">
+						<div style="display:flex;flex-direction:column;gap:12px;">
+							<div>
+								<label style="font-weight:600;margin-bottom:4px;display:block;">טקסט עברית</label>
+								<textarea id="hpFooterHe" class="form-input" rows="2" placeholder="טקסט footer בעברית...">${escAttr((hp.footerText && hp.footerText.he) ? hp.footerText.he : '')}</textarea>
+							</div>
+							<div>
+								<label style="font-weight:600;margin-bottom:4px;display:block;">טקסט ערבית</label>
+								<textarea id="hpFooterAr" class="form-input" rows="2" placeholder="نص التذييل بالعربية..." dir="rtl">${escAttr((hp.footerText && hp.footerText.ar) ? hp.footerText.ar : '')}</textarea>
+							</div>
+							<button class="btn btn-primary" onclick="App._saveHomepageFooter()" style="align-self:flex-start;">💾 שמור Footer</button>
+						</div>
+					</div>
+				</div>
+
+			</div>
+
+			<style>
+				@media (max-width: 768px) {
+					#mainContent [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+				}
+			</style>
+		`; // <-- סיום הזרקת ה-HTML
+
+		// 🔑 הוספה קריטית: אתחול TinyMCE לאחר שה-DOM של דף השער צויר לחלוטין
+		setTimeout(() => {
+			if (typeof App !== 'undefined' && typeof App._initHpTinyMCE === 'function') {
+				App._initHpTinyMCE();
+			}
+		}, 150); // 150 מילי-שניות נותנות לדפדפן זמן מספיק לרנדר את ה-textarea לפני האתחול
+	} // <-- סיום הפונקציה renderHomepage
 
     function _renderHomepageNavTable(hp) {
         const items = (hp.navItems || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -5606,130 +6898,144 @@ function _saveCompleteData(solutionId) {
         </table>`;
     }
 
-    function _saveHomepageHeader() {
-        const nameHe = document.getElementById('hpSiteNameHe').value.trim();
-        const nameAr = document.getElementById('hpSiteNameAr').value.trim();
-        const logoInput = document.getElementById('hpLogoInput');
-        const newLogo = logoInput && logoInput.dataset.imagedata ? logoInput.dataset.imagedata : null;
-        const updates = { siteName: { he: nameHe, ar: nameAr } };
-        if (newLogo) updates.logo = newLogo;
-        DataStore.updateHomepage(updates);
-        showToast('הכותרת נשמרה', 'success');
-        // Re-render and re-initialize TinyMCE after a short delay
-        setTimeout(function() { renderHomepage(); _initHpTinyMCE(); }, 100);
-    }
+	function _saveHomepageHeader() {
+		const nameHe = document.getElementById('hpSiteNameHe').value.trim();
+		const nameAr = document.getElementById('hpSiteNameAr').value.trim();
+		const displayMode = document.getElementById('hpDisplayMode').value;
+		
+		const logoInput = document.getElementById('hpLogoInput');
+		const newLogo = logoInput && logoInput.dataset.imagedata ? logoInput.dataset.imagedata : null;
+		
+		const bannerInput = document.getElementById('hpBannerInput');
+		const newBanner = bannerInput && bannerInput.dataset.imagedata ? bannerInput.dataset.imagedata : null;
 
-    var _hpTinyMCEInit = false;
-    function _initHpTinyMCE() {
-        if (typeof tinymce === 'undefined') {
-            console.warn('[Homepage] TinyMCE not loaded yet');
-            return;
-        }
-        // Destroy existing editor if any
-        if (_hpTinyMCEInit) {
-            try {
-                var existingEditor = tinymce.get('hpMainRich');
-                if (existingEditor) {
-                    existingEditor.save();
-                    existingEditor.destroy();
-                }
-            } catch(e) { console.error('[Homepage] Error destroying editor:', e); }
-            _hpTinyMCEInit = false;
-        }
-        // Initialize new editor
-        try {
-            tinymce.init({
-                selector: '#hpMainRich',
-                height: 450,
-                directionality: 'rtl',
-                language: 'he_IL',
-                menubar: 'file edit view insert format table tools',
-                plugins: 'advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste wordcount help directionality textcolor',
-                toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
-                content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } h1 { font-size: 26px; } h2 { font-size: 22px; } h3 { font-size: 18px; }',
-                branding: false,
-                promotion: false,
-                resize: true,
-                statusbar: true,
-                paste_data_images: true,
-                setup: function(editor) {
-                    editor.on('init', function() {
-                        _hpTinyMCEInit = true;
-                        console.log('[Homepage] TinyMCE initialized successfully');
-                    });
-                }
-            });
-        } catch(e) {
-            console.error('[Homepage] Error initializing TinyMCE:', e);
-        }
-    }
+		if (displayMode === 'banner' && !newBanner) {
+			showToast('בחרת להציג באנר, אך לא העלית תמונת באנר. אנא העלה באנר או שנה ל"לוגו + שם".', 'warning');
+			return;
+		}
 
-    // ================================================================
-    //  TinyMCE INITIALIZATION FOR NEW SOLUTION FORM
-    // ================================================================
-    var _nsfTinyMCEInit = false;
-    function _initNsfTinyMCE() {
-        if (typeof tinymce === 'undefined') {
-            console.warn('[NewSolution] TinyMCE not loaded yet');
-            return;
-        }
-        // Destroy existing editors if any
-        if (_nsfTinyMCEInit) {
-            try {
-                var descEditor = tinymce.get('nsf_desc');
-                var notesEditor = tinymce.get('nsf_notes');
-                if (descEditor) { descEditor.save(); descEditor.destroy(); }
-                if (notesEditor) { notesEditor.save(); notesEditor.destroy(); }
-            } catch(e) { console.error('[NewSolution] Error destroying editors:', e); }
-            _nsfTinyMCEInit = false;
-        }
-        // Initialize new editors for description and notes fields
-        try {
-            tinymce.init({
-                selector: '#nsf_desc',
-                height: 300,
-                directionality: 'rtl',
-                language: 'he_IL',
-                menubar: 'file edit view insert format table tools',
-                plugins: 'advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste wordcount help directionality textcolor',
-                toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
-                content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } h1 { font-size: 26px; } h2 { font-size: 22px; } h3 { font-size: 18px; }',
-                branding: false,
-                promotion: false,
-                resize: true,
-                statusbar: true,
-                paste_data_images: true,
-                setup: function(editor) {
-                    editor.on('init', function() {
-                        console.log('[NewSolution] TinyMCE description editor initialized');
-                    });
-                }
-            });
-            tinymce.init({
-                selector: '#nsf_notes',
-                height: 200,
-                directionality: 'rtl',
-                language: 'he_IL',
-                menubar: false,
-                plugins: 'advlist autolink lists link charmap searchreplace visualblocks code directionality textcolor',
-                toolbar: 'undo redo | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link | removeformat | code',
-                content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 14px; line-height: 1.6; padding: 12px; direction: rtl; }',
-                branding: false,
-                promotion: false,
-                resize: true,
-                statusbar: true,
-                paste_data_images: false,
-                setup: function(editor) {
-                    editor.on('init', function() {
-                        _nsfTinyMCEInit = true;
-                        console.log('[NewSolution] TinyMCE initialized successfully');
-                    });
-                }
-            });
-        } catch(e) {
-            console.error('[NewSolution] Error initializing TinyMCE:', e);
-        }
+		const updates = { 
+			siteName: { he: nameHe, ar: nameAr },
+			displayMode: displayMode
+		};
+		if (newLogo) updates.logo = newLogo;
+		if (newBanner) updates.banner = newBanner;
+		
+		DataStore.updateHomepage(updates);
+		showToast('הכותרת נשמרה', 'success');
+		
+		setTimeout(function() { 
+			if (typeof renderHomepage === 'function') renderHomepage(); 
+			if (typeof _initHpTinyMCE === 'function') _initHpTinyMCE(); 
+		}, 100);
+	}
+
+// ==========================================
+// אתחול חסין-תקלות של TinyMCE לדף שער
+// ==========================================
+function _initHpTinyMCE() {
+    if (typeof tinymce === 'undefined') {
+        setTimeout(_initHpTinyMCE, 300);
+        return;
     }
+    const textarea = document.getElementById('hpMainRich');
+    if (!textarea) {
+        setTimeout(_initHpTinyMCE, 300);
+        return;
+    }
+    if (tinymce.get('hpMainRich')) {
+        tinymce.get('hpMainRich').remove();
+    }
+    tinymce.init({
+        selector: '#hpMainRich',
+        base_url: './tinymce',
+        suffix: '.min',
+        height: 500,
+        width: '100%',
+        directionality: 'rtl',
+        language: 'he_IL',
+        plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table wordcount help directionality',
+        toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
+        content_style: 'body { font-family: "Noto Sans Hebrew", "Noto Sans Arabic", "Tajawal", Arial, sans-serif; font-size: 16px; line-height: 1.8; padding: 16px; direction: rtl; }',
+        branding: false,
+        promotion: false,
+        resize: true,
+        statusbar: true,
+        paste_data_images: true
+    });
+}
+
+var _nsfTinyMCEInit = false;
+
+function _initNsfTinyMCE() {
+    if (typeof tinymce === 'undefined') {
+        console.warn('[NewSolution] TinyMCE not loaded yet');
+        return;
+    }
+    if (_nsfTinyMCEInit) {
+        try {
+            var descEditor = tinymce.get('nsf_desc');
+            var notesEditor = tinymce.get('nsf_notes');
+            if (descEditor) { descEditor.save(); descEditor.destroy(); }
+            if (notesEditor) { notesEditor.save(); notesEditor.destroy(); }
+        } catch(e) { console.error('[NewSolution] Error destroying editors:', e); }
+        _nsfTinyMCEInit = false;
+    }
+    try {
+        tinymce.init({
+            selector: '#nsf_desc',
+            base_url: './tinymce',  // 🔑 NEW
+            suffix: '.min',         // 🔑 NEW
+            readonly: false,
+            statistics: false,
+            height: 300,
+            directionality: 'rtl',
+            language: 'he_IL',         // 🔑 UPDATED
+            menubar: 'file edit view insert format table tools',
+            plugins: 'advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table wordcount help directionality textcolor', // 🔑 UPDATED: Removed 'paste'
+            toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
+            content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; } h1 { font-size: 26px; } h2 { font-size: 22px; } h3 { font-size: 18px; }',
+            branding: false,
+            promotion: false,
+            resize: true,
+            statusbar: true,
+            paste_data_images: true,
+            setup: function(editor) {
+                editor.on('init', function() {
+                    console.log('[NewSolution] TinyMCE description editor initialized');
+                });
+            }
+        });
+        
+        tinymce.init({
+            selector: '#nsf_notes',
+            base_url: './tinymce',  // 🔑 NEW
+            suffix: '.min',         // 🔑 NEW
+            readonly: false,
+            statistics: false,
+            height: 200,
+            directionality: 'rtl',
+            language: 'he_IL',         // 🔑 UPDATED
+            menubar: false,
+            plugins: 'advlist autolink lists link charmap searchreplace visualblocks code directionality textcolor', // 🔑 UPDATED: Removed 'paste'
+            toolbar: 'undo redo | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link | removeformat | code',
+            content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 14px; line-height: 1.6; padding: 12px; direction: rtl; }',
+            branding: false,
+            promotion: false,
+            resize: true,
+            statusbar: true,
+            paste_data_images: false,
+            setup: function(editor) {
+                editor.on('init', function() {
+                    _nsfTinyMCEInit = true;
+                    console.log('[NewSolution] TinyMCE initialized successfully');
+                });
+            }
+        });
+    } catch(e) {
+        console.error('[NewSolution] Error initializing TinyMCE:', e);
+    }
+}
 
     function _saveHomepageContent() {
         // Save editor content before saving
@@ -6001,6 +7307,33 @@ function _saveCompleteData(solutionId) {
         };
         reader.readAsDataURL(file);
     }
+	
+	function _previewHomepageBanner(input) {
+		if (!input.files || !input.files[0]) return;
+		const file = input.files[0];
+		if (file.size > 2 * 1024 * 1024) { showToast('גודל קובץ מקסימלי: 2MB', 'error'); return; }
+		const reader = new FileReader();
+		reader.onload = function(e) {
+			const img = new Image();
+			img.onload = function() {
+				const canvas = document.createElement('canvas');
+				const maxWidth = 1200;
+				let w = img.width, h = img.height;
+				if (w > maxWidth) {
+					h = Math.round(h * maxWidth / w);
+					w = maxWidth;
+				}
+				canvas.width = w; canvas.height = h;
+				canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+				const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+				const preview = document.getElementById('hpBannerPreview');
+				if (preview) preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+				input.dataset.imagedata = dataUrl;
+			};
+			img.src = e.target.result;
+		};
+		reader.readAsDataURL(file);
+	}
 
     // ================================================================
     //  BUDGETS (תקציבים)
@@ -6335,16 +7668,86 @@ function _saveCompleteData(solutionId) {
     // ================================================================
     //  PERIODS (תקופות)
     // ================================================================
+
+    // ============================================
+    // 🔧 תקופות (Periods) - גרסה מתוקנת ויציבה
+    // ============================================
+    let _editingPeriodItem = null;
+
+    // 🔑 תיקון קריטי: שימוש בגרשיים עבריים (״) במקום רגילים (") למניעת שבירת HTML
+    const HEB_TO_ENG_YEAR_MAP = {
+        'תשפ״א': '2020-2021',
+        'תשפ״ב': '2021-2022',
+        'תשפ״ג': '2022-2023',
+        'תשפ״ד': '2023-2024',
+        'תשפ״ה': '2024-2025',
+        'תשפ״ו': '2025-2026',
+        'תשפ״ז': '2026-2027',
+        'תשפ״ח': '2027-2028',
+        'תשפ״ט': '2028-2029',
+        'תש״צ': '2029-2030',
+        'תשצ״א': '2030-2031',
+        'תשצ״ב': '2031-2032'
+    };
+
+    function getHebrewYearOptions(selectedYear = '') {
+        return Object.keys(HEB_TO_ENG_YEAR_MAP).map(year => {
+            const isSelected = (year === selectedYear) ? ' selected' : '';
+            return `<option value="${year}"${isSelected}>${year} (${HEB_TO_ENG_YEAR_MAP[year]})</option>`;
+        }).join('');
+    }
+
+    function _onPHebYear() {
+        const h = document.getElementById('fPHebYear').value;
+        const eng = HEB_TO_ENG_YEAR_MAP[h] || '';
+        
+        console.log('[Period] נבחרה שנה:', h, '→ שנה לועזית:', eng);
+        
+        document.getElementById('fPEngYear').value = eng;
+        
+        if (eng) {
+            const years = eng.split('-').map(Number);
+            if (years.length === 2 && years[0] && years[1]) {
+                const year1 = years[0];
+                const year2 = years[1];
+                
+                document.getElementById('fP1Label').value = '2 מ׳: 09–12';
+                document.getElementById('fP1Start').value = `${year1}-09-01`;
+                document.getElementById('fP1End').value = `${year1}-12-31`;
+                
+                document.getElementById('fP2Label').value = '1 מ׳: 01–08';
+                document.getElementById('fP2Start').value = `${year2}-01-01`;
+                document.getElementById('fP2End').value = `${year2}-08-30`;
+                
+                console.log('[Period] שדות עודכנו בהצלחה');
+            }
+        } else {
+            document.getElementById('fP1Label').value = '';
+            document.getElementById('fP1Start').value = '';
+            document.getElementById('fP1End').value = '';
+            document.getElementById('fP2Label').value = '';
+            document.getElementById('fP2Start').value = '';
+            document.getElementById('fP2End').value = '';
+        }
+    }
+
     function renderPeriods() {
         const items = DataStore.getAll(DataStore.KEYS.PERIODS) || [];
+        let headerHtml = '';
+        if (typeof _lookupTableHeader === 'function') {
+            headerHtml = _lookupTableHeader('תקופות', items.length, '📅', '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.openPeriodModal()">➕ תקופה חדשה</button>');
+        } else {
+            headerHtml = `<div class="card-header"><span class="card-title">📅 תקופות (${items.length})</span> <button class="btn btn-sm btn-primary" onclick="App.openPeriodModal()">➕ תקופה חדשה</button></div>`;
+        }
+        
         document.getElementById('section-periods').innerHTML = `
-            ${_lookupTableHeader('תקופות', items.length, '📅', '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.openPeriodModal()">➕ תקופה חדשה</button>')}
+            ${headerHtml}
             <div class="card"><div class="card-body">
                 <div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr><th>שנה עברית</th><th>שנה לועזית</th><th>2 מ׳: 09–12</th><th>1 מ׳: 01–08</th><th>פעילה</th><th>פעולות</th></tr></thead><tbody>
                 ${items.map(p => `<tr>
-                    <td><strong>${p.hebrewYear}</strong></td><td>${p.englishYear || '—'}</td>
-                    <td>${p.period1Label || '2 מ׳: 09–12'}: ${formatDate(p.period1Start)} - ${formatDate(p.period1End)}</td>
-                    <td>${p.period2Label || '1 מ׳: 01–08'}: ${formatDate(p.period2Start)} - ${formatDate(p.period2End)}</td>
+                    <td><strong>${p.hebrewYear || ''}</strong></td><td>${p.englishYear || '—'}</td>
+                    <td>${p.period1Label || '2 מ׳: 09–12'}: ${p.period1Start || ''} - ${p.period1End || ''}</td>
+                    <td>${p.period2Label || '1 מ׳: 01–08'}: ${p.period2Start || ''} - ${p.period2End || ''}</td>
                     <td>${p.isActive ? '<span class="badge badge-success">פעילה</span>' : '<button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="App._switchActivePeriod(\'' + p.id + '\')" title="הגדר כפעילה">⚡ הפעל</button>'}</td>
                     <td><div style="display:flex;gap:4px;"><button class="btn btn-outline btn-sm" onclick="App.openPeriodModal('${p.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="App.deletePeriod('${p.id}')">🗑️</button></div></td>
                 </tr>`).join('')}</tbody></table></div>
@@ -6353,116 +7756,231 @@ function _saveCompleteData(solutionId) {
 
     function openPeriodModal(id = null) {
         const p = id ? DataStore.getById(DataStore.KEYS.PERIODS, id) : null;
-        editingItem = p;
+        _editingPeriodItem = p;
+        
+        const hebOptions = '<option value="">בחר שנה</option>' + getHebrewYearOptions(p ? p.hebrewYear : '');
+        const autoFieldStyle = 'style="background:#f0f9ff; border:1px solid #bae6fd;"';
+        
+        console.log('[Period] פתיחת חלון, תקופה קיימת:', p ? p.hebrewYear : 'חדשה');
+        
         showModal(p ? 'עריכת תקופה' : 'תקופה חדשה', `
             <div class="form-grid">
-                <div class="form-group"><label>שנת תקציב (עברית)</label><select id="fPHebYear" class="form-select" onchange="App._onPHebYear()"><option value="">בחר</option>${getHebrewYearOptions(p ? p.hebrewYear : '')}</select></div>
-                <div class="form-group"><label>שנה לועזית</label><input type="text" id="fPEngYear" class="form-input" value="${p ? p.englishYear || '' : ''}" readonly style="background:var(--gray-50);"></div>
-                <div class="form-group"><label>2 מ׳: 09–12 - תווית</label><input type="text" id="fP1Label" class="form-input" value="${p ? p.period1Label || '2 מ׳: 09–12' : '2 מ׳: 09–12'}"></div>
-                <div class="form-group"><label>2 מ׳: 09–12 - התחלה</label><input type="date" id="fP1Start" class="form-input" value="${p ? p.period1Start || '' : ''}"></div>
-                <div class="form-group"><label>2 מ׳: 09–12 - סיום</label><input type="date" id="fP1End" class="form-input" value="${p ? p.period1End || '' : ''}"></div>
-                <div class="form-group"><label>1 מ׳: 01–08 - תווית</label><input type="text" id="fP2Label" class="form-input" value="${p ? p.period2Label || '1 מ׳: 01–08' : '1 מ׳: 01–08'}"></div>
-                <div class="form-group"><label>1 מ׳: 01–08 - התחלה</label><input type="date" id="fP2Start" class="form-input" value="${p ? p.period2Start || '' : ''}"></div>
-                <div class="form-group"><label>1 מ׳: 01–08 - סיום</label><input type="date" id="fP2End" class="form-input" value="${p ? p.period2End || '' : ''}"></div>
-                <div class="form-group"><label>פעילה</label><select id="fPActive" class="form-select"><option value="yes" ${p && p.isActive ? 'selected' : ''}>כן</option><option value="no" ${p && !p.isActive ? 'selected' : ''}>לא</option></select></div>
+                <div class="form-group">
+                    <label>שנת תקציב (עברית) <span style="color:red">*</span></label>
+                    <select id="fPHebYear" class="form-select" onchange="App._onPHebYear()">
+                        ${hebOptions}
+                    </select>
+                    <small style="color:var(--gray-500);font-size:11px;">💡 בחר שנה - כל שאר השדות יתמלאו אוטומטית</small>
+                </div>
+                <div class="form-group">
+                    <label>שנה לועזית (אוטומטי)</label>
+                    <input type="text" id="fPEngYear" class="form-input" value="${p ? p.englishYear || '' : ''}" ${autoFieldStyle}>
+                </div>
+                
+                <div style="grid-column: 1 / -1; margin-top:10px; padding:10px; background:#e0f2fe; border-radius:8px; font-weight:600; color:#0369a1;">
+                    📅 מחצית ראשונה (2 מ׳: 09–12)
+                </div>
+                <div class="form-group">
+                    <label>תווית (אוטומטי)</label>
+                    <input type="text" id="fP1Label" class="form-input" value="${p ? p.period1Label || '2 מ׳: 09–12' : ''}" ${autoFieldStyle}>
+                </div>
+                <div class="form-group">
+                    <label>תאריך התחלה (אוטומטי)</label>
+                    <input type="date" id="fP1Start" class="form-input" value="${p ? p.period1Start || '' : ''}" ${autoFieldStyle}>
+                </div>
+                <div class="form-group">
+                    <label>תאריך סיום (אוטומטי)</label>
+                    <input type="date" id="fP1End" class="form-input" value="${p ? p.period1End || '' : ''}" ${autoFieldStyle}>
+                </div>
+                
+                <div style="grid-column: 1 / -1; margin-top:10px; padding:10px; background:#fef3c7; border-radius:8px; font-weight:600; color:#92400e;">
+                    📅 מחצית שנייה (1 מ׳: 01–08)
+                </div>
+                <div class="form-group">
+                    <label>תווית (אוטומטי)</label>
+                    <input type="text" id="fP2Label" class="form-input" value="${p ? p.period2Label || '1 מ׳: 01–08' : ''}" ${autoFieldStyle}>
+                </div>
+                <div class="form-group">
+                    <label>תאריך התחלה (אוטומטי)</label>
+                    <input type="date" id="fP2Start" class="form-input" value="${p ? p.period2Start || '' : ''}" ${autoFieldStyle}>
+                </div>
+                <div class="form-group">
+                    <label>תאריך סיום (אוטומטי)</label>
+                    <input type="date" id="fP2End" class="form-input" value="${p ? p.period2End || '' : ''}" ${autoFieldStyle}>
+                </div>
+                
+                <div class="form-group" style="grid-column: 1 / -1; margin-top:10px;">
+                    <label>האם התקופה פעילה?</label>
+                    <select id="fPActive" class="form-select">
+                        <option value="yes" ${p && p.isActive ? 'selected' : ''}>✅ כן - תקופה פעילה</option>
+                        <option value="no" ${(!p || (p && !p.isActive)) ? 'selected' : ''}>❌ לא - תקופה לא פעילה</option>
+                    </select>
+                </div>
             </div>`,
-        `<button class="btn btn-primary" onclick="App.savePeriod()">${p ? '💾 שמור' : '➕ צור'}</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
-    }
-
-    function _onPHebYear() {
-        const h = document.getElementById('fPHebYear').value;
-        const eng = DataStore.getEnglishYear(h) || '';
-        document.getElementById('fPEngYear').value = eng;
-        // Auto-calculate period dates from Hebrew year
-        // e.g. תשפ"ז → 2026-2027
-        //   Period 1 "2 מ׳: 09–12": 1.9.2026 – 31.12.2026
-        //   Period 2 "1 מ׳: 01–08": 1.1.2027 – 31.8.2027
-        if (eng) {
-            const years = eng.split('-').map(Number);
-            if (years.length === 2 && years[0] && years[1]) {
-                document.getElementById('fP1Label').value = '2 מ׳: 09–12';
-                document.getElementById('fP1Start').value = years[0] + '-09-01';
-                document.getElementById('fP1End').value = years[0] + '-12-31';
-                document.getElementById('fP2Label').value = '1 מ׳: 01–08';
-                document.getElementById('fP2Start').value = years[1] + '-01-01';
-                document.getElementById('fP2End').value = years[1] + '-08-31';
-            }
+        `<button class="btn btn-primary" onclick="App.savePeriod()">${p ? '💾 שמור שינויים' : '➕ צור תקופה'}</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
+        
+        // 🔑 תיקון קריטי: אם עורכים תקופה קיימת, הפעל את החישוב האוטומטי
+        if (p && p.hebrewYear) {
+            setTimeout(() => {
+                console.log('[Period] מפעיל חישוב אוטומטי לשנה:', p.hebrewYear);
+                document.getElementById('fPHebYear').value = p.hebrewYear;
+                _onPHebYear();
+            }, 100);
         }
     }
 
     function savePeriod() {
-        var data = { hebrewYear: document.getElementById('fPHebYear').value, englishYear: document.getElementById('fPEngYear').value, period1Label: document.getElementById('fP1Label').value.trim(), period1Start: document.getElementById('fP1Start').value, period1End: document.getElementById('fP1End').value, period2Label: document.getElementById('fP2Label').value.trim(), period2Start: document.getElementById('fP2Start').value, period2End: document.getElementById('fP2End').value, isActive: document.getElementById('fPActive').value === 'yes' };
-        // Enforce single active period: if marking this one as active, deactivate all others
+        const hebYear = document.getElementById('fPHebYear').value;
+        if (!hebYear) {
+            showToast('יש לבחור שנת תקציב (עברית)', 'error');
+            return;
+        }
+        
+        const data = { 
+            hebrewYear: hebYear, 
+            englishYear: document.getElementById('fPEngYear').value, 
+            period1Label: document.getElementById('fP1Label').value.trim(), 
+            period1Start: document.getElementById('fP1Start').value, 
+            period1End: document.getElementById('fP1End').value, 
+            period2Label: document.getElementById('fP2Label').value.trim(), 
+            period2Start: document.getElementById('fP2Start').value, 
+            period2End: document.getElementById('fP2End').value, 
+            isActive: document.getElementById('fPActive').value === 'yes' 
+        };
+        
         if (data.isActive) {
-            var allPeriods = DataStore.getAll(DataStore.KEYS.PERIODS) || [];
+            const allPeriods = DataStore.getAll(DataStore.KEYS.PERIODS) || [];
             allPeriods.forEach(function(p) {
-                if (p.isActive && (!editingItem || p.id !== editingItem.id)) {
+                if (p.isActive && (!_editingPeriodItem || p.id !== _editingPeriodItem.id)) {
                     DataStore.update(DataStore.KEYS.PERIODS, p.id, { isActive: false });
                 }
             });
         }
-        if (editingItem) { DataStore.update(DataStore.KEYS.PERIODS, editingItem.id, data); showToast('התקופה עודכנה', 'success'); }
-        else { DataStore.create(DataStore.KEYS.PERIODS, data); showToast('התקופה נוצרה', 'success'); }
-        editingItem = null; closeModal(); _loadActivePeriod(); _renderActivePeriodBadge(); renderPeriods(); updateSolutionsCount();
+        
+        if (_editingPeriodItem) { 
+            DataStore.update(DataStore.KEYS.PERIODS, _editingPeriodItem.id, data); 
+            showToast('התקופה עודכנה בהצלחה', 'success'); 
+        } else { 
+            DataStore.create(DataStore.KEYS.PERIODS, data); 
+            showToast('התקופה נוצרה בהצלחה', 'success'); 
+        }
+        
+        _editingPeriodItem = null; 
+        closeModal(); 
+        if (typeof _loadActivePeriod === 'function') _loadActivePeriod(); 
+        if (typeof _renderActivePeriodBadge === 'function') _renderActivePeriodBadge(); 
+        renderPeriods(); 
+        if (typeof updateSolutionsCount === 'function') updateSolutionsCount();
     }
 
-    function deletePeriod(id) { confirmDialog('למחוק תקופה?', () => { _moveToRecycleBin(DataStore.KEYS.PERIODS, id); showToast('נמחקה', 'success'); renderPeriods(); }); }
+    function deletePeriod(id) { 
+        confirmDialog('⚠️ האם למחוק תקופה זו?', () => { 
+            if (typeof _moveToRecycleBin === 'function') {
+                _moveToRecycleBin(DataStore.KEYS.PERIODS, id); 
+            } else {
+                DataStore.remove(DataStore.KEYS.PERIODS, id);
+            }
+            showToast('התקופה נמחקה', 'success'); 
+            renderPeriods(); 
+        }); 
+    }
 
     // ================================================================
     //  LOOKUP TABLES (טבלאות ערכים)
     // ================================================================
-    function renderLookupTables() {
-        const tables = [
-            { key: DataStore.KEYS.INSPECTORS, label: 'מפקחים', isCustom: 'inspectors' },
-            { key: DataStore.KEYS.PEDAGOGICAL_EXECUTORS, label: 'מבצעים פדגוגיים', isCustom: 'pedagogical_executors' },
-            { key: DataStore.KEYS.LOOKUP_SCHOOLS, label: 'בתי ספר', isSchools: true },
-            { key: DataStore.KEYS.LOOKUP_DOMAINS, label: 'תחום פתרון למידה' },
-            { key: DataStore.KEYS.LOOKUP_EDUCATION_STAGES, label: 'שלב חינוך' },
-            { key: DataStore.KEYS.LOOKUP_EDUCATION_TYPES, label: 'סוג חינוך' },
-            { key: DataStore.KEYS.LOOKUP_WEEK_DAYS, label: 'ימי שבוע' },
-            { key: DataStore.KEYS.LOOKUP_MEETING_TYPES, label: 'סוג מפגש' },
-            { key: DataStore.KEYS.LOOKUP_BUDGET_TYPES, label: 'מתוקצב?' },
-            { key: DataStore.KEYS.LOOKUP_ALLOCATION_STATUS, label: 'סטטוס שיוך תקציב' },
-            { key: DataStore.KEYS.LOOKUP_SOLUTION_STATUS, label: 'סטטוס פתרון למידה' },
-            { key: DataStore.KEYS.LOOKUP_PERFORMER_TYPES, label: 'סוג מבצע' },
-            { key: DataStore.KEYS.LOOKUP_LECTURER_STATUS, label: 'סטטוס מרצה' },
-            { key: DataStore.KEYS.LOOKUP_CERTIFIED_LECTURER, label: 'מרצה מוסב' },
-            { key: DataStore.KEYS.LOOKUP_EXPERT_FIELD, label: 'מומחה בתחומו' },
-            { key: DataStore.KEYS.LOOKUP_FIELD_KNOWLEDGE, label: 'תחום דעת' },
-            { key: DataStore.KEYS.LOOKUP_ROLE_HOLDERS, label: 'בעלי תפקידים' },
-            { key: DataStore.KEYS.LOOKUP_BROAD_TOPICS, label: 'נושא רוחב' },
-            { key: DataStore.KEYS.LOOKUP_DESIGNATED_PROGRAMS, label: 'תוכניות ייעודיות' },
-            { key: DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, label: 'סוג אחריות פתרון למידה' }
-        ];
+function _renderLookupTable(key, isSchools, isCustom, label) {
+    try {
+        // שליפה בטוחה של הנתונים
+        let items = [];
+        try {
+            items = DataStore.getAll(key) || [];
+        } catch (e) {
+            console.error(`שגיאה בשליפת נתונים עבור ${key}:`, e);
+            return `<div style="padding:20px; color:red;">שגיאה בטעינת הנתונים עבור ${label}. בדוק קונסול.</div>`;
+        }
 
-        // Clamp saved index in case tabs changed
-        if (_activeLookupTabIndex >= tables.length) _activeLookupTabIndex = 0;
-        const activeTable = tables[_activeLookupTabIndex];
-        _currentLookupTableLabel = activeTable.label;
+        console.log(`[Render 1:1] טבלה: ${label}, מפתח: ${key}, רשומות:`, items.length);
 
-        let tabsHtml = tables.map((t, i) => {
-            const isCustomType = t.isCustom ? `'${t.isCustom}'` : 'null';
-            const isSchoolsFlag = !!t.isSchools;
-            return `<button class="tab ${i === _activeLookupTabIndex ? 'active' : ''}" onclick="App.switchLookupTab('${t.key}', this, ${isSchoolsFlag}, ${isCustomType}, ${i}, '${t.label}')">${t.label}</button>`;
-        }).join('');
-        let contentHtml = _renderLookupTable(activeTable.key, !!activeTable.isSchools, activeTable.isCustom || null, activeTable.label);
+        if (!Array.isArray(items) || items.length === 0) {
+            return `<div style="padding:40px; text-align:center; color:var(--gray-500); font-weight:600; background:#f9fafb; border-radius:8px; border:1px dashed #ccc;">
+                אין רשומות להצגה בטבלה "${label}".<br>
+                <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="App.openLookupModal('${key}', '${isCustom || ''}', ${isSchools})">➕ הוסף רשומה ראשונה</button>
+            </div>`;
+        }
 
-        document.getElementById('section-lookup-tables').innerHTML = `
-            <div class="card"><div class="card-header">
-                <span class="card-title">🔄 טבלאות ערכים</span>
-            </div><div class="card-body">
-                <div class="tabs" id="lookupTabs">${tabsHtml}</div>
-                <div id="lookupContent">${contentHtml}</div>
-            </div></div>`;
+        let headers = '';
+        let rowsHtml = '';
+
+        if (isSchools) {
+            headers = `<th>סמל מוסד</th><th>שם מוסד</th><th>מעמד משפטי</th><th>סוג חינוך</th><th>שלב חינוך</th><th>מנהל</th><th>מפקח</th><th>פעולות</th>`;
+            rowsHtml = items.map(item => `
+                <tr>
+                    <td>${item.code || '-'}</td><td>${item.name || '-'}</td><td>${item.legalStatus || '-'}</td>
+                    <td>${item.educationType || '-'}</td><td>${item.educationStage || '-'}</td>
+                    <td>${item.principalName || '-'}</td><td>${item.inspectorName || '-'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="App.deleteLookupItem('${key}', '${item.id}')">🗑️</button></td>
+                </tr>`).join('');
+        } else if (isCustom === 'pedagogical_executors') {
+            headers = `<th>מספר חברה</th><th>שם מוסד</th><th>שם קבוצה</th><th>עלות שעתית</th><th>הערות</th><th>פעולות</th>`;
+            rowsHtml = items.map(item => `
+                <tr>
+                    <td>${item.companyNumber || '-'}</td><td>${item.institutionName || '-'}</td><td>${item.groupName || '-'}</td>
+                    <td>${item.hourlyCost || '0'}</td><td>${item.notes || '-'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="App.deleteLookupItem('${key}', '${item.id}')">🗑️</button></td>
+                </tr>`).join('');
+        } else if (isCustom === 'inspectors') {
+            headers = `<th>שם מלא</th><th>טלפון</th><th>דוא"ל</th><th>מחוז</th><th>פעולות</th>`;
+            rowsHtml = items.map(item => `
+                <tr>
+                    <td>${item.fullName || '-'}</td><td>${item.phone || '-'}</td><td>${item.email || '-'}</td><td>${item.district || '-'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="App.deleteLookupItem('${key}', '${item.id}')">🗑️</button></td>
+                </tr>`).join('');
+        } else {
+            // ברירת מחדל לכל טבלאות הערכים הפשוטות
+            headers = `<th>ערך / קוד</th><th>תווית (עברית)</th><th>תווית (ערבית)</th><th>פעולות</th>`;
+            rowsHtml = items.map(item => `
+                <tr>
+                    <td><strong>${item.value || '-'}</strong></td><td>${item.label || '-'}</td><td>${item.labelAr || '-'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="App.deleteLookupItem('${key}', '${item.id}')">🗑️</button></td>
+                </tr>`).join('');
+        }
+
+        return `
+            <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <h3 style="margin:0; font-size:18px;">${label} <span style="color:var(--primary); font-size:14px;">(${items.length} רשומות)</span></h3>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('import_${key}').click()">📥 ייבוא מאקסל</button>
+                    <input type="file" id="import_${key}" style="display:none" accept=".xlsx,.xls,.csv" onchange="App.startImport('lookup_values', this, '${key}')">
+                    <button class="btn btn-primary btn-sm" onclick="App.openLookupModal('${key}', '${isCustom || ''}', ${isSchools})">➕ הוספת רשומה</button>
+                </div>
+            </div>
+            <div style="overflow-x:auto; border:1px solid var(--gray-200); border-radius:8px;">
+                <table class="data-table" style="width:100%; border-collapse:collapse; font-size:14px;">
+                    <thead style="background:var(--gray-50);"><tr>${headers}</tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
+    } catch (e) {
+        console.error("שגיאה קריטית ב-_renderLookupTable:", e);
+        return `<div style="padding:20px; color:red;">שגיאה חמורה ברינדור הטבלה. בדוק קונסול.</div>`;
     }
+}
 
-    function switchLookupTab(key, tabEl, isSchools, customType, tabIndex, label) {
-        if (typeof tabIndex === 'number') _activeLookupTabIndex = tabIndex;
-        if (label) _currentLookupTableLabel = label;
-        document.querySelectorAll('#lookupTabs .tab').forEach(t => t.classList.remove('active'));
-        tabEl.classList.add('active');
-        document.getElementById('lookupContent').innerHTML = _renderLookupTable(key, isSchools, customType, label);
-    }
+	function switchLookupTab(key, tabEl, isSchools, customType, tabIndex, label) {
+	if (typeof tabIndex === 'number') {
+		_activeLookupTabIndex = tabIndex;
+		window._activeLookupTabIndex = tabIndex; // 🔑 תיקון: סנכרון גם למשתנה הגלובלי
+	}
+	if (label) _currentLookupTableLabel = label;
+     
+     // 📌 שמירת הטאב הפעיל לשחזור לאחר רענון
+     try { sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex); } catch(e) {}
+     
+     document.querySelectorAll('#lookupTabs .tab').forEach(t => t.classList.remove('active'));
+     tabEl.classList.add('active');
+     document.getElementById('lookupContent').innerHTML = _renderLookupTable(key, isSchools, customType, label);
+ }
 
     function _renderLookupTable(key, isSchools, customType, label) {
         if (customType === 'inspectors') return _renderInspectorsTab(label);
@@ -6591,6 +8109,93 @@ function _saveCompleteData(solutionId) {
             </div>`,
         `<button class="btn btn-primary" onclick="App.saveSchool()">${sch ? '💾 שמור' : '➕ הוסף'}</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
     }
+
+function renderLookupTables() {
+		try {
+			// 🔑 תיקון קריטי: שחזור הטאב הפעיל מ-sessionStorage
+			const savedTab = sessionStorage.getItem('matspanet_last_lookup_tab');
+			if (savedTab !== null && !isNaN(parseInt(savedTab, 10))) {
+				window._activeLookupTabIndex = parseInt(savedTab, 10);
+			}
+			if (typeof window._activeLookupTabIndex === 'undefined' || window._activeLookupTabIndex === null) {
+				window._activeLookupTabIndex = 0;
+			}
+
+        const tables = [
+            { key: DataStore.KEYS.INSPECTORS, label: 'מפקחים', isCustom: 'inspectors' },
+            { key: DataStore.KEYS.PEDAGOGICAL_EXECUTORS, label: 'מבצעים פדגוגיים', isCustom: 'pedagogical_executors' },
+            { key: DataStore.KEYS.LOOKUP_SCHOOLS, label: 'בתי ספר', isSchools: true },
+            { key: DataStore.KEYS.LOOKUP_DOMAINS, label: 'תחום פתרון למידה' },
+            { key: DataStore.KEYS.LOOKUP_EDUCATION_STAGES, label: 'שלב חינוך' },
+            { key: DataStore.KEYS.LOOKUP_EDUCATION_TYPES, label: 'סוג חינוך' },
+            { key: DataStore.KEYS.LOOKUP_WEEK_DAYS, label: 'ימי שבוע' },
+            { key: DataStore.KEYS.LOOKUP_MEETING_TYPES, label: 'סוג מפגש' },
+            { key: DataStore.KEYS.LOOKUP_BUDGET_TYPES, label: 'מתוקצב?' },
+            { key: DataStore.KEYS.LOOKUP_ALLOCATION_STATUS, label: 'סטטוס שיוך תקציב' },
+            { key: DataStore.KEYS.LOOKUP_SOLUTION_STATUS, label: 'סטטוס פתרון למידה' },
+            { key: DataStore.KEYS.LOOKUP_PERFORMER_TYPES, label: 'סוג מבצע' },
+            { key: DataStore.KEYS.LOOKUP_LECTURER_STATUS, label: 'סטטוס מרצה' },
+            { key: DataStore.KEYS.LOOKUP_CERTIFIED_LECTURER, label: 'מרצה מוסב' },
+            { key: DataStore.KEYS.LOOKUP_EXPERT_FIELD, label: 'מומחה בתחומו' },
+            { key: DataStore.KEYS.LOOKUP_FIELD_KNOWLEDGE, label: 'תחום דעת' },
+            { key: DataStore.KEYS.LOOKUP_ROLE_HOLDERS, label: 'בעלי תפקידים' },
+            { key: DataStore.KEYS.LOOKUP_BROAD_TOPICS, label: 'נושא רוחב' },
+            { key: DataStore.KEYS.LOOKUP_DESIGNATED_PROGRAMS, label: 'תוכניות ייעודיות' },
+            { key: DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES, label: 'סוג אחריות פתרון למידה' }
+        ];
+
+        // בדיקת גבולות
+        if (window._activeLookupTabIndex >= tables.length) window._activeLookupTabIndex = 0;
+        
+        const activeTable = tables[window._activeLookupTabIndex];
+        window._currentLookupTableLabel = activeTable.label;
+
+        let tabsHtml = '';
+        try {
+            tabsHtml = tables.map((t, i) => {
+                const isCustomType = t.isCustom ? `'${t.isCustom}'` : 'null';
+                const isSchoolsFlag = !!t.isSchools;
+                return `<button class="tab ${i === window._activeLookupTabIndex ? 'active' : ''}" 
+                    onclick="App.switchLookupTab('${t.key}', this, ${isSchoolsFlag}, ${isCustomType}, ${i}, '${t.label}')"
+                    style="padding: 8px 12px; cursor: pointer; border: 1px solid #ccc; background: ${i === window._activeLookupTabIndex ? '#e0e7ff' : '#fff'}; border-radius: 4px 4px 0 0;">
+                    ${t.label}
+                </button>`;
+            }).join('');
+        } catch (e) {
+            console.error("שגיאה ביצירת הלשוניות:", e);
+            tabsHtml = '<div style="color:red; padding:10px;">שגיאה ביצירת הלשוניות. בדוק קונסול.</div>';
+        }
+
+        let contentHtml = '<div style="padding:20px;">טוען...</div>';
+        try {
+            contentHtml = _renderLookupTable(activeTable.key, !!activeTable.isSchools, activeTable.isCustom || null, activeTable.label);
+        } catch (e) {
+            console.error("שגיאה ברינדור תוכן הטבלה:", e);
+            contentHtml = `
+                <div style="padding:20px; color:red; direction:rtl; text-align:right; background:#fee2e2; border:1px solid red; border-radius:8px;">
+                    <h3>⚠️ שגיאה בהצגת הטבלה: ${activeTable.label}</h3>
+                    <p><strong>הודעת שגיאה:</strong> ${e.message}</p>
+                    <details><summary>ראה פרטים טכניים (למפתח)</summary><pre style="font-size:12px; overflow:auto;">${e.stack}</pre></details>
+                </div>`;
+        }
+
+        const section = document.getElementById('section-lookup-tables');
+        if (section) {
+            section.innerHTML = `
+                <div class="card">
+                    <div class="card-header"><span class="card-title">🔄 טבלאות ערכים</span></div>
+                    <div class="card-body">
+                        <div class="tabs" id="lookupTabs" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:15px; border-bottom:1px solid #ddd;">${tabsHtml}</div>
+                        <div id="lookupContent">${contentHtml}</div>
+                    </div>
+                </div>`;
+        } else {
+            console.error("האלמנט section-lookup-tables לא נמצא ב-DOM!");
+        }
+    } catch (e) {
+        console.error("שגיאה קריטית ב-renderLookupTables:", e);
+    }
+}
 
     function saveSchool() {
         const code = document.getElementById('fSCHCode').value.trim();
@@ -6812,7 +8417,7 @@ function _saveCompleteData(solutionId) {
             companyNumber: (document.getElementById('fPECompanyNum').value || '').trim(),
             institutionName: institutionName,
             groupName: (document.getElementById('fPEGroupName').value || '').trim(),
-            hourlyCost: parseFloat(document.getElementById('fPEHourlyCost').value) || 0,
+            hourlyCost: parseFloat(String(record.hourlyCost || '').replace(/[^\d.-]/g, '')) || 0,
             notes: (document.getElementById('fPENotes').value || '').trim()
         };
         if (editingItem) {
@@ -6942,59 +8547,88 @@ function _saveCompleteData(solutionId) {
             </div>`;
     }
 
-    function exportCSV(type) {
-        let items, csv = '\uFEFF';
-        if (type === 'lookup_table') {
-            if (!_currentLookupKey) { showToast('לא נבחרה טבלה', 'warning'); return; }
-            items = DataStore.getAll(_currentLookupKey) || [];
-            if (!items.length) { showToast('אין נתונים', 'warning'); return; }
-            csv += 'ערך,תווית (עברית),תווית (ערבית),סדר,פעיל\n';
-            items.forEach(i => { csv += `"${i.value||''}","${i.label||''}","${i.labelAr||''}","${i.order||1}","${i.isActive !== false ? 'כן' : 'לא'}"\n`; });
-            downloadFile(csv, `matspanet_lookup_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
-            showToast('יוצא בהצלחה', 'success');
-            return;
-        }
-        const keyMap = { solutions: DataStore.KEYS.SOLUTIONS, mentors: DataStore.KEYS.MENTORS, guides_repo: DataStore.KEYS.GUIDES_REPO, budgets: DataStore.KEYS.BUDGETS, schools: DataStore.KEYS.LOOKUP_SCHOOLS, activity_log: DataStore.KEYS.ACTIVITY_LOG, faq: DataStore.KEYS.FAQ_DATA };
-        items = DataStore.getAll(keyMap[type]) || [];
-        if (!items.length) { showToast('אין נתונים', 'warning'); return; }
-        if (type === 'solutions') {
-            // Flat format: 28 columns, one row per mentor
-            var _csvAllInst = DataStore.getAll(DataStore.KEYS.SOLUTION_INSTRUCTORS) || [];
-            var _csvInstBySol = {};
-            _csvAllInst.forEach(function(inst) {
-                if (!_csvInstBySol[inst.solutionId]) _csvInstBySol[inst.solutionId] = [];
-                _csvInstBySol[inst.solutionId].push(inst);
-            });
-            csv += 'סוג האחריות של פתרון למידה,שם בית הספר,שם פתרון למידה,מספר פתרון למידה,תיאור פתרון למידה,מדריך אחראי,תחום,נושא,שלב חינוך,סוג חינוך,תאריך תחילת ההשתלמות,תאריך סיום ההשתלמות,יום בשבוע,סוג מפגש,שעות אקדמיות מוכרות לגמול,מתוקצב?,סה"כ שעות מתוקצבות,סוג תקצוב,סוג המנחה,שם המנחה,שעות לתקופה ב׳ 09-12,שעות לתקופה א׳ 01-08,סה"כ שעות,סה"כ שעות מתוקצבות (שעות ליווי),קישור וואטסאפ,קישור רישום מוקדם,הצג בקטלוג הציבורי,הערה כללית\n';
-            items.forEach(function(s) {
-                var insts = _csvInstBySol[s.id] || [];
-                var csvRows = _buildSolutionFlatRows(s, insts);
-                csvRows.forEach(function(row) {
-                    csv += '"' + row.map(function(v) { return String(v).replace(/"/g, '""'); }).join('","') + '"\n';
-                });
-            });
-        } else if (type === 'mentors') {
-            csv += 'ת.ז. מרצה,שם מרצה (עברית),שם מרצה (ערבית),טלפון נייד,דוא"ל,מרצה מוסב,מומחה בתחומו,סטטוס\n';
-            items.forEach(m => { csv += `"${m.idNumber||''}","${m.fullNameHe||m.fullName||''}","${m.fullNameAr||''}","${m.phone||''}","${m.email||''}","${m.isCertifiedLecturer!==null?(m.isCertifiedLecturer?'כן':'לא'):''}","${m.expertInField!==null?(m.expertInField?'כן':'לא'):''}","${m.lecturerStatus||''}"\n`; });
-        } else if (type === 'guides_repo') {
-            csv += 'ת.ז.,שם מלא (עברית),שם מלא (ערבית),תפקיד,טלפון,דוא"ל,תחומי התמחות\n';
-            items.forEach(g => { csv += `"${g.idNumber||''}","${g.fullName||''}","${g.fullNameAr||''}","${g.position||''}","${g.phone||''}","${g.email||''}","${g.specializations||''}"\n`; });
-        } else if (type === 'schools') {
-            csv += 'סמל מוסד,שם מוסד,מעמד משפטי,סוג חינוך מוסד,שלב חינוך במוסד,שם מנהל,שם מפקח\n';
-            items.forEach(s => { csv += `"${s.code||''}","${s.name||''}","${s.legalStatus||''}","${s.educationType||''}","${s.educationStage||''}","${s.principalName||''}","${s.inspectorName||''}"\n`; });
-        } else if (type === 'activity_log') {
-            csv += 'תאריך,משתמש,תפקיד,סוג פעולה,פרטים\n';
-            items.forEach(a => { csv += `"${a.timestamp||''}","${a.userName||''}","${a.userRole||''}","${a.actionType||''}","${a.description||''}"\n`; });
-        } else if (type === 'budgets') {
-            csv += 'קוד תקציב,שנת תקציב (עברית),שנת תקציב,תקופה,ידוע / משוערך,צבע הכסף,יחידה אירגונית מנהלת,תקציב עבור,תיאור תקציב,הערה,סכום (₪),יתרת תכנון (₪),יתרת ניהול (₪),יתרת תקציב פנויה (₪)\n';
-            items.forEach(b => { csv += `"${b.budgetCode||''}","${b.hebrewYear||''}","${b.englishYear||''}","${b.period||''}","${b.estimationStatus||''}","${b.moneyColor||''}","${b.organizationalUnit||''}","${b.budgetFor||''}","${b.description||''}","${b.notes||''}","${b.amount||0}","${b.planningBalance||0}","${b.managementBalance||0}","${b.freeBudgetBalance||0}"\n`; });
-        } else if (type === 'faq') {
-            csv += 'סדר,כותרת (ערבית),כותרת (עברית),תשובה (ערבית),תשובה (עברית)\n';
-            items.forEach(f => { csv += `"${f.order||0}","${(f.titleAr||'').replace(/"/g,'""')}","${(f.titleHe||'').replace(/"/g,'""')}","${(f.answerAr||'').replace(/<[^>]*>/g,'').replace(/"/g,'""')}","${(f.answerHe||'').replace(/<[^>]*>/g,'').replace(/"/g,'""')}"\n`; });
-        }
-        downloadFile(csv, `matspanet_${type}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
-        showToast('יוצא בהצלחה', 'success');
-    }
+	// ================================================================
+	//  ייצוא ל-CSV (מתוקן לתמיכה מלאה בעברית/ערבית ובשדות החדשים)
+	// ================================================================
+	function exportCSV(section) {
+		if (section !== 'registrations') {
+			showToast('ייצוא זה זמין כרגע רק לנרשמים', 'info');
+			return;
+		}
+
+		let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+		
+		// סינון לפי הרשאות (אם יש)
+		const visibleSolIds = _getGuideVisibleSolutionIds();
+		if (visibleSolIds !== null) {
+			items = items.filter(r => visibleSolIds.includes(r.solutionId));
+		}
+
+		if (!items.length) {
+			showToast('אין נתונים לייצוא', 'warning');
+			return;
+		}
+
+		// הגדרת כותרות העמודות
+		const headers = ['תאריך רישום', 'שם פתרון למידה', 'שם מלא', 'טלפון', 'דוא"ל', 'סמל מוסד', 'שם בית ספר', 'תפקיד'];
+
+		// פונקציית עזר לניקוי וציטוט ערכים ל-CSV (מונעת שבירה בגלל פסיקים או גרשיים בתוך הטקסט)
+		const escapeCSV = (val) => {
+			if (val === null || val === undefined) return '';
+			const str = String(val).trim();
+			// אם הערך מכיל פסיק, גרש, או ירידת שורה, עוטפים אותו בגרשיים ומכפילים גרשיים פנימיים
+			if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+				return '"' + str.replace(/"/g, '""') + '"';
+			}
+			return str;
+		};
+
+		// בניית שורות הנתונים
+		const rows = items.map(r => {
+			// טיפול נכון בשדות המוסד (גם אם הגיעו כמערך וגם אם הגיעו כמחרוזת מופרדת)
+			const codes = Array.isArray(r.institutionCodes) 
+				? r.institutionCodes.join(' | ') 
+				: (r.institutionCodes || r.institutionCode || '');
+				
+			const names = Array.isArray(r.institutionNames) 
+				? r.institutionNames.join(' | ') 
+				: (r.institutionNames || r.institutionName || '');
+
+			return [
+				formatDate(r.createdAt),
+				r.solutionName || '',
+				r.fullName || '',
+				r.phone || '',
+				r.email || '',
+				codes,
+				names,
+				r.role || ''
+			];
+		});
+
+		// הרכבת מחרוזת ה-CSV
+		let csvContent = headers.map(escapeCSV).join(',') + '\n';
+		rows.forEach(row => {
+			csvContent += row.map(escapeCSV).join(',') + '\n';
+		});
+
+		// 🔑 קריטי: הוספת UTF-8 BOM (\uFEFF) כדי שאקסל יזהה עברית/ערבית נכון
+		const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+		
+		// יצירת קישור הורדה דינמי
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		const fileName = `matspanet_registrations_${new Date().toISOString().split('T')[0]}.csv`;
+		link.setAttribute('download', fileName);
+		
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+
+		showToast(`קובץ ${fileName} יוצא בהצלחה`, 'success');
+	}
 
     function exportJSON() {
         const data = DataStore.exportAllData();
@@ -7103,125 +8737,120 @@ function _saveCompleteData(solutionId) {
         showModal('אימות מקדים — ייבוא מרצים', html, btns);
     }
 
-    function _executeMentorsBatchImport() {
-        var validRows = _batchImportValidRows;
-        if (!validRows || !validRows.length) { showToast('אין רשומות לייבוא', 'warning'); return; }
-
-        _batchImportCancel = false;
-        var totalRecords = validRows.length;
-        var batchSize = 5000;
-        var totalBatches = Math.ceil(totalRecords / batchSize);
-        var currentBatch = 0;
-        var newCount = 0;
-        var updatedCount = 0;
-        var errorRows = [];
-
-        // Read existing mentors once — build id→index map for O(1) lookup
-        var allMentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
-        var mentorIdxMap = {};
-        allMentors.forEach(function(m, idx) { if (m.idNumber) mentorIdxMap[m.idNumber] = idx; });
-        var nowTs = new Date().toISOString();
-        var updateDetails = [];
-
-        // Show progress modal
-        var progressHtml = '<div style="text-align:center;direction:rtl;">';
-        progressHtml += '<div style="font-size:48px;margin-bottom:12px;">⏳</div>';
-        progressHtml += '<div id="batch_import_status" style="font-weight:600;font-size:15px;margin-bottom:16px;">מכין ייבוא...</div>';
-        progressHtml += '<div style="background:var(--gray-200, #e5e7eb);border-radius:10px;height:24px;overflow:hidden;margin-bottom:10px;">';
-        progressHtml += '<div id="batch_import_bar" style="background:var(--primary-color, #4f46e5);height:100%;width:0%;border-radius:10px;transition:width 0.3s ease;"></div>';
-        progressHtml += '</div>';
-        progressHtml += '<div id="batch_import_detail" style="font-size:12px;color:var(--gray-500);">0 / ' + totalRecords + ' רשומות</div>';
-        progressHtml += '<div style="margin-top:16px;"><button class="btn btn-outline btn-sm" onclick="App._cancelBatchImport()">⏹ ביטול</button></div>';
-        progressHtml += '</div>';
-
-        closeModal();
-        showModal('ייבוא מדורג — מאגר מרצים', progressHtml, '', true);
-
-        function processBatch() {
-            if (_batchImportCancel) {
-                _onBatchImportComplete(newCount, updatedCount, errorRows, updateDetails, true);
-                return;
-            }
-
-            var startIdx = currentBatch * batchSize;
-            var endIdx = Math.min(startIdx + batchSize, totalRecords);
-
-            for (var i = startIdx; i < endIdx; i++) {
-                var rec = validRows[i];
-                try {
-                    var existingIdx = mentorIdxMap[rec.idNumber];
-                    if (existingIdx !== undefined) {
-                        // UPDATE existing record — merge changed fields only
-                        var existing = allMentors[existingIdx];
-                        var changedFields = [];
-                        _MENTOR_UPSERT_FIELDS.forEach(function(f) {
-                            var oldVal = (existing[f] || '').toString().trim();
-                            var newVal = (rec[f] || '').toString().trim();
-                            if (oldVal !== newVal) {
-                                changedFields.push({ field: f, label: _MENTOR_FIELD_LABELS[f] || f, oldVal: oldVal, newVal: newVal });
-                                existing[f] = newVal;
-                            }
-                        });
-                        existing.updatedAt = nowTs;
-                        updatedCount++;
-                        if (changedFields.length > 0) {
-                            updateDetails.push({ rowNum: rec._rowNum, idNumber: rec.idNumber, fullName: existing.fullNameHe || existing.fullName, changedFields: changedFields });
-                        }
-                    } else {
-                        // INSERT new record
-                        var newMentor = {
-                            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
-                            idNumber: rec.idNumber || '',
-                            fullNameHe: rec.fullNameHe || '',
-                            fullNameAr: rec.fullNameAr || '',
-                            phone: rec.phone || '',
-                            email: rec.email || '',
-                            isCertifiedLecturer: rec.isCertifiedLecturer || '',
-                            expertInField: rec.expertInField || '',
-                            lecturerStatus: rec.lecturerStatus || '',
-                            createdAt: nowTs,
-                            updatedAt: nowTs
-                        };
-                        allMentors.push(newMentor);
-                        mentorIdxMap[newMentor.idNumber] = allMentors.length - 1;
-                        newCount++;
-                    }
-                } catch(err) {
-                    errorRows.push({ row: rec._rowNum || (i + 2), field: 'כללי', error: err.message });
+function _executeMentorsBatchImport(fieldMappings, rows) {
+    if (!rows || !rows.length) {
+        showToast('אין רשומות לייבוא', 'warning');
+        return;
+    }
+    
+    closeModal();
+    
+    var total = rows.length;
+    var batchSize = 1000;
+    var currentBatch = 0;
+    var newCount = 0;
+    var updatedCount = 0;
+    var errorCount = 0;
+    
+    // טעינה חד-פעמית של המרצים הקיימים
+    var allMentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+    var mentorMap = {};
+    allMentors.forEach(function(m, idx) {
+        if (m.idNumber) mentorMap[m.idNumber] = idx;
+    });
+    
+    // הצגת מסך התקדמות
+    showModal('ייבוא מדורג', 
+        '<div style="text-align:center;padding:20px;">' +
+        '<div style="font-size:48px;margin-bottom:12px;">⏳</div>' +
+        '<div id="importStatus" style="font-weight:600;margin-bottom:12px;">מכין ייבוא...</div>' +
+        '<div style="height:12px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:8px;">' +
+        '<div id="importBar" style="width:0%;height:100%;background:var(--primary);border-radius:6px;transition:width 0.2s;"></div>' +
+        '</div>' +
+        '<div id="importDetail" style="font-size:13px;color:var(--gray-500);">0 / ' + total + '</div>' +
+        '</div>', '', true);
+    
+    function processChunk() {
+        var start = currentBatch * batchSize;
+        var end = Math.min(start + batchSize, total);
+        
+        for (var i = start; i < end; i++) {
+            var row = rows[i];
+            var record = {};
+            
+            // 🔑 תיקון קריטי: מיפוי השדות לפי fieldMappings
+            fieldMappings.forEach(function(fm) {
+                if (fm.colIdx < row.length) {
+                    var val = row[fm.colIdx];
+                    record[fm.fieldKey] = val ? String(val).trim().replace(/^\$+/, '') : '';
                 }
+            });
+            
+            var idNum = record.idNumber;
+            if (!idNum) {
+                errorCount++;
+                continue;
             }
-
-            // Write entire array to localStorage — ONE write per batch instead of per record
-            try {
-                DataStore.saveAll(DataStore.KEYS.MENTORS, allMentors);
-            } catch(e) {
-                // localStorage quota exceeded — cannot easily undo mixed inserts/updates, just stop
-                _onBatchImportComplete(newCount, updatedCount, errorRows, updateDetails, false);
-                return;
-            }
-
-            currentBatch++;
-            var pct = Math.min(100, Math.round((currentBatch / totalBatches) * 100));
-            var processed = newCount + updatedCount;
-
-            var bar = document.getElementById('batch_import_bar');
-            var status = document.getElementById('batch_import_status');
-            var detail = document.getElementById('batch_import_detail');
-
-            if (bar) bar.style.width = pct + '%';
-            if (status) status.textContent = 'מייבא מחזור ' + currentBatch + ' מתוך ' + totalBatches + '...';
-            if (detail) detail.textContent = processed + ' / ' + totalRecords + ' רשומות';
-
-            if (currentBatch < totalBatches) {
-                setTimeout(processBatch, 10);
+            
+            var existingIdx = mentorMap[idNum];
+            if (existingIdx !== undefined) {
+                // עדכון רשומה קיימת
+                var existing = allMentors[existingIdx];
+                Object.keys(record).forEach(function(key) {
+                    if (key !== 'idNumber') existing[key] = record[key];
+                });
+                existing.updatedAt = new Date().toISOString();
+                updatedCount++;
             } else {
-                setTimeout(function() { _onBatchImportComplete(newCount, updatedCount, errorRows, updateDetails, false); }, 200);
+                // יצירת רשומה חדשה
+                var newMentor = {
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
+                    idNumber: idNum,
+                    fullNameHe: record.fullNameHe || '',
+                    fullNameAr: record.fullNameAr || '',
+                    phone: record.phone || '',
+                    email: record.email || '',
+                    isCertifiedLecturer: record.isCertifiedLecturer || '',
+                    expertInField: record.expertInField || '',
+                    lecturerStatus: record.lecturerStatus || '',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                allMentors.push(newMentor);
+                mentorMap[idNum] = allMentors.length - 1;
+                newCount++;
             }
         }
-
-        // Start first batch
-        setTimeout(processBatch, 50);
+        
+        // שמירה לשרת (וגם לזיכרון אם צריך)
+        try {
+            DataStore.saveAll(DataStore.KEYS.MENTORS, allMentors);
+        } catch(e) {
+            console.error('Chunk save failed:', e);
+        }
+        
+        currentBatch++;
+        var pct = Math.min(100, Math.round((currentBatch * batchSize / total) * 100));
+        var bar = document.getElementById('importBar');
+        var status = document.getElementById('importStatus');
+        var detail = document.getElementById('importDetail');
+        
+        if (bar) bar.style.width = pct + '%';
+        if (status) status.textContent = 'מעבד מחזור ' + currentBatch + ' מתוך ' + Math.ceil(total / batchSize) + '...';
+        if (detail) detail.textContent = Math.min(currentBatch * batchSize, total) + ' / ' + total + ' רשומות';
+        
+        if (currentBatch * batchSize < total) {
+            setTimeout(processChunk, 50);
+        } else {
+            closeModal();
+            showToast('ייבוא הושלם: ' + newCount + ' חדשים, ' + updatedCount + ' עודכנו' + (errorCount > 0 ? ', ' + errorCount + ' שגיאות' : ''), 'success');
+            importWizardData = { type: null, headers: [], rows: [], mappings: {} };
+            renderMentors();
+        }
     }
+    
+    setTimeout(processChunk, 100);
+}
 
     function _cancelBatchImport() {
         _batchImportCancel = true;
@@ -7344,52 +8973,75 @@ function _saveCompleteData(solutionId) {
         showToast('קובץ העדכונים הורד', 'success');
     }
 
-    function startImport(type, input, targetKey) {
-        _importTargetKey = targetKey || null;
-        const file = input.files[0]; if (!file) return;
-        const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-        if (isExcel && typeof XLSX !== 'undefined') {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-                    const ws = wb.Sheets[wb.SheetNames[0]];
-                    // Use sheet_to_json with header:1 to get raw 2D array — avoids CSV parsing issues with commas/newlines in cells
-                    const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                    const nonEmpty = rawRows.filter(function(r) { return r && r.length && r.some(function(v) { return String(v).trim() !== ''; }); });
-                    if (nonEmpty.length < 2) { showToast('קובץ ריק', 'error'); return; }
-                    const headers = nonEmpty[0].map(function(h) { return String(h).trim(); });
-                    const rows = nonEmpty.slice(1).map(function(r) { return r.map(function(v) {
-                        if (v instanceof Date && !isNaN(v.getTime())) {
-                            var yyyy = v.getFullYear();
-                            var mm = String(v.getMonth() + 1).padStart(2, '0');
-                            var dd = String(v.getDate()).padStart(2, '0');
-                            return yyyy + '-' + mm + '-' + dd;
-                        }
-                        return String(v).trim();
-                    }); });
-                    importWizardData = { type, headers, rows, mappings: {} };
-                    _renderMappingWizard();
-                } catch(err) { showToast('שגיאה: ' + err.message, 'error'); }
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const lines = e.target.result.split('\n').filter(l => l.trim());
-                    if (lines.length < 2) { showToast('קובץ ריק', 'error'); return; }
-                    const headers = _parseCSV(lines[0]);
-                    const rows = [];
-                    for (let i = 1; i < lines.length; i++) { const vals = _parseCSV(lines[i]); if (vals.some(v => v.trim())) rows.push(vals); }
-                    importWizardData = { type, headers: headers.map(h => h.trim()), rows, mappings: {} };
-                    _renderMappingWizard();
-                } catch(err) { showToast('שגיאה: ' + err.message, 'error'); }
-            };
-            reader.readAsText(file);
+function startImport(type, input, targetKey) {
+    _importTargetKey = targetKey || null;
+    const file = input.files[0];
+    if (!file) return;
+
+    // הצגת חיווי טעינה
+    showModal('📥 טוען קובץ...', 
+        '<div style="text-align:center;padding:40px;">' +
+        '<div style="font-size:32px;margin-bottom:12px;">⏳</div>' +
+        '<p style="font-weight:600;">מנתח קידוד ועמודות...</p>' +
+        '<p style="font-size:12px;color:var(--gray-500);margin-top:8px;">ממיר לעברית/ערבית תקנית</p>' +
+        '</div>', '', true);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            // 🔑 קריטי: שימוש ב-XLSX.read לכל סוגי הקבצים (כולל CSV) מונע בעיות קידוד (ג'יבריש)
+            const workbook = XLSX.read(e.target.result, {
+                type: 'array',
+                cellDates: true,
+                raw: false,
+                codepage: 65001 // כפיית קידוד UTF-8
+            });
+
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            // קריאה כמערך מערכים (header: 1) שומרת על הסדר המדויק של העמודות
+            const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '', raw: false });
+
+            // ניקוי שורות ריקות לחלוטין
+            const cleanData = rawData.filter(row => row.some(cell => String(cell).trim() !== ''));
+
+            if (cleanData.length < 2) {
+                closeModal();
+                showToast('הקובץ ריק או לא תקין', 'error');
+                return;
+            }
+
+            // 🔑 קריטי: ניקוי כותרות מהסרת תו BOM (גורם לג'יבריש) ורווחים מיותרים
+            const headers = cleanData[0].map(h => String(h).replace(/^\uFEFF/, '').trim());
+            
+            const rows = cleanData.slice(1).map(row =>
+                row.map(cell => {
+                    // המרת תאריכי אקסל לפורמט אחיד YYYY-MM-DD
+                    if (cell instanceof Date && !isNaN(cell.getTime())) {
+                        return cell.getFullYear() + '-' + String(cell.getMonth() + 1).padStart(2, '0') + '-' + String(cell.getDate()).padStart(2, '0');
+                    }
+                    return String(cell).trim();
+                })
+            );
+
+            importWizardData = { type: type, headers: headers, rows: rows, mappings: {} };
+            closeModal();
+            _renderMappingWizard(); // קריאה לאשף המיפוי המשופר
+
+        } catch (err) {
+            closeModal();
+            console.error('Import Error:', err);
+            showToast('שגיאה בקריאת הקובץ: ' + err.message, 'error');
         }
-        input.value = '';
-    }
+    };
+    
+    reader.onerror = function() { 
+        closeModal(); 
+        showToast('שגיאה בקריאת הקובץ מהדיסק', 'error'); 
+    };
+    
+    // 🔑 קריאה כ-ArrayBuffer היא הבטוחה ביותר לשימור קידוד תווים עם ספריית XLSX
+    reader.readAsArrayBuffer(file); 
+}
 
     function _parseCSV(line) {
         const r = []; let cur = '', inQ = false;
@@ -7401,3704 +9053,4269 @@ function _saveCompleteData(solutionId) {
         r.push(cur.trim()); return r;
     }
 
-    function _renderMappingWizard() {
-        const { type, headers, rows } = importWizardData;
-        const fields = IMPORT_FIELD_MAPS[type];
-        if (!fields) { showToast('סוג ייבוא לא מוכר: ' + type, 'error'); return; }
-
-        const headerOpts = headers.map((h, i) => `<option value="${i}">${h}</option>`).join('');
-        const autoMap = _autoDetectMapping(fields, headers);
-
-        showModal('מיפוי עמודות — ' + _importTypeLabel(type), `
-            <p style="color:var(--gray-500);margin-bottom:12px;font-size:13px;">
-                מפה את עמודות הקובץ לשדות המערכת. זוהו <strong>${headers.length}</strong> עמודות ו-<strong>${rows.length}</strong> שורות נתונים.
-                המיפוי האוטומטי זוהה בהתאם לשמות העמודות — ניתן לשנות.
-            </p>
-            <div style="display:grid;gap:6px;max-height:350px;overflow-y:auto;padding:4px 0;">
-                ${fields.map((f, i) => `
-                    <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--gray-100);">
-                        <span style="flex:1;font-size:13px;font-weight:600;color:var(--gray-700);min-width:120px;">${f.label}</span>
-                        <span style="font-size:16px;color:var(--gray-300);">←</span>
-                        <select id="import_field_${i}" class="form-select" style="font-size:12px;padding:6px 10px;width:220px;">
-                            <option value="">— ללא מיפוי —</option>${headerOpts}
-                        </select>
-                    </div>
-                `).join('')}
-            </div>
-            <div style="margin-top:12px;font-size:12px;color:var(--gray-500);">
-                <strong>תצוגה מקדימה:</strong> ${Math.min(3, rows.length)} שורות ראשונות מתוך ${rows.length}
-            </div>`,
-        `<button class="btn btn-primary" onclick="App.executeImport()">✅ אשר קליטה</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
-
-        // Apply auto-detected mappings
-        Object.keys(autoMap).forEach(function(fi) {
-            var sel = document.getElementById('import_field_' + fi);
-            if (sel) sel.value = String(autoMap[fi]);
-        });
-    }
-
-    function executeImport() {
-        const { type, rows } = importWizardData;
-        const fields = IMPORT_FIELD_MAPS[type];
-        if (!fields) { showToast('סוג לא מוכר', 'error'); return; }
-
-        // Read field→column mappings from dropdowns
-        var fieldMappings = [];
-        fields.forEach(function(f, fi) {
-            var sel = document.getElementById('import_field_' + fi);
-            if (sel && sel.value !== '') {
-                fieldMappings.push({ fieldKey: f.key, colIdx: parseInt(sel.value) });
-            }
-        });
-
-        if (!fieldMappings.length) { showToast('לא נבחר מיפוי', 'warning'); return; }
-
-        // Pre-build lookup map for schools upsert (avoid O(n²) localStorage reads)
-        var schoolCodeMap = {};
-        if (type === 'schools') {
-            var allSchools = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
-            allSchools.forEach(function(s) { if (s.code) schoolCodeMap[s.code] = s.id; });
-        }
-
-        // Pre-build lookup value map for upsert (avoid O(n²) reads)
-        var lkValueMap = {};
-        var lkMaxOrder = 0;
-        if (type === 'lookup_values' && _importTargetKey) {
-            var existingLkItems = DataStore.getAll(_importTargetKey) || [];
-            existingLkItems.forEach(function(item) { if (item.value) lkValueMap[item.value] = item.id; });
-            lkMaxOrder = existingLkItems.reduce(function(max, item) { return Math.max(max, item.order || 0); }, 0);
-        }
-
-        // Pre-validation for budgets
-        if (type === 'budgets') {
-            var budgetErrors = [];
-            var existingBudgetCodes = (DataStore.getAll(DataStore.KEYS.BUDGETS) || []).map(function(eb) { return eb.budgetCode; });
-            var finFields = [
-                { key: 'amount', label: 'סכום (₪)' },
-                { key: 'planningBalance', label: 'יתרת תכנון (₪)' },
-                { key: 'managementBalance', label: 'יתרת ניהול (₪)' },
-                { key: 'freeBudgetBalance', label: 'יתרת תקציב פנויה (₪)' }
-            ];
-            var importCodes = [];
-            rows.forEach(function(rowValues, rowIdx) {
-                var rec = {};
-                fieldMappings.forEach(function(fm) {
-                    if (fm.colIdx < rowValues.length) { rec[fm.fieldKey] = rowValues[fm.colIdx].trim(); }
-                });
-                var rowNum = rowIdx + 2;
-                if (!rec.budgetCode) {
-                    budgetErrors.push({ row: rowNum, field: 'קוד תקציב', error: 'שדה חובה ריק' });
-                } else {
-                    if (existingBudgetCodes.indexOf(rec.budgetCode) !== -1) {
-                        budgetErrors.push({ row: rowNum, field: 'קוד תקציב', error: 'קוד כפול — קיים כבר במערכת: ' + rec.budgetCode });
-                    }
-                    if (importCodes.indexOf(rec.budgetCode) !== -1) {
-                        budgetErrors.push({ row: rowNum, field: 'קוד תקציב', error: 'קוד כפול בתוך הקובץ: ' + rec.budgetCode });
-                    }
-                    importCodes.push(rec.budgetCode);
-                }
-                finFields.forEach(function(ff) {
-                    var val = rec[ff.key];
-                    if (val !== '' && val !== undefined && isNaN(parseFloat(val))) {
-                        budgetErrors.push({ row: rowNum, field: ff.label, error: 'ערך כספי לא תקין: "' + val + '"' });
-                    }
-                });
-            });
-            if (budgetErrors.length) {
-                var errHtml = '<p style="color:var(--danger, #dc2626);font-weight:600;margin-bottom:12px;">נמצאו ' + budgetErrors.length + ' שגיאות בנתוני הייבוא. יש לתקן את הקובץ ולנסות שוב.</p>';
-                errHtml += '<div style="max-height:400px;overflow-y:auto;"><table class="data-table" style="box-shadow:none;"><thead><tr><th>שורה</th><th>שדה</th><th>שגיאה</th></tr></thead><tbody>';
-                budgetErrors.forEach(function(e) {
-                    errHtml += '<tr><td>' + e.row + '</td><td>' + escAttr(e.field) + '</td><td style="color:var(--danger, #dc2626);">' + escAttr(e.error) + '</td></tr>';
-                });
-                errHtml += '</tbody></table></div>';
-                closeModal();
-                showModal('דוח שגיאות ייבוא — תקציבים', errHtml, '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>');
-                return;
-            }
-        }
-
-        // Pre-validation for mentors — batch processing with Upsert (insert new / update existing)
-        if (type === 'mentors') {
-            var mentorErrors = [];
-            var newMentorRows = [];    // records to INSERT
-            var updateMentorRows = []; // {rowNum, idNumber, fullName, record, changedFields: [{field, label, oldVal, newVal}]}
-            var existingMentorMap = {}; // idNumber → mentor object (for field comparison)
-            (DataStore.getAll(DataStore.KEYS.MENTORS) || []).forEach(function(m) {
-                if (m.idNumber) existingMentorMap[m.idNumber] = m;
-            });
-            var fileMentorIds = {};
-
-            rows.forEach(function(rowValues, rowIdx) {
-                var rec = {};
-                fieldMappings.forEach(function(fm) {
-                    if (fm.colIdx < rowValues.length) { rec[fm.fieldKey] = rowValues[fm.colIdx].trim(); }
-                });
-                if (rec.idNumber) rec.idNumber = rec.idNumber.replace(/^\$+/, '');
-                if (rec.phone) rec.phone = rec.phone.replace(/^\$+/, '');
-
-                var rowNum = rowIdx + 2;
-
-                // Skip empty rows
-                var firstVal = rec[fieldMappings[0].fieldKey] || '';
-                if (!firstVal) return;
-
-                // Validate required idNumber
-                if (!rec.idNumber) {
-                    mentorErrors.push({ row: rowNum, field: 'ת.ז. מרצה', error: 'שדה חובה ריק' });
-                    return;
-                }
-
-                // Check duplicate within file
-                if (fileMentorIds[rec.idNumber]) {
-                    mentorErrors.push({ row: rowNum, field: 'ת.ז. מרצה', error: 'ת.ז. כפולה בתוך הקובץ: ' + rec.idNumber });
-                    return;
-                }
-                fileMentorIds[rec.idNumber] = true;
-
-                rec._rowNum = rowNum;
-
-                // Check if exists in system → prepare for UPDATE
-                var existing = existingMentorMap[rec.idNumber];
-                if (existing) {
-                    var changedFields = [];
-                    _MENTOR_UPSERT_FIELDS.forEach(function(f) {
-                        var oldVal = (existing[f] || '').toString().trim();
-                        var newVal = (rec[f] || '').toString().trim();
-                        if (oldVal !== newVal) {
-                            changedFields.push({ field: f, label: _MENTOR_FIELD_LABELS[f] || f, oldVal: oldVal, newVal: newVal });
-                        }
-                    });
-                    updateMentorRows.push({ rowNum: rowNum, idNumber: rec.idNumber, fullName: existing.fullNameHe || existing.fullName || rec.fullNameHe, record: rec, changedFields: changedFields });
-                } else {
-                    newMentorRows.push(rec);
-                }
-            });
-
-            // Merge into a single array for batch processing: new first, then updates
-            _batchImportValidRows = newMentorRows.concat(updateMentorRows.map(function(u) { return u.record; }));
-            _showMentorsImportSummary(newMentorRows, updateMentorRows, mentorErrors, fieldMappings);
-            return;
-        }
-
-        // ============ Solutions import: group rows by solution, one mentor per row ============
-        if (type === 'solutions') {
-            // Error collection for detailed reporting (column name + row number)
-            var _solImportErrors = [];
-
-            // Helper: match lookup by value, label (Hebrew), or labelAr (Arabic)
-            function _solResolveLookup(key, val, fieldName, rowNum) {
-                if (!val) return '';
-                var items = DataStore.getAll(key) || [];
-                var m = items.find(function(i) {
-                    return i.value === val || i.label === val || (i.labelAr && i.labelAr === val);
-                });
-                if (!m) {
-                    _solImportErrors.push('שורה ' + rowNum + ', עמודה "' + fieldName + '": ערך לא מזוהה — "' + val + '"');
-                }
-                return m ? m.value : val;
-            }
-            function _solResolveLookupArray(key, val, fieldName, rowNum) {
-                if (!val) return [];
-                if (Array.isArray(val)) return val;
-                var parts = String(val).split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-                if (parts.length <= 1 && !String(val).match(/,/)) { var r = _solResolveLookup(key, val, fieldName, rowNum); return r ? [r] : []; }
-                return parts.map(function(p) { return _solResolveLookup(key, p, fieldName, rowNum); });
-            }
-
-            // Step 1: Parse all rows into records
-            var parsedRows = [];
-            rows.forEach(function(rowValues, rowIdx) {
-                var rec = {};
-                fieldMappings.forEach(function(fm) {
-                    if (fm.colIdx < rowValues.length) { rec[fm.fieldKey] = rowValues[fm.colIdx].trim(); }
-                });
-                var firstVal = rec[fieldMappings[0].fieldKey] || '';
-                if (!firstVal) return;
-                parsedRows.push({ rec: rec, rowNum: rowIdx + 2 });
-            });
-
-            // Step 2: Group by solution identity (name + solutionNumber)
-            var solGroups = {};
-            parsedRows.forEach(function(item) {
-                var r = item.rec;
-                var solKey = (r.name || '_unnamed') + '|||' + (r.solutionNumber || '');
-                if (!solGroups[solKey]) { solGroups[solKey] = { solData: r, mentorRows: [], firstRowNum: item.rowNum }; }
-                solGroups[solKey].mentorRows.push(r);
-                // Store mentors field value for later processing (comma-separated list from Excel import)
-                // Also check for alternative field names like 'mentorsList', 'instructors', 'צוות מנחים'
-                if ((r.mentors || r.instructors) && !solGroups[solKey].mentorsList) {
-                    solGroups[solKey].mentorsList = r.mentors || r.instructors;
-                }
-            });
-
-            // Step 3: Process each solution group
-            var solCount = 0;
-            Object.keys(solGroups).forEach(function(solKey) {
-                var group = solGroups[solKey];
-                var rec = group.solData;
-                var _rowNum = group.firstRowNum;
-
-                // Resolve guideId from guideName (Hebrew: fullName, Arabic: fullNameAr)
-                var guideId = '';
-                if (rec.guideName) {
-                    var guides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
-                    var found = guides.find(function(g) { return g.fullName === rec.guideName || (g.fullNameAr && g.fullNameAr === rec.guideName); });
-                    if (found) guideId = found.id;
-                    else { _solImportErrors.push('שורה ' + _rowNum + ', עמודה "מדריך אחראי": ערך לא מזוהה — "' + rec.guideName + '"'); }
-                }
-                // Resolve responsibilityType (value / label / labelAr)
-                var respType = rec.responsibilityType || '';
-                if (respType) {
-                    var allRespTypes = DataStore.getAll(DataStore.KEYS.LOOKUP_RESPONSIBILITY_TYPES) || [];
-                    var matched = allRespTypes.find(function(rr) { return rr.value === respType || rr.label === respType || (rr.labelAr && rr.labelAr === respType); });
-                    if (matched) respType = matched.value;
-                    else { _solImportErrors.push('שורה ' + _rowNum + ', עמודה "סוג האחריות": ערך לא מזוהה — "' + respType + '"'); }
-                }
-                // Resolve topic (bilingual: label / labelAr)
-                var resolvedTopicType = _solResolveLookup(DataStore.KEYS.LOOKUP_DOMAINS, rec.topicType, 'תחום', _rowNum);
-                var topicLookupKey = getTopicLookupKey(resolvedTopicType);
-                var resolvedTopic = topicLookupKey ? _solResolveLookup(topicLookupKey, rec.topic, 'נושא', _rowNum) : (rec.topic || '');
-                // Resolve budget types (bilingual: label / labelAr)
-                var baseBudgetTypeValue = '';
-                if (rec.baseBudgetType) {
-                    var allBT = DataStore.getAll(DataStore.KEYS.LOOKUP_BUDGET_TYPES) || [];
-                    var btM = allBT.find(function(b) { return b.value === rec.baseBudgetType || b.label === rec.baseBudgetType || (b.labelAr && b.labelAr === rec.baseBudgetType); });
-                    if (btM) baseBudgetTypeValue = btM.value;
-                }
-                // Determine budget type (bilingual yes/no)
-                var _impBT = 'לא מתוקצב';
-                var _impIB = rec.baseBudgetStatus === 'כן' || rec.baseBudgetStatus === 'yes' || rec.baseBudgetStatus === 'true' || rec.baseBudgetStatus === 'نعم';
-                if (_impIB) _impBT = 'מתוקצב';
-
-                // Create the solution once
-                var newSol = DataStore.create(DataStore.KEYS.SOLUTIONS, {
-                    responsibilityType: respType,
-                    schoolName: rec.schoolName || '',
-                    name: rec.name || '',
-                    solutionNumber: rec.solutionNumber || '',
-                    description: rec.description || '',
-                    guideId: guideId,
-                    topicType: resolvedTopicType,
-                    topic: resolvedTopic,
-                    educationStage: _solResolveLookupArray(DataStore.KEYS.LOOKUP_EDUCATION_STAGES, rec.educationStage, 'שלב חינוך', _rowNum),
-                    educationType: _solResolveLookupArray(DataStore.KEYS.LOOKUP_EDUCATION_TYPES, rec.educationType, 'סוג חינוך', _rowNum),
-                    startDate: normalizeDateValue(rec.startDate),
-                    endDate: normalizeDateValue(rec.endDate),
-                    weekDay: _solResolveLookup(DataStore.KEYS.LOOKUP_WEEK_DAYS, rec.weekDay, 'יום בשבוע', _rowNum),
-                    meetingType: _solResolveLookup(DataStore.KEYS.LOOKUP_MEETING_TYPES, rec.meetingType, 'סוג מפגש', _rowNum),
-                    academicHours: parseFloat(rec.academicHours) || 0,
-                    whatsappLink: rec.whatsappLink || '',
-                    earlyRegistrationLink: rec.earlyRegistrationLink || '',
-                    showInCatalog: (rec.showInPublicCatalog === 'כן' || rec.showInPublicCatalog === 'yes' || rec.showInPublicCatalog === 'true' || rec.showInPublicCatalog === true || rec.showInPublicCatalog === 'نعم') ? true : false,
-                    notes: rec.notes || '',
-                    budgetType: _impBT,
-                    budgetTypeValue: baseBudgetTypeValue,
-                    budgetedHours: parseFloat(rec.baseBudgetedHours) || 0,
-                    status: 'בתכנון',
-                    createdBy: currentUser.id,
-                    periodId: AppContext.activePeriod ? AppContext.activePeriod.id : null
-                });
-
-                if (!newSol || !newSol.id) return;
-                solCount++;
-
-                // Process each row: create mentor entry based on mentorType field
-                // Also handle comma-separated mentor names and auto-create special rows
-                var _createdInstTypes = {}; // track which special types were created
-                
-                // First, process mentors from the 'mentors' field (comma-separated list from Excel import)
-                if (group.mentorsList) {
-                    var mentorsFromField = String(group.mentorsList).split(',').map(function(n) { return n.trim(); }).filter(Boolean);
-                    mentorsFromField.forEach(function(mentorName) {
-                        DataStore.create(DataStore.KEYS.SOLUTION_INSTRUCTORS, {
-                            solutionId: newSol.id,
-                            mentorId: null,
-                            fullName: mentorName,
-                            fullNameHe: mentorName,
-                            fullNameAr: '',
-                            idNumber: '', phone: '', email: '',
-                            performerType: '',
-                            lecturerStatus: '',
-                            totalAcademicHours: 0,
-                            period1Hours: 0,
-                            period2Hours: 0,
-                            isAccompaniment: false
-                        });
-                    });
-                }
-                
-                group.mentorRows.forEach(function(mRec) {
-                    var mType = String(mRec.mentorType || 'רגיל').trim();
-                    var mName = String(mRec.mentorName || '').trim();
-                    var mP2Raw = String(mRec.mentorP2 || '').trim();
-                    var mP1Raw = String(mRec.mentorP1 || '').trim();
-                    var mP2 = mP2Raw !== '' ? parseFloat(mP2Raw) : 0;
-                    var mP1 = mP1Raw !== '' ? parseFloat(mP1Raw) : 0;
-                    var hasHours = (mP2Raw !== '' || mP1Raw !== '');
-
-                    // Skip empty mentor names (but track special types for auto-creation below)
-                    if (!mName) {
-                        if (mType === 'כוח פנים' || mType === 'שעות ליווי') {
-                            _createdInstTypes[mType] = { p2: mP2, p1: mP1, total: mP2 + mP1 };
-                        }
-                        return;
-                    }
-
-                    var isAcc = (mType === 'שעות ליווי');
-                    var isInternal = (mType === 'כוח פנים');
-
-                    if (isAcc) {
-                        // שעות ליווי row: name may be empty, total from hours or solution-level accBudgetedHours
-                        _createdInstTypes['שעות ליווי'] = { p2: mP2, p1: mP1, total: mP2 + mP1, name: mName };
-                    } else if (isInternal) {
-                        // כוח פנים row
-                        _createdInstTypes['כוח פנים'] = { p2: mP2, p1: mP1, total: mP2 + mP1 };
-                    } else if (mName.indexOf(',') !== -1) {
-                        // Comma-separated mentor names: split into individual rows (hours not assigned per-mentor)
-                        var names = mName.split(',').map(function(n) { return n.trim(); }).filter(Boolean);
-                        names.forEach(function(singleName) {
-                            DataStore.create(DataStore.KEYS.SOLUTION_INSTRUCTORS, {
-                                solutionId: newSol.id,
-                                mentorId: null,
-                                fullName: singleName,
-                                fullNameHe: singleName,  // Store name in Hebrew field for catalog display
-                                fullNameAr: '',          // Arabic name empty by default
-                                idNumber: '', phone: '', email: '',
-                                performerType: '',
-                                lecturerStatus: '',
-                                totalAcademicHours: 0,
-                                period1Hours: 0,
-                                period2Hours: 0,
-                                isAccompaniment: false
-                            });
-                        });
-                    } else {
-                        // Single mentor row (with or without hours)
-                        DataStore.create(DataStore.KEYS.SOLUTION_INSTRUCTORS, {
-                            solutionId: newSol.id,
-                            mentorId: null,
-                            fullName: mName,
-                            fullNameHe: mName,  // Store name in Hebrew field for catalog display
-                            fullNameAr: '',     // Arabic name empty by default
-                            idNumber: '', phone: '', email: '',
-                            performerType: '',
-                            lecturerStatus: '',
-                            totalAcademicHours: mP2 + mP1,
-                            period1Hours: mP2,
-                            period2Hours: mP1,
-                            isAccompaniment: false
-                        });
-                    }
-                });
-
-                // Auto-create כוח פנים from solution-level internalForceHours if not yet created
-                var _impInternalH = parseFloat(rec.internalForceHours) || 0;
-                if (_impInternalH > 0 && !_createdInstTypes['כוח פנים']) {
-                    _createdInstTypes['כוח פנים'] = { p2: 0, p1: 0, total: _impInternalH };
-                }
-                // Create כוח פנים instructor record if applicable
-                if (_createdInstTypes['כוח פנים']) {
-                    var _ifData = _createdInstTypes['כוח פנים'];
-                    DataStore.create(DataStore.KEYS.SOLUTION_INSTRUCTORS, {
-                        solutionId: newSol.id,
-                        mentorId: null,
-                        fullName: 'כוח פנים',
-                        idNumber: '', phone: '', email: '',
-                        performerType: 'כוח פנים',
-                        lecturerStatus: '',
-                        totalAcademicHours: _ifData.total,
-                        period1Hours: _ifData.p2,
-                        period2Hours: _ifData.p1,
-                        isAccompaniment: false
-                    });
-                }
-
-                // Auto-create שעות ליווי from solution-level accBudgetedHours if not yet created
-                var _impAccH = parseFloat(rec.accBudgetedHours) || 0;
-                if (_impAccH > 0 && !_createdInstTypes['שעות ליווי']) {
-                    _createdInstTypes['שעות ליווי'] = { p2: 0, p1: 0, total: _impAccH };
-                }
-                // Create שעות ליווי instructor record if applicable
-                if (_createdInstTypes['שעות ליווי']) {
-                    var _accData = _createdInstTypes['שעות ליווי'];
-                    DataStore.create(DataStore.KEYS.SOLUTION_INSTRUCTORS, {
-                        solutionId: newSol.id,
-                        mentorId: null,
-                        fullName: _accData.name || '',
-                        idNumber: '', phone: '', email: '',
-                        performerType: '',
-                        lecturerStatus: '',
-                        totalAcademicHours: _accData.total,
-                        period1Hours: _accData.p2,
-                        period2Hours: _accData.p1,
-                        isAccompaniment: true
-                    });
-                }
-            });
-
-            // Report results with detailed error info if any
-            if (_solImportErrors.length > 0) {
-                var _errSummary = 'יובאו ' + solCount + ' פתרונות למידה. נתגלו ' + _solImportErrors.length + ' שגיאות מיפוי:';
-                var _errList = _solImportErrors.slice(0, 20).map(function(e) { return '<li style="margin-bottom:4px;font-size:12px;">' + e + '</li>'; }).join('');
-                if (_solImportErrors.length > 20) _errList += '<li style="color:var(--gray-400);font-size:11px;">... ועוד ' + (_solImportErrors.length - 20) + ' שגיאות</li>';
-                showModal('תוצאות ייבוא', '<p style="margin-bottom:10px;">' + _errSummary + '</p><ul style="max-height:300px;overflow-y:auto;direction:rtl;text-align:right;padding-right:16px;">' + _errList + '</ul>', '<button class="btn btn-primary" onclick="App.closeModal()">סגור</button>');
-            } else {
-                showToast('יובאו ' + solCount + ' פתרונות למידה בהצלחה', 'success');
-                closeModal();
-            }
-            renderSolutions();
-            return;
-        }
-
-        var count = 0;
-        var updatedCount = 0;
-        rows.forEach(function(rowValues) {
-            var record = {};
-            fieldMappings.forEach(function(fm) {
-                if (fm.colIdx < rowValues.length) {
-                    record[fm.fieldKey] = rowValues[fm.colIdx].trim();
-                }
-            });
-
-            // Strip $ prefix from idNumber and phone (Excel currency formatting artifact)
-            if (record.idNumber) record.idNumber = record.idNumber.replace(/^\$+/, '');
-            if (record.phone) record.phone = record.phone.replace(/^\$+/, '');
-
-            // Skip empty rows (check first mapped field)
-            var firstVal = record[fieldMappings[0].fieldKey] || '';
-            if (!firstVal) return;
-
-            if (type === 'mentors') {
-                DataStore.create(DataStore.KEYS.MENTORS, {
-                    idNumber: record.idNumber || '', fullNameHe: record.fullNameHe || record.fullName || '',
-                    fullNameAr: record.fullNameAr || '',
-                    phone: record.phone || '', email: record.email || '',
-                    isCertifiedLecturer: record.isCertifiedLecturer || '',
-                    expertInField: record.expertInField || '',
-                    lecturerStatus: record.lecturerStatus || ''
-                });
-            } else if (type === 'guides_repo') {
-                // Upsert by idNumber
-                const grIdMap = {};
-                (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || []).forEach(g => { if (g.idNumber) grIdMap[g.idNumber] = g.id; });
-                const existing = record.idNumber ? (grIdMap[record.idNumber] ? DataStore.getById(DataStore.KEYS.GUIDES_REPO, grIdMap[record.idNumber]) : null) : null;
-                const grData = {
-                    idNumber: record.idNumber || '', fullName: record.fullName || '',
-                    fullNameAr: record.fullNameAr || '', position: record.position || '',
-                    phone: record.phone || '', email: record.email || '',
-                    specializations: record.specializations || ''
-                };
-                if (existing) { DataStore.update(DataStore.KEYS.GUIDES_REPO, existing.id, grData); updatedCount++; }
-                else { DataStore.create(DataStore.KEYS.GUIDES_REPO, grData); }
-            } else if (type === 'users') {
-                DataStore.create(DataStore.KEYS.USERS, {
-                    fullName: record.fullName || '', username: record.username || '',
-                    password: record.password || '1234', email: record.email || '',
-                    role: record.role || 'guide', isActive: true
-                });
-            } else if (type === 'budgets') {
-                var bEngYear = record.englishYear || '';
-                if (!bEngYear && record.hebrewYear) { bEngYear = DataStore.getEnglishYear(record.hebrewYear) || ''; }
-                DataStore.create(DataStore.KEYS.BUDGETS, {
-                    budgetCode: record.budgetCode || '', hebrewYear: record.hebrewYear || '',
-                    englishYear: bEngYear,
-                    period: record.period || '', estimationStatus: record.estimationStatus || '',
-                    moneyColor: record.moneyColor || '',
-                    organizationalUnit: record.organizationalUnit || '',
-                    budgetFor: record.budgetFor || 'learning_solution',
-                    description: record.description || '', notes: record.notes || '',
-                    amount: parseFloat(record.amount) || 0,
-                    planningBalance: parseFloat(record.planningBalance) || 0,
-                    managementBalance: parseFloat(record.managementBalance) || 0,
-                    freeBudgetBalance: parseFloat(record.freeBudgetBalance) || 0
-                });
-            } else if (type === 'schools') {
-                // Upsert by institution code (סמל מוסד) — prevent duplicates
-                const code = (record.code || '').trim();
-                const schoolData = {
-                    code: code,
-                    name: record.name || '',
-                    legalStatus: record.legalStatus || '',
-                    educationType: record.educationType || '',
-                    educationStage: record.educationStage || '',
-                    principalName: record.principalName || '',
-                    inspectorName: record.inspectorName || '',
-                    order: 1, isActive: true
-                };
-                if (code) {
-                    const existingId = schoolCodeMap[code];
-                    if (existingId) {
-                        DataStore.update(DataStore.KEYS.LOOKUP_SCHOOLS, existingId, schoolData);
-                        updatedCount++;
-                    } else {
-                        const newItem = DataStore.create(DataStore.KEYS.LOOKUP_SCHOOLS, schoolData);
-                        if (newItem && newItem.id) schoolCodeMap[code] = newItem.id;
-                    }
-                } else {
-                    DataStore.create(DataStore.KEYS.LOOKUP_SCHOOLS, schoolData);
-                }
-            } else if (type === 'inspectors') {
-                DataStore.create(DataStore.KEYS.INSPECTORS, {
-                    fullName: record.fullName || '', phone: record.phone || '',
-                    email: record.email || '', district: record.district || '',
-                    schoolIds: []
-                });
-            } else if (type === 'pedagogical_executors') {
-                DataStore.create(DataStore.KEYS.PEDAGOGICAL_EXECUTORS, {
-                    companyNumber: (record.companyNumber || '').trim(),
-                    institutionName: (record.institutionName || record.fullName || '').trim(),
-                    groupName: (record.groupName || '').trim(),
-                    hourlyCost: parseFloat(record.hourlyCost) || 0,
-                    notes: (record.notes || '').trim()
-                });
-            } else if (type === 'lookup_values') {
-                if (!_importTargetKey) { showToast('לא נבחרה טבלת יעד', 'error'); return; }
-                const val = (record.value || '').trim();
-                if (!val) return;
-                const lkData = { value: val, label: record.label || val, labelAr: record.labelAr || '', order: 0, isActive: true };
-                const existingLkId = lkValueMap[val];
-                if (existingLkId) {
-                    // On update, preserve existing order
-                    const existingItem = DataStore.getById(_importTargetKey, existingLkId);
-                    lkData.order = existingItem ? (existingItem.order || 0) : 0;
-                    DataStore.update(_importTargetKey, existingLkId, lkData);
-                    updatedCount++;
-                } else {
-                    // Auto-assign next sequential order
-                    lkMaxOrder++;
-                    lkData.order = lkMaxOrder;
-                    const newLkItem = DataStore.create(_importTargetKey, lkData);
-                    if (newLkItem && newLkItem.id) lkValueMap[val] = newLkItem.id;
-                }
-            } else if (type === 'faq') {
-                const faqMaxOrder = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).reduce((m, i) => Math.max(m, i.order || 0), 0);
-                DataStore.create(DataStore.KEYS.FAQ_DATA, {
-                    titleAr: record.titleAr || '', titleHe: record.titleHe || '',
-                    answerAr: record.answerAr || '', answerHe: record.answerHe || '',
-                    order: parseInt(record.order) || (faqMaxOrder + count + 1)
-                });
-            }
-            count++;
-        });
-        closeModal();
-        if ((type === 'schools' || type === 'lookup_values' || type === 'guides_repo') && updatedCount > 0) {
-            showToast((count - updatedCount) + ' רשומות חדשות נוצרו, ' + updatedCount + ' רשומות קיימות עודכנו', 'success');
-        } else {
-            showToast(count + ' רשומות יובאו בהצלחה', 'success');
-        }
-        importWizardData = { type: null, headers: [], rows: [], mappings: {} };
-        _importTargetKey = null;
-        if (type === 'solutions') { renderSolutions(); updateSolutionsCount(); }
-        else if (type === 'guides_repo') renderGuidesRepo();
-        else if (type === 'budgets') renderBudgets();
-        else if (type === 'users') renderGuides();
-        else if (type === 'lookup_values' || type === 'inspectors' || type === 'pedagogical_executors' || type === 'schools') renderLookupTables();
-        else if (type === 'faq') renderFAQ();
-        else renderMentors();
-    }
-
-    // Excel export for מדריכים
-    function exportExcelGuides() {
-        const items = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
-        if (!items.length) { showToast('אין נתונים', 'warning'); return; }
-        if (typeof XLSX === 'undefined') { showToast('ספריית XLSX לא נטענה', 'error'); return; }
-        const data = items.map(g => ({
-            'ת.ז.': g.idNumber || '',
-            'שם מלא (עברית)': g.fullName || '',
-            'שם מלא (ערבית)': g.fullNameAr || '',
-            'תפקיד': g.position || '',
-            'טלפון': g.phone || '',
-            'דוא"ל': g.email || '',
-            'תחומי התמחות': g.specializations || ''
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'מדריכים');
-        XLSX.writeFile(wb, `matspanet_guides_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showToast('יוצא בהצלחה', 'success');
-    }
-
-    // Rich Text comment modal
-    function openCommentModal(solutionId) {
-        const comments = (DataStore.getAll(DataStore.KEYS.SOLUTION_COMMENTS) || []).filter(c => c.solutionId === solutionId);
-        const solution = DataStore.getById(DataStore.KEYS.SOLUTIONS, solutionId);
-        let commentsHtml = '';
-        if (comments.length === 0) {
-            commentsHtml = '<p style="color:var(--gray-400);text-align:center;padding:20px;">אין תגובות עדיין</p>';
-        } else {
-            commentsHtml = comments.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0)).map(c => {
-                return `<div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                        <strong style="font-size:13px;">${c.authorName || 'משתמש'}</strong>
-                        <span style="font-size:11px;color:var(--gray-400);">${formatDate(c.createdAt)}</span>
-                    </div>
-                    <div style="font-size:14px;line-height:1.6;">${c.content || ''}</div>
-                    <div style="margin-top:6px;text-align:left;"><button class="btn btn-danger btn-sm" onclick="App.deleteComment('${c.id}','${solutionId}')">🗑️</button></div>
-                </div>`;
-            }).join('');
-        }
-
-        showModal('💬 תגובות' + (solution ? ' - ' + solution.name : ''), `
-            <div style="max-height:300px;overflow-y:auto;margin-bottom:12px;" id="commentsListDiv">${commentsHtml}</div>
-            <div style="border-top:1px solid var(--gray-200);padding-top:12px;">
-                <div style="display:flex;gap:4px;margin-bottom:8px;padding:6px;background:var(--gray-50);border-radius:6px;">
-                    <button class="btn btn-outline btn-sm" onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
-                    <button class="btn btn-outline btn-sm" onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
-                    <button class="btn btn-outline btn-sm" onclick="document.execCommand('underline')" title="Underline"><u>U</u></button>
-                    <button class="btn btn-outline btn-sm" onclick="document.execCommand('insertUnorderedList')" title="List">•</button>
-                </div>
-                <div id="commentEditor" contenteditable="true" style="min-height:80px;max-height:150px;overflow-y:auto;border:1px solid var(--gray-300);border-radius:6px;padding:10px;font-size:14px;line-height:1.6;" data-placeholder="כתוב תגובה..."></div>
-            </div>`,
-        `<button class="btn btn-primary" onclick="App.saveComment('${solutionId}')">💬 שלח תגובה</button><button class="btn btn-outline" onclick="App.closeModal()">סגור</button>`);
-    }
-
-    function saveComment(solutionId) {
-        const editor = document.getElementById('commentEditor');
-        const content = editor ? editor.innerHTML.trim() : '';
-        if (!content) { showToast('יש לכתוב תגובה', 'error'); return; }
-        DataStore.create(DataStore.KEYS.SOLUTION_COMMENTS, {
-            solutionId: solutionId,
-            content: content,
-            authorName: currentUser.fullName,
-            createdBy: currentUser.id,
-            createdAt: new Date().toISOString()
-        });
-        showToast('התגובה נוספה', 'success');
-        openCommentModal(solutionId);
-    }
-
-    function deleteComment(commentId, solutionId) {
-        _moveToRecycleBin(DataStore.KEYS.SOLUTION_COMMENTS, commentId);
-        showToast('התגובה נמחקה', 'success');
-        openCommentModal(solutionId);
-    }
-
-    function importJSON(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                var data = JSON.parse(e.target.result);
-                // תמיכה בייבוא קבצי גיבוי עם __backup_meta (שחזור מלא) או ללא (ייבוא רגיל)
-                if (data.__backup_meta) {
-                    // שחזור מלא מקובץ גיבוי - משתמש בפונקציה הקיימת
-                    App._pendingRestoreData = data;
-                    confirmDialog('⚠️ נמצא קובץ גיבוי עם ' + Object.keys(data).filter(function(k){return k!=='__backup_meta';}).length + ' טבלאות\nהאם לבצע שחזור מלא של כל הטבלאות?', function() {
-                        var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
-                        var applied = 0;
-                        tablesInFile.forEach(function(k) {
-                            try { DataStore.saveAll(k, data[k]); applied++; } catch(e) { console.error('[Import] Error restoring', k, e); }
-                        });
-                        logActivity('restore_full', 'ייבוא גיבוי (' + applied + ' טבלאות)', 'settings');
-                        showToast('✅ ייבוא הושלם — ' + applied + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success');
-                        setTimeout(function() { window.location.reload(); }, 1500);
-                    });
-                } else {
-                    // ייבוא רגיל ללא מטא-נתונים
-                    DataStore.importData(data, true);
-                    showToast('הנתונים יובאו! מרענן...', 'success');
-                    setTimeout(() => window.location.reload(), 1500);
-                }
-            }
-            catch(err) { showToast('שגיאה בקריאת JSON: ' + err.message, 'error'); }
-        };
-        reader.readAsText(file); input.value = '';
-    }
-
-    // ================================================================
-    //  REGISTRATIONS (רישומים) - משופר
-    // ================================================================
-    let _regSortField = 'createdAt';
-    let _regSortDir = 'desc';
-
-    function renderRegistrations() {
-        let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        // סינון לפי מדריך – מציג רק רשומים לפתרונות של המדריך הנוכחי
-        const visibleSolIds = _getGuideVisibleSolutionIds();
-        if (visibleSolIds !== null) {
-            items = items.filter(r => visibleSolIds.includes(r.solutionId));
-        }
-        const totalCount = items.length;
-        const canFull = _canFullSection('registrations');
-
-        document.getElementById('section-registrations').innerHTML = `
-            ${_lookupTableHeader('נרשמים לפתרונות למידה', totalCount, '👥')}
-            <div class="card"><div class="card-body">
-                <div class="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--gray-50);border-radius:var(--border-radius);border:1px solid var(--gray-100);">
-                    ${canFull ? `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📥 ייבוא<input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="App.startImport('registrations',this)"></label>` : ''}
-                    <button class="btn btn-outline btn-sm" onclick="App.exportCSV('registrations')">📤 ייצוא CSV</button>
-                    <button class="btn btn-outline btn-sm" onclick="App._exportRegistrationsExcel()">📊 Excel</button>
-                    <button class="btn btn-outline btn-sm" onclick="App.printSection()">🖨️ הדפסה</button>
-                    <button class="btn btn-outline btn-sm" style="color:#25D366;border-color:#25D366;" onclick="App._openWhatsAppModal()">💬 שליחת WhatsApp</button>
-                    ${canFull ? '<button class="btn btn-primary btn-sm" onclick="App._addRegistrationManual()">➕ הוספה</button>' : ''}
-                    ${canFull ? `<button class="btn btn-danger btn-sm" onclick="App.clearAllRegistrations()">🗑️ מחיקה גורפת</button>` : ''}
-                </div>
-                <div class="toolbar">
-                    <input type="text" class="search-input" id="regSearch" placeholder="🔍 חיפוש חופשי לפי שם, טלפון, דוא\"ל, פתרון למידה..." oninput="App.filterRegistrations()">
-                    <select class="filter-select" id="regSortF" onchange="App._sortRegistrations()">
-                        <option value="createdAt" ${_regSortField==='createdAt'?'selected':''}>מיון לפי תאריך</option>
-                        <option value="fullName" ${_regSortField==='fullName'?'selected':''}>מיון לפי שם</option>
-                        <option value="solutionName" ${_regSortField==='solutionName'?'selected':''}>מיון לפי פתרון</option>
-                    </select>
-                    <button class="btn btn-outline btn-sm" onclick="App._toggleRegSortDir()">${_regSortDir === 'desc' ? '↓ שכב' : '↑ עולה'}</button>
-                    ${_colVisBtnHtml('registrations')}
-                </div>
-                <div id="regTableDiv">${_renderRegTable(items)}</div>
-            </div></div>`;
-        _applyTableFeatures('registrations');
-    }
-
-    function _addRegistrationManual() {
-        const solutions = _getVisibleSolutions();
-        const solOpts = solutions.sort((a,b) => (a.name||'').localeCompare(b.name||'','he')).map(s =>
-            `<option value="${s.id}" data-name="${escAttr(s.name||'')}">${escAttr(s.name || 'בחר פתרון למידה')}</option>`
-        ).join('');
-        showModal('➕ הוספת נרשם', `
-            <div class="form-grid">
-                <div class="form-group"><label>שם מלא *</label><input type="text" id="fRegAddName" class="form-input" required></div>
-                <div class="form-group"><label>טלפון *</label><input type="text" id="fRegAddPhone" class="form-input" required></div>
-                <div class="form-group"><label>דוא"ל *</label><input type="email" id="fRegAddEmail" class="form-input" required></div>
-                <div class="form-group"><label>תפקיד *</label><input type="text" id="fRegAddRole" class="form-input" required></div>
-                <div class="form-group"><label>מוסד</label><input type="text" id="fRegAddInst" class="form-input" placeholder="סמל מוסד"></div>
-                <div class="form-group"><label>בית ספר</label><input type="text" id="fRegAddSchool" class="form-input" placeholder="שם בית ספר"></div>
-                <div class="form-group full-width"><label>פתרון למידה *</label>
-                    <select id="fRegAddSolution" class="form-select" required onchange="App._updateRegAddSolName()">
-                        <option value="">בחר פתרון למידה</option>
-                        ${solOpts}
-                    </select>
-                </div>
-            </div>`,
-        `<button class="btn btn-primary" onclick="App._saveManualRegistration()">💾 שמור</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
-    }
-
-    function _updateRegAddSolName() {
-        // just a placeholder in case we need it
-    }
-
-    function _saveManualRegistration() {
-        const name = (document.getElementById('fRegAddName').value || '').trim();
-        const phone = (document.getElementById('fRegAddPhone').value || '').trim();
-        const email = (document.getElementById('fRegAddEmail').value || '').trim();
-        const role = (document.getElementById('fRegAddRole').value || '').trim();
-        const solSel = document.getElementById('fRegAddSolution');
-        const solutionId = solSel ? solSel.value : '';
-        const solutionName = solSel ? solSel.options[solSel.selectedIndex].getAttribute('data-name') || solSel.options[solSel.selectedIndex].text : '';
-
-        if (!name || !phone || !email || !role || !solutionId) {
-            showToast('נא למלא את כל השדות החובה', 'error');
-            return;
-        }
-
-        DataStore.create(DataStore.KEYS.REGISTRATIONS, {
-            fullName: name,
-            phone: phone,
-            email: email,
-            role: role,
-            institutionCode: (document.getElementById('fRegAddInst').value || '').trim(),
-            institutionName: (document.getElementById('fRegAddSchool').value || '').trim(),
-            solutionId: solutionId,
-            solutionName: solutionName,
-            createdAt: new Date().toISOString()
-        });
-
-        logActivity('add_registration', 'הוספת נרשם: ' + name, 'registration', '');
-        closeModal();
-        showToast('הנרשם נוסף בהצלחה', 'success');
-        renderRegistrations();
-    }
-
-    function _sortRegistrations() {
-        _regSortField = document.getElementById('regSortF').value;
-        App.filterRegistrations();
-    }
-    function _toggleRegSortDir() {
-        _regSortDir = _regSortDir === 'desc' ? 'asc' : 'desc';
-        App.filterRegistrations();
-    }
-
-    function _exportRegistrationsExcel() {
-        let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        if (!items.length) { showToast('אין נתונים', 'warning'); return; }
-        if (typeof XLSX === 'undefined') { showToast('ספריית XLSX לא נטענה', 'error'); return; }
-
-        // Build school lookup: code -> name
-        const allSchools = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
-        const schoolByCode = {};
-        allSchools.forEach(function(s) { schoolByCode[s.code] = s.name; });
-
-        // Flatten: one row per school per teacher
-        const rows = [];
-        items.forEach(function(r) {
-            var codes = Array.isArray(r.institutionCodes) ? r.institutionCodes
-                       : (r.institutionCode ? [r.institutionCode] : []);
-            var names = Array.isArray(r.institutionNames) ? r.institutionNames
-                       : (r.institutionName ? [r.institutionName] : []);
-
-            if (codes.length === 0) {
-                // No school at all — single row with empty school fields
-                rows.push({
-                    'שם': r.fullName || '',
-                    'טלפון': r.phone || '',
-                    'דוא"ל': r.email || '',
-                    'סמל מוסד': '',
-                    'בית ספר': '',
-                    'תפקיד': r.role || '',
-                    'פתרון / השתלמות': r.solutionName || '',
-                    'תאריך': formatDate(r.createdAt)
-                });
-            } else {
-                codes.forEach(function(code, idx) {
-                    var name = names[idx] || schoolByCode[code] || code;
-                    rows.push({
-                        'שם': r.fullName || '',
-                        'טלפון': r.phone || '',
-                        'דוא"ל': r.email || '',
-                        'סמל מוסד': code,
-                        'בית ספר': name,
-                        'תפקיד': r.role || '',
-                        'פתרון / השתלמות': r.solutionName || '',
-                        'תאריך': formatDate(r.createdAt)
-                    });
-                });
-            }
-        });
-
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'רישומים');
-        XLSX.writeFile(wb, `matspanet_registrations_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showToast('יוצא בהצלחה', 'success');
-    }
-
-    function _renderRegTable(items) {
-        const canFull = _canFullSection('registrations');
-        if (!items.length) return '<div class="empty-state"><div class="empty-icon">📝</div><h3>אין רישומים</h3></div>';
-        const sorted = [...items].sort((a, b) => {
-            let va = a[_regSortField] || '', vb = b[_regSortField] || '';
-            if (_regSortField === 'createdAt') {
-                return _regSortDir === 'desc' ? new Date(b.createdAt||0) - new Date(a.createdAt||0) : new Date(a.createdAt||0) - new Date(b.createdAt||0);
-            }
-            return _regSortDir === 'desc' ? vb.localeCompare(va, 'he') : va.localeCompare(vb, 'he');
-        });
-        return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr>
-            <th>שם</th><th>טלפון</th><th>דוא"ל</th><th>מוסד</th><th>בית ספר</th><th>תפקיד</th><th>פתרון / השתלמות</th><th>תאריך</th>${canFull ? '<th>פעולות</th>' : ''}
-        </tr></thead><tbody>${sorted.map(r => `<tr>
-            <td><strong>${escAttr(r.fullName)}</strong></td>
-            <td style="direction:ltr">${r.phone || '—'}</td>
-            <td>${r.email || '—'}</td>
-            <td>${Array.isArray(r.institutionCodes) ? r.institutionCodes.join(' | ') : (r.institutionCode || '—')}</td>
-            <td>${Array.isArray(r.institutionNames) ? r.institutionNames.join(', ') : (r.institutionName || '—')}</td>
-            <td>${r.role || '—'}</td>
-            <td>${r.solutionName || '—'}</td>
-            <td style="font-size:12px;">${formatDate(r.createdAt)}</td>
-            ${canFull ? `<td><div style="display:flex;gap:4px;">
-                <button class="btn btn-outline btn-sm" onclick="App.editRegistration('${r.id}')" title="עריכה">✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="App.deleteRegistration('${r.id}')" title="מחיקה">🗑️</button>
-            </div></td>` : ''}
-        </tr>`).join('')}</tbody></table></div>`;
-    }
-
-    function filterRegistrations() {
-        const search = document.getElementById('regSearch').value.toLowerCase();
-        let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        // סינון לפי מדריך
-        if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'system_admin' && currentUser.role !== 'system_operator' && currentUser.role !== 'team_leader') {
-            let userGuideIds = (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [])
-                .filter(g => g.userId === currentUser.id)
-                .map(g => g.id);
-            // Fallback: match by fullName if no userId link
-            if (userGuideIds.length === 0 && currentUser.fullName) {
-                const normalizedName = currentUser.fullName.trim();
-                userGuideIds = (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [])
-                    .filter(g => (g.fullName || '').trim() === normalizedName)
-                    .map(g => g.id);
-            }
-            if (userGuideIds.length > 0) {
-                const mySolutionIds = (DataStore.getAll(DataStore.KEYS.SOLUTIONS) || []).filter(s => userGuideIds.includes(s.guideId)).map(s => s.id);
-                items = items.filter(r => mySolutionIds.includes(r.solutionId));
-            }
-        }
-        if (search) {
-            items = items.filter(r => {
-                const s = search;
-                if ((r.fullName||'').toLowerCase().includes(s)) return true;
-                if ((r.phone||'').includes(s)) return true;
-                if ((r.email||'').toLowerCase().includes(s)) return true;
-                if ((r.solutionName||'').toLowerCase().includes(s)) return true;
-                // Support searching in both old single-value and new array fields
-                const codes = Array.isArray(r.institutionCodes) ? r.institutionCodes.join(' ') : (r.institutionCode || '');
-                const names = Array.isArray(r.institutionNames) ? r.institutionNames.join(' ') : (r.institutionName || '');
-                if (codes.toLowerCase().includes(s)) return true;
-                if (names.toLowerCase().includes(s)) return true;
-                return false;
-            });
-        }
-        _resetPagination('registrations');
-        document.getElementById('regTableDiv').innerHTML = _renderRegTable(items);
-        _applyTableFeatures('registrations');
-    }
-
-    // ---- Edit Registration: Institution Tag Helpers ----
-    let _editSelectedInstitutions = [];
-    let _editInstDocClickHandler = null;
-
-    function _initEditInstitutionTags(record) {
-        _editSelectedInstitutions = [];
-        _editInstCleanup();
-
-        // Load school list from DataStore
-        const allSchools = (DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [])
-            .filter(function(s) { return s.isActive !== false; });
-
-        // Resolve existing selections from record (support both array and singular formats)
-        let existingCodes = [];
-        let existingNames = [];
-        if (Array.isArray(record.institutionCodes) && record.institutionCodes.length) {
-            existingCodes = record.institutionCodes;
-            existingNames = Array.isArray(record.institutionNames) ? record.institutionNames : [];
-        } else if (record.institutionCode) {
-            // Old singular format
-            existingCodes = [record.institutionCode];
-            existingNames = record.institutionName ? [record.institutionName] : [];
-        }
-
-        // Build a lookup map: code -> school object
-        const schoolByCode = {};
-        allSchools.forEach(function(s) { schoolByCode[s.code] = s; });
-
-        // Create initial tags from saved data
-        existingCodes.forEach(function(code, idx) {
-            const school = schoolByCode[code];
-            const name = school ? school.name : (existingNames[idx] || code);
-            _editSelectedInstitutions.push({ code: code, name: name });
-        });
-
-        // Render initial tags
-        const tagsContainer = document.getElementById('editInstTags');
-        if (tagsContainer) {
-            tagsContainer.innerHTML = _editSelectedInstitutions.map(function(inst) {
-                return '<div class="institution-tag" data-code="' + escAttr(inst.code) + '">' +
-                    '<span class="tag-text">' + escAttr(inst.code) + ' — ' + escAttr(inst.name) + '</span>' +
-                    '<button type="button" class="tag-remove" data-code="' + escAttr(inst.code) + '" title="הסר">&times;</button>' +
-                    '</div>';
-            }).join('');
-        }
-
-        // Search input handler
-        const searchInput = document.getElementById('editInstSearch');
-        const dropdown = document.getElementById('editInstDropdown');
-        const wrapper = document.getElementById('editInstWrapper');
-
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const q = (searchInput.value || '').trim().toLowerCase();
-                if (!q || !dropdown) { if (dropdown) dropdown.style.display = 'none'; return; }
-
-                const selectedCodes = _editSelectedInstitutions.map(function(i) { return i.code; });
-
-                const matches = allSchools.filter(function(s) {
-                    if (selectedCodes.indexOf(s.code) !== -1) return false;
-                    return (s.code || '').includes(q) ||
-                           (s.name || '').toLowerCase().includes(q) ||
-                           (s.educationStage || '').toLowerCase().includes(q) ||
-                           (s.principalName || '').toLowerCase().includes(q) ||
-                           (s.inspectorName || '').toLowerCase().includes(q);
-                }).slice(0, 50);
-
-                if (!matches.length) {
-                    dropdown.innerHTML = '<div style="padding:12px;color:var(--gray-400);font-size:14px;text-align:center;">לא נמצאו תוצאות</div>';
-                    dropdown.style.display = 'block';
-                    return;
-                }
-
-                dropdown.innerHTML = matches.map(function(s) {
-                    return '<div class="inst-suggestion-item" data-code="' + escAttr(s.code || '') +
-                        '" data-name="' + escAttr(s.name || '') + '">' +
-                        '<div class="inst-sug-header">' +
-                            '<span class="inst-sug-code">' + escAttr(s.code || '') + '</span>' +
-                            '<span class="inst-sug-name">' + escAttr(s.name || '') + '</span>' +
-                            (s.educationStage ? ' <span style="font-size:11px;color:var(--gray-400);flex-shrink:0;">' + escAttr(s.educationStage) + '</span>' : '') +
-                        '</div></div>';
-                }).join('');
-
-                dropdown.style.display = 'block';
-
-                // Attach click handlers to suggestions
-                dropdown.querySelectorAll('.inst-suggestion-item').forEach(function(el) {
-                    el.addEventListener('click', function() {
-                        _editAddInstitutionTag({ code: this.dataset.code, name: this.dataset.name });
-                    });
-                });
-            });
-
-            searchInput.addEventListener('focus', function() {
-                // Trigger search on focus to show suggestions if there's already a query
-                if (searchInput.value.trim()) {
-                    searchInput.dispatchEvent(new Event('input'));
-                }
-            });
-        }
-
-        // Click on wrapper focuses the search input
-        if (wrapper && searchInput) {
-            wrapper.addEventListener('click', function(e) {
-                if (e.target === wrapper || e.target.id === 'editInstTags') {
-                    searchInput.focus();
-                }
-            });
-        }
-
-        // Remove tag handlers (event delegation on tagsContainer)
-        if (tagsContainer) {
-            tagsContainer.addEventListener('click', function(e) {
-                const removeBtn = e.target.closest('.tag-remove');
-                if (removeBtn) {
-                    e.stopPropagation();
-                    const code = removeBtn.dataset.code;
-                    _editRemoveInstitutionTag(code);
-                }
-            });
-        }
-
-        // Close dropdown on click outside
-        _editInstDocClickHandler = function(e) {
-            if (dropdown && wrapper &&
-                !dropdown.contains(e.target) && !wrapper.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
-        };
-        document.addEventListener('click', _editInstDocClickHandler);
-    }
-
-    function _editAddInstitutionTag(inst) {
-        if (_editSelectedInstitutions.some(function(i) { return i.code === inst.code; })) return;
-
-        _editSelectedInstitutions.push(inst);
-
-        const tagsContainer = document.getElementById('editInstTags');
-        const searchInput = document.getElementById('editInstSearch');
-        const dropdown = document.getElementById('editInstDropdown');
-
-        if (tagsContainer) {
-            const tag = document.createElement('div');
-            tag.className = 'institution-tag';
-            tag.dataset.code = inst.code;
-            tag.innerHTML = '<span class="tag-text">' + inst.code + ' — ' + escAttr(inst.name) + '</span>' +
-                '<button type="button" class="tag-remove" data-code="' + inst.code + '" title="הסר">&times;</button>';
-            tagsContainer.appendChild(tag);
-        }
-
-        if (searchInput) { searchInput.value = ''; searchInput.focus(); }
-        if (dropdown) dropdown.style.display = 'none';
-    }
-
-    function _editRemoveInstitutionTag(code) {
-        _editSelectedInstitutions = _editSelectedInstitutions.filter(function(i) { return i.code !== code; });
-        const tagsContainer = document.getElementById('editInstTags');
-        if (tagsContainer) {
-            const tagEl = tagsContainer.querySelector('.institution-tag[data-code="' + code + '"]');
-            if (tagEl) tagEl.remove();
-        }
-    }
-
-    function _editInstCleanup() {
-        if (_editInstDocClickHandler) {
-            document.removeEventListener('click', _editInstDocClickHandler);
-            _editInstDocClickHandler = null;
-        }
-        const dropdown = document.getElementById('editInstDropdown');
-        if (dropdown) dropdown.style.display = 'none';
-    }
-
-    function editRegistration(id) {
-        const r = DataStore.getById(DataStore.KEYS.REGISTRATIONS, id);
-        if (!r) return;
-        editingItem = r;
-        showModal('עריכת רישום', `
-            <div class="form-grid">
-                <div class="form-group"><label>שם מלא *</label><input type="text" id="fRegName" class="form-input" value="${escAttr(r.fullName)}" required></div>
-                <div class="form-group"><label>טלפון</label><input type="text" id="fRegPhone" class="form-input" value="${r.phone || ''}"></div>
-                <div class="form-group"><label>דוא"ל</label><input type="email" id="fRegEmail" class="form-input" value="${r.email || ''}"></div>
-                <div class="form-group" style="grid-column:1/-1;position:relative;">
-                    <label>סמל מוסד / שם בית ספר</label>
-                    <div class="inst-autocomplete-wrapper" id="editInstWrapper">
-                        <div id="editInstTags"></div>
-                        <input type="text" id="editInstSearch" class="form-input" placeholder="🔍 חפש לפי סמל, שם..." autocomplete="off">
-                    </div>
-                    <div id="editInstDropdown" class="inst-autocomplete-dropdown"></div>
-                </div>
-                <div class="form-group"><label>תפקיד</label><input type="text" id="fRegRole" class="form-input" value="${escAttr(r.role || '')}"></div>
-            </div>`,
-        `<button class="btn btn-primary" onclick="App.saveEditRegistration()">💾 שמור</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
-        _initEditInstitutionTags(r);
-    }
-
-    function saveEditRegistration() {
-        const name = document.getElementById('fRegName').value.trim();
-        if (!name) { showToast('יש להזין שם', 'error'); return; }
-        const instCodes = _editSelectedInstitutions.map(function(i) { return i.code; });
-        const instNames = _editSelectedInstitutions.map(function(i) { return i.name; });
-        const updateData = {
-            fullName: name,
-            phone: document.getElementById('fRegPhone').value.trim(),
-            email: document.getElementById('fRegEmail').value.trim(),
-            institutionCodes: instCodes,
-            institutionNames: instNames,
-            role: document.getElementById('fRegRole').value.trim()
-        };
-        // Clear old singular fields if arrays are used
-        if (instCodes.length > 0) {
-            updateData.institutionCode = '';
-            updateData.institutionName = '';
-        }
-        DataStore.update(DataStore.KEYS.REGISTRATIONS, editingItem.id, updateData);
-        logActivity('edit_registration', 'עריכת נרשם: ' + name, 'registration', editingItem.id);
-        _editSelectedInstitutions = [];
-        _editInstCleanup();
-        editingItem = null;
-        closeModal(); showToast('הרישום עודכן', 'success');
-        renderRegistrations();
-    }
-
-    function deleteRegistration(id) {
-        const r = DataStore.getById(DataStore.KEYS.REGISTRATIONS, id);
-        confirmDialog('למחוק רישום זה?', () => {
-            _moveToRecycleBin(DataStore.KEYS.REGISTRATIONS, id);
-            logActivity('delete_registration', 'מחיקת נרשם: ' + (r ? r.fullName : ''), 'registration', id);
-            showToast('הרישום נמחק', 'success');
-            renderRegistrations();
-        });
-    }
-
-    function clearAllRegistrations() {
-        let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        // סינון לפי מדריך אם צריך
-        const visibleSolIds = _getGuideVisibleSolutionIds();
-        if (visibleSolIds !== null) {
-            items = items.filter(r => visibleSolIds.includes(r.solutionId));
-        }
-        if (!items.length) return;
-        confirmDialog(`⚠️ למחוק את כל ${items.length} הרשומות?\nפעולה זו אינה ניתנת לביטול!`, () => {
-            // מחיקה רק של הרשומות המוצגות (לפי הסינון)
-            const visibleIds = new Set(items.map(i => i.id));
-            const allItems = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-            const remaining = allItems.filter(i => !visibleIds.has(i.id));
-            DataStore.saveAll(DataStore.KEYS.REGISTRATIONS, remaining);
-            logActivity('bulk_delete_registrations', 'מחיקה גורפת של ' + items.length + ' נרשמים', 'registration', '');
-            showToast(items.length + ' רשומות נמחקו', 'success');
-            renderRegistrations();
-        });
-    }
-
-    // ================================================================
-    //  WHATSAPP MESSAGING (שליחת הודעות WhatsApp)
-    // ================================================================
-
-    // תבניות ברירת מחדל להפניות אישיות
-    const _WA_DEFAULT_TEMPLATES = [
-        { id: 'he_morning',    lang: 'he', period: 'morning',   hourFrom: 6,  hourTo: 11,  text: 'בוקר טוב [שם],' },
-        { id: 'he_afternoon',  lang: 'he', period: 'afternoon', hourFrom: 12, hourTo: 16,  text: 'צהריים טובים [שם],' },
-        { id: 'he_evening',    lang: 'he', period: 'evening',   hourFrom: 17, hourTo: 20,  text: 'ערב טוב [שם],' },
-        { id: 'he_night',      lang: 'he', period: 'night',     hourFrom: 21, hourTo: 5,  text: 'לילה טוב [שם],' },
-        { id: 'ar_morning',    lang: 'ar', period: 'morning',   hourFrom: 6,  hourTo: 11,  text: 'صباح الخير [اسم],' },
-        { id: 'ar_afternoon',  lang: 'ar', period: 'afternoon', hourFrom: 12, hourTo: 16,  text: 'مساء الخير [اسم],' },
-        { id: 'ar_evening',    lang: 'ar', period: 'evening',   hourFrom: 17, hourTo: 20,  text: 'مساء الخير [اسم],' },
-        { id: 'ar_night',      lang: 'ar', period: 'night',     hourFrom: 21, hourTo: 5,  text: 'تصبح على خير [اسم],' }
-    ];
-
-    function _getWaLang() {
-        var settings = DataStore.getSettings();
-        return (settings && settings.language) || document.documentElement.lang || 'he';
-    }
-
-    function _getWaTemplates() {
-        var settings = DataStore.getSettings();
-        return (settings && settings.waTemplates && settings.waTemplates.length) ? settings.waTemplates : _WA_DEFAULT_TEMPLATES;
-    }
-
-    function _getAutoGreeting() {
-        var lang = _getWaLang();
-        var templates = _getWaTemplates();
-        var hour = new Date().getHours();
-        // מציאת התבנית המתאימה: שפה + טווח שעות
-        for (var i = 0; i < templates.length; i++) {
-            var t = templates[i];
-            if (t.lang !== lang) continue;
-            if (t.hourFrom <= t.hourTo) {
-                if (hour >= t.hourFrom && hour <= t.hourTo) return t;
-            } else {
-                // חצות (למשל 21-5)
-                if (hour >= t.hourFrom || hour <= t.hourTo) return t;
-            }
-        }
-        // נפילה — נסה למצוא כל תבנית בשפה המתאימה
-        var fallback = templates.find(function(t) { return t.lang === lang; });
-        return fallback || templates[0];
-    }
-
-    function _applyWaGreeting(template, name) {
-        if (!template || !name) return '';
-        return template.text.replace('[שם]', name).replace('[اسم]', name);
-    }
-
-    function _renderWaGreetingOptions() {
-        var lang = _getWaLang();
-        var templates = _getWaTemplates();
-        var autoT = _getAutoGreeting();
-        var autoLabel = autoT ? autoT.text.replace('[שם]', '...').replace('[اسم]', '...') : '—';
-        // קיבוץ לפי שפה
-        var heTemplates = templates.filter(function(t) { return t.lang === 'he'; });
-        var arTemplates = templates.filter(function(t) { return t.lang === 'ar'; });
-        var opts = '<option value="auto">' + (lang === 'ar' ? '✅ تلقائي (موصى به): ' : '✅ אוטומטי (מומלץ): ') + escAttr(autoLabel) + '</option>';
-        if (heTemplates.length) {
-            opts += '<optgroup label="עברית">';
-            heTemplates.forEach(function(t) {
-                var label = t.text.replace('[שם]', '...').replace('[اسم]', '...');
-                opts += '<option value="' + t.id + '">' + escAttr(label) + '</option>';
-            });
-            opts += '</optgroup>';
-        }
-        if (arTemplates.length) {
-            opts += '<optgroup label="العربية">';
-            arTemplates.forEach(function(t) {
-                var label = t.text.replace('[שם]', '...').replace('[اسم]', '...');
-                opts += '<option value="' + t.id + '">' + escAttr(label) + '</option>';
-            });
-            opts += '</optgroup>';
-        }
-        opts += '<option value="custom">' + (lang === 'ar' ? '✏️ كتابة حرة' : '✏️ כתיבה חופשית') + '</option>';
-        return opts;
-    }
-
-    function _onWaGreetingChange() {
-        var sel = document.getElementById('waGreetingMode');
-        var customDiv = document.getElementById('waCustomGreetingDiv');
-        var previewDiv = document.getElementById('waGreetingPreview');
-        if (!sel) return;
-        var val = sel.value;
-        // הצגת/הסתרת שדה כתיבה חופשית
-        if (customDiv) customDiv.style.display = val === 'custom' ? 'block' : 'none';
-        // עדכון תצוגה מקדימה
-        if (previewDiv) {
-            var templates = _getWaTemplates();
-            var t;
-            if (val === 'auto') {
-                t = _getAutoGreeting();
-            } else {
-                t = templates.find(function(x) { return x.id === val; });
-            }
-            if (t) {
-                var example = t.lang === 'ar' ? 'أحمد' : 'דני';
-                var preview = _applyWaGreeting(t, example);
-                previewDiv.textContent = preview;
-                previewDiv.style.display = 'block';
-            } else {
-                previewDiv.style.display = 'none';
-            }
-        }
-    }
-
-    function _openWhatsAppModal() {
-        // גזירת רשימת הפתרונות ישירות מהרשומות המוצגות בטבלה — מבטיח זהות מלאה
-        let regs = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        const visibleSolIds = _getGuideVisibleSolutionIds();
-        if (visibleSolIds !== null) {
-            regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
-        }
-        // חילוץ פתרונות למידה ייחודיים מתוך הרשומות המסוננות
-        const solMap = {};
-        const allSolutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
-        regs.forEach(r => {
-            if (r.solutionId && !solMap[r.solutionId]) {
-                const sol = allSolutions.find(s => s.id === r.solutionId);
-                if (sol) solMap[r.solutionId] = sol.name || r.solutionName || '';
-            }
-        });
-        const solutions = Object.entries(solMap)
-            .map(([id, name]) => ({ id, name }))
-            .sort((a, b) => a.name.localeCompare(b.name, 'he'));
-        if (!solutions.length) { showToast('אין פתרונות למידה עם נרשמים', 'warning'); return; }
-        const solOpts = solutions.map(s =>
-            `<option value="${s.id}" data-name="${escAttr(s.name || '')}">${escAttr(s.name || 'בחר פתרון למידה')}</option>`
-        ).join('');
-        showModal('💬 שליחת הודעת WhatsApp', `
-            <div class="form-grid">
-                <div class="form-group full-width">
-                    <label>בחירת פתרון למידה *</label>
-                    <select id="waSolution" class="form-select" onchange="App._onWaSolutionChange()">
-                        <option value="">— בחר פתרון למידה —</option>
-                        ${solOpts}
-                    </select>
-                </div>
-                <div class="form-group full-width" id="waRecipientsDiv" style="display:none;">
-                    <label>רשימת נמענים <span id="waRecipCount" style="color:var(--gray-500);font-weight:normal;"></span></label>
-                    <div id="waRecipientsList" style="max-height:180px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--border-radius);padding:8px;"></div>
-                </div>
-                <div class="form-group full-width">
-                    <label>תוכן ההודעה *</label>
-                    <textarea id="waMessage" class="form-input" rows="4" placeholder="${_getWaLang() === 'ar' ? 'اكتب محتوى الرسالة هنا...' : 'כתוב את תוכן ההודעה כאן...'}" style="resize:vertical;"></textarea>
-                </div>
-                <div class="form-group full-width">
-                    <label>👤 ${_getWaLang() === 'ar' ? 'تحية شخصية' : 'הפנייה אישית'}</label>
-                    <select id="waGreetingMode" class="form-select" onchange="App._onWaGreetingChange()">
-                        ${_renderWaGreetingOptions()}
-                    </select>
-                    <div id="waCustomGreetingDiv" style="display:none;margin-top:8px;">
-                        <input type="text" id="waCustomGreeting" class="form-input" placeholder="${_getWaLang() === 'ar' ? 'اكتب تحية مخصصة... (استخدم [שם] أو [اسم] للاسم)' : 'כתוב פנייה מותאמת... (השתמש ב-[שם] או [اسم] לשם המשתלם)'}">
-                    </div>
-                    <div id="waGreetingPreview" style="margin-top:6px;padding:8px 12px;background:var(--gray-50);border-radius:var(--border-radius);font-size:13px;color:var(--gray-600);display:none;"></div>
-                </div>
-            </div>`,
-        `<button class="btn btn-primary" style="background:#25D366;border-color:#25D366;" onclick="App._sendWhatsAppMessages()">💬 ${_getWaLang() === 'ar' ? 'إرسال' : 'שליחה'}</button><button class="btn btn-outline" onclick="App.closeModal()">${_getWaLang() === 'ar' ? 'إلغاء' : 'ביטול'}</button>`);
-        // הפעלת תצוגה מקדימה ראשונית
-        setTimeout(function() { App._onWaGreetingChange(); }, 50);
-    }
-
-    function _onWaSolutionChange() {
-        const sel = document.getElementById('waSolution');
-        const div = document.getElementById('waRecipientsDiv');
-        const list = document.getElementById('waRecipientsList');
-        const count = document.getElementById('waRecipCount');
-        if (!sel || !sel.value) { div.style.display = 'none'; return; }
-        const solId = sel.value;
-        const solName = sel.options[sel.selectedIndex].getAttribute('data-name') || sel.options[sel.selectedIndex].text;
-        const allRegs = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        // סינון לפי מדריך אם צריך
-        let regs = allRegs.filter(r => r.solutionId === solId);
-        const visibleSolIds = _getGuideVisibleSolutionIds();
-        if (visibleSolIds !== null) {
-            regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
-        }
-        div.style.display = 'block';
-        count.textContent = '(' + regs.length + ' נמענים)';
-        if (!regs.length) {
-            list.innerHTML = '<div style="color:var(--gray-500);text-align:center;padding:12px;">אין נרשמים לפתרון למידה זה</div>';
-            return;
-        }
-        list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-            '<thead><tr style="background:var(--gray-50);"><th style="padding:6px 8px;text-align:right;">שם</th><th style="padding:6px 8px;text-align:right;">טלפון</th></tr></thead><tbody>' +
-            regs.map(r => `<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:5px 8px;">${escAttr(r.fullName)}</td><td style="padding:5px 8px;direction:ltr;text-align:left;">${r.phone || '—'}</td></tr>`).join('') +
-            '</tbody></table>';
-    }
-
-    function _sendWhatsAppMessages() {
-        const solSel = document.getElementById('waSolution');
-        const message = (document.getElementById('waMessage').value || '').trim();
-        const greetingMode = (document.getElementById('waGreetingMode') || {}).value || 'auto';
-        if (!solSel || !solSel.value) { showToast(_getWaLang() === 'ar' ? 'يجب اختيار حل تعلم' : 'יש לבחור פתרון למידה', 'error'); return; }
-        if (!message) { showToast(_getWaLang() === 'ar' ? 'يجب كتابة محتوى الرسالة' : 'יש לכתוב תוכן הודעה', 'error'); return; }
-        const solId = solSel.value;
-        const solName = solSel.options[solSel.selectedIndex].getAttribute('data-name') || solSel.options[solSel.selectedIndex].text;
-        const allRegs = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
-        let regs = allRegs.filter(r => r.solutionId === solId);
-        const visibleSolIds = _getGuideVisibleSolutionIds();
-        if (visibleSolIds !== null) {
-            regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
-        }
-        if (!regs.length) { showToast(_getWaLang() === 'ar' ? 'لا يوجد مسجلون لهذا الحل' : 'אין נרשמים לפתרון למידה זה', 'warning'); return; }
-        // סינון נמענים עם מספר טלפון תקין
-        const validRegs = regs.filter(r => r.phone && r.phone.replace(/[\s\-\(\)\+]/g, '').length >= 9);
-        if (!validRegs.length) { showToast(_getWaLang() === 'ar' ? 'لم يتم العثور على مستلمين برقم هاتف صالح' : 'לא נמצאו נמענים עם מספר טלפון תקין', 'warning'); return; }
-        // בחירת תבנית הפנייה
-        var greetingTemplate = null;
-        var customGreetingText = null;
-        if (greetingMode === 'auto') {
-            greetingTemplate = _getAutoGreeting();
-        } else if (greetingMode === 'custom') {
-            var customEl = document.getElementById('waCustomGreeting');
-            customGreetingText = customEl ? customEl.value.trim() : '';
-            if (!customGreetingText) { showToast(_getWaLang() === 'ar' ? 'يجب كتابة تحية مخصصة' : 'יש לכתוב פנייה מותאמת', 'error'); return; }
-        } else {
-            var templates = _getWaTemplates();
-            greetingTemplate = templates.find(function(t) { return t.id === greetingMode; });
-        }
-        // שליחה לכל נמען בלשונית חדשה
-        let sentCount = 0;
-        validRegs.forEach((r, idx) => {
-            let fullMsg = message;
-            var greeting = '';
-            if (greetingMode === 'custom' && customGreetingText && r.fullName) {
-                greeting = customGreetingText.replace('[שם]', r.fullName).replace('[اسم]', r.fullName);
-            } else if (greetingTemplate && r.fullName) {
-                greeting = _applyWaGreeting(greetingTemplate, r.fullName);
-            }
-            if (greeting) {
-                fullMsg = greeting + ' ' + fullMsg;
-            }
-            // ניקוי מספר טלפון לפורמט בינלאומי
-            let phone = r.phone.replace(/[\s\-\(\)\.]/g, '');
-            if (!phone.startsWith('+') && !phone.startsWith('972')) {
-                if (phone.startsWith('0')) phone = '972' + phone.substring(1);
-                else phone = '972' + phone;
-            }
-            if (phone.startsWith('+')) phone = phone.substring(1);
-            const waUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(fullMsg);
-            setTimeout(() => {
-                window.open(waUrl, '_blank');
-            }, idx * 300);
-            sentCount++;
-        });
-        logActivity('whatsapp_send', 'שליחת WhatsApp ל-' + sentCount + ' נרשמים | פתרון: ' + solName, 'registration', solId);
-        closeModal();
-        showToast('נפתחו ' + sentCount + ' הודעות WhatsApp בלשוניות חדשות', 'success');
-    }
-
-    // ================================================================
-    //  ADVANCED PERMISSIONS (הרשאות מתקדמות)
-    // ================================================================
-    let _permsSelectedUserId = null;
-
-    function renderPermissions() {
-        const users = (DataStore.getAll(DataStore.KEYS.USERS) || []).filter(u => u.isActive !== false);
-        const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'system_admin');
-        if (!isAdminUser) {
-            document.getElementById('section-permissions').innerHTML = '<div class="empty-state"><div class="empty-icon">🔒</div><h3>גישה מוגבלת</h3><p>רק מנהל מערכת יכול לנהל הרשאות</p></div>';
-            return;
-        }
-
-        const permCount = users.filter(u => u.permissions && Object.keys(u.permissions).length > 0).length;
-        let html = `${_lookupTableHeader('הרשאות מתקדמות', permCount, '🔐')}
-        <div class="card"><div class="card-body">
-            <div style="margin-bottom:16px;">
-                <label style="display:block;font-weight:600;margin-bottom:6px;">בחר משתמש</label>
-                <select id="permsUserSelect" class="form-select" onchange="App._permsOnUserChange()" style="max-width:400px;">
-                    <option value="">-- בחר משתמש --</option>
-                    ${users.map(u => `<option value="${u.id}" ${_permsSelectedUserId === u.id ? 'selected' : ''}>${escAttr(u.fullName)} (${Auth.getRoleLabel(u.role)})</option>`).join('')}
-                </select>
-            </div>
-            <div id="permsPartsContainer">
-                <div style="text-align:center;padding:32px;color:var(--gray-400);">
-                    <div style="font-size:36px;margin-bottom:10px;">👤</div>
-                    <p>בחר משתמש כדי להגדיר הרשאות</p>
-                </div>
-            </div>
-        </div></div>`;
-        document.getElementById('section-permissions').innerHTML = html;
-
-        // Re-render if user was already selected
-        if (_permsSelectedUserId) {
-            setTimeout(() => _permsOnUserChange(), 50);
-        }
-    }
-
-    function _permsOnUserChange() {
-        const sel = document.getElementById('permsUserSelect');
-        const userId = sel ? sel.value : '';
-        _permsSelectedUserId = userId || null;
-        const container = document.getElementById('permsPartsContainer');
-        if (!container) return;
-
-        if (!userId) {
-            container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray-400);"><div style="font-size:36px;margin-bottom:10px;">👤</div><p>בחר משתמש כדי להגדיר הרשאות</p></div>';
-            return;
-        }
-
-        const user = DataStore.getById(DataStore.KEYS.USERS, userId);
-        if (!user) return;
-
-        // Load existing permissions for this user (default: all unchecked = no access)
-        const perms = user.permissions || {};
-
-        // Don't allow editing admin/system_admin permissions (they always have full access)
-        if (user.role === 'admin' || user.role === 'system_admin') {
-            container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--gray-500);">
-                <div style="font-size:36px;margin-bottom:10px;">👑</div>
-                <p><strong>${escAttr(user.fullName)}</strong> הוא מנהל מערכת — גישה מלאה אוטומטית לכל חלקי המערכת.</p>
-            </div>`;
-            return;
-        }
-
-        let partsHtml = SYSTEM_PARTS.map(part => {
-            const permLevel = perms[part.id] || ''; // '', 'view', or 'full'
-            const isChecked = permLevel !== '';
-            const isView = permLevel === 'view';
-            const isFull = permLevel === 'full';
-            return `<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--gray-200);border-radius:var(--border-radius);margin-bottom:8px;background:${isChecked ? 'var(--gray-50)' : '#fff'};flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px;">
-                    <span style="font-size:20px;">${part.icon}</span>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px;">
-                        <input type="checkbox" id="perm_chk_${part.id}" ${isChecked ? 'checked' : ''} onchange="App._permTogglePart('${part.id}')" style="width:18px;height:18px;cursor:pointer;">
-                        ${part.label}
-                    </label>
-                </div>
-                <div id="perm_levels_${part.id}" style="display:flex;gap:12px;align-items:center;${isChecked ? '' : 'opacity:0.35;pointer-events:none;'}">
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;color:var(--gray-600);">
-                        <input type="radio" name="perm_level_${part.id}" value="view" ${isView ? 'checked' : ''} onchange="App._permSetLevel('${part.id}','view')">
-                        👁️ צפייה בלבד
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;color:var(--gray-600);">
-                        <input type="radio" name="perm_level_${part.id}" value="full" ${isFull ? 'checked' : ''} onchange="App._permSetLevel('${part.id}','full')">
-                        ✏️ מלאה (עריכה, מחיקה, השלמת נתונים)
-                    </label>
-                </div>
-            </div>`;
-        }).join('');
-
-        container.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                <p style="color:var(--gray-500);font-size:13px;">ברירת מחדל: כל האפשרויות לא מסומנות = אין גישה.</p>
-                <div style="display:flex;gap:8px;">
-                    <button class="btn btn-outline btn-sm" onclick="App._permsResetUser()">🔄 איפוס הרשאות</button>
-                </div>
-            </div>
-            ${partsHtml}
-            <div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--gray-200);">
-                <button class="btn btn-primary" onclick="App._permsSave()">💾 שמור הרשאות</button>
-                <button class="btn btn-outline" onclick="App._permsSelectedUserId=null;App.renderPermissions();" style="margin-right:8px;">ביטול</button>
-            </div>`;
-    }
-
-    function _permTogglePart(partId) {
-        const chk = document.getElementById('perm_chk_' + partId);
-        const levels = document.getElementById('perm_levels_' + partId);
-        if (!chk || !levels) return;
-        if (chk.checked) {
-            levels.style.opacity = '1';
-            levels.style.pointerEvents = 'auto';
-            // Default to 'view' when first checked
-            const viewRadio = document.querySelector('input[name="perm_level_' + partId + '"][value="view"]');
-            if (viewRadio && !document.querySelector('input[name="perm_level_' + partId + '"]:checked')) {
-                viewRadio.checked = true;
-            }
-        } else {
-            levels.style.opacity = '0.35';
-            levels.style.pointerEvents = 'none';
-            // Uncheck radios
-            document.querySelectorAll('input[name="perm_level_' + partId + '"]').forEach(r => r.checked = false);
-        }
-    }
-
-    function _permSetLevel(partId, level) {
-        // Ensure checkbox is checked when a level is selected
-        const chk = document.getElementById('perm_chk_' + partId);
-        if (chk && !chk.checked) {
-            chk.checked = true;
-            _permTogglePart(partId);
-        }
-    }
-
-    function _permsResetUser() {
-        if (!_permsSelectedUserId) return;
-        confirmDialog('לאפס את כל ההרשאות של משתמש זה? (כל האפשרויות יהפכו ללא גישה)', function() {
-            DataStore.update(DataStore.KEYS.USERS, _permsSelectedUserId, { permissions: {} });
-            showToast('ההרשאות אופסו', 'success');
-            renderPermissions();
-        });
-    }
-
-    function _permsSave() {
-        if (!_permsSelectedUserId) return;
-        const perms = {};
-        SYSTEM_PARTS.forEach(part => {
-            const chk = document.getElementById('perm_chk_' + part.id);
-            if (chk && chk.checked) {
-                const selected = document.querySelector('input[name="perm_level_' + part.id + '"]:checked');
-                perms[part.id] = selected ? selected.value : 'view';
-            }
-            // If not checked, don't include in perms (no access)
-        });
-        DataStore.update(DataStore.KEYS.USERS, _permsSelectedUserId, { permissions: perms });
-        logActivity('update_permissions', 'עדכון הרשאות משתמש', 'user', _permsSelectedUserId);
-        showToast('ההרשאות נשמרו בהצלחה', 'success');
-    }
-
-    // ============ PERMISSION CHECKING HELPERS ============
-    /**
-     * Check if the current user can VIEW a given section.
-     * Admin/system_admin always can. Others check their permissions.
-     */
-    function _canViewSection(sectionId) {
-        if (!currentUser) return false;
-        const role = currentUser.role || '';
-        if (role === 'admin' || role === 'system_admin') return true;
-        // If user has no permissions object at all, default: show all (backward compat)
-        if (!currentUser.permissions) return true;
-        // Homepage and FAQ are always visible to all users
-        if (sectionId === 'homepage' || sectionId === 'faq') return true;
-        const perm = currentUser.permissions[sectionId];
-        return perm === 'view' || perm === 'full';
-    }
-
-    /**
-     * Check if the current user has FULL access to a given section.
-     * Admin/system_admin always do.
-     */
-    function _canFullSection(sectionId) {
-        if (!currentUser) return false;
-        const role = currentUser.role || '';
-        if (role === 'admin' || role === 'system_admin') return true;
-        if (!currentUser.permissions) return true;
-        return currentUser.permissions[sectionId] === 'full';
-    }
-
-    // ================================================================
-    //  ACTIVITY LOG (מעקב והיסטוריה)
-    // ================================================================
-    function renderActivityLog() {
-        const items = (DataStore.getAll(DataStore.KEYS.ACTIVITY_LOG) || []).sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
-        const actionLabels = {
-            'login': '🔐 כניסה למערכת',
-            'add_solution': '➕ הוספת פתרון למידה',
-            'edit_solution': '✏️ עריכת פתרון למידה',
-            'delete_solution': '🗑️ מחיקת פתרון למידה',
-            'restore_solution': '♻️ שחזור פתרון מסל מחזור',
-            'add_registration': '➕ הוספת נרשם',
-            'edit_registration': '✏️ עריכת נרשם',
-            'delete_registration': '🗑️ מחיקת נרשם',
-            'bulk_delete_registrations': '🗑️ מחיקה גורפת — נרשמים',
-            'whatsapp_send': '💬 שליחת WhatsApp — נרשמים'
-        };
-        document.getElementById('section-activity-log').innerHTML = `
-            ${_lookupTableHeader('מעקב והיסטוריה', items.length, '📊', '<div style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.printSection()">🖨️ הדפסה</button><button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.exportCSV(\'activity_log\')">📤 ייצוא CSV</button></div>')}
-            <div class="card"><div class="card-body">
-                <div class="toolbar">
-                    <select class="filter-select" id="actTypeF" onchange="App.filterActivityLog()">
-                        <option value="">כל הפעולות</option>
-                        <option value="login">כניסה למערכת</option>
-                        <option value="add_solution">הוספת פתרון</option>
-                        <option value="edit_solution">עריכת פתרון</option>
-                        <option value="delete_solution">מחיקת פתרון</option>
-                        <option value="restore_solution">שחזור פתרון</option>
-                        <option value="add_registration">הוספת נרשם</option>
-                        <option value="edit_registration">עריכת נרשם</option>
-                        <option value="delete_registration">מחיקת נרשם</option>
-                        <option value="bulk_delete_registrations">מחיקה גורפת — נרשמים</option>
-                        <option value="whatsapp_send">שליחת WhatsApp</option>
-                    </select>
-                    <input type="text" class="search-input" id="actSearch" placeholder="🔍 חיפוש לפי שם משתמש..." oninput="App.filterActivityLog()">
-                </div>
-                <div id="actTableDiv" style="max-height:500px;overflow-y:auto;">${_renderActTable(items)}</div>
-            </div></div>`;
-    }
-
-    function _renderActTable(items) {
-        if (!items.length) return '<div class="empty-state"><div class="empty-icon">📊</div><h3>אין רשומות פעילות</h3></div>';
-        const actionLabels = {
-            'login': '🔐', 'add_solution': '➕', 'edit_solution': '✏️',
-            'delete_solution': '🗑️', 'restore_solution': '♻️',
-            'add_registration': '➕', 'edit_registration': '✏️',
-            'delete_registration': '🗑️', 'bulk_delete_registrations': '🗑️',
-            'whatsapp_send': '💬'
-        };
-        return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr>
-            <th>תאריך ושעה</th><th>משתמש</th><th>תפקיד</th><th>פעולה</th><th>פרטים</th>
-        </tr></thead><tbody>${items.map(a => `<tr>
-            <td style="font-size:12px;white-space:nowrap;">${new Date(a.timestamp).toLocaleString('he-IL')}</td>
-            <td><strong>${escAttr(a.userName || '—')}</strong></td>
-            <td>${a.userRole ? Auth.getRoleBadge(a.userRole) : '—'}</td>
-            <td>${actionLabels[a.actionType] || '📋'} ${a.actionType || ''}</td>
-            <td style="font-size:13px;color:var(--gray-600);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(a.description || '')}">${escAttr(a.description || '—')}</td>
-        </tr>`).join('')}</tbody></table></div>`;
-    }
-
-    function filterActivityLog() {
-        const type = document.getElementById('actTypeF').value;
-        const search = document.getElementById('actSearch').value.toLowerCase();
-        let items = (DataStore.getAll(DataStore.KEYS.ACTIVITY_LOG) || []).sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
-        if (type) items = items.filter(a => a.actionType === type);
-        if (search) items = items.filter(a => (a.userName||'').toLowerCase().includes(search) || (a.description||'').toLowerCase().includes(search));
-        document.getElementById('actTableDiv').innerHTML = _renderActTable(items);
-    }
-
-    // ================================================================
-    // ---- Recycle Bin Helpers ----
-    const _ENTITY_META = {
-        solutions:                 { label: 'פתרון למידה',          nameField: 'name' },
-        solution_instructors:      { label: 'מנחה משויך',           nameField: 'fullName' },
-        mentors:                   { label: 'מרצה',                 nameField: 'fullName' },
-        guides_repo:               { label: 'מדריך',                nameField: 'fullName' },
-        budgets:                   { label: 'תקציב',                nameField: 'budgetCode' },
-        periods:                   { label: 'תקופה',                nameField: 'name' },
-        lookup_schools:            { label: 'בית ספר',             nameField: 'name' },
-        inspectors:                { label: 'מפקח',                nameField: 'fullName' },
-        pedagogical_executors:     { label: 'מבצע פדגוגי',        nameField: 'institutionName' },
-        registrations:             { label: 'נרשם',                nameField: 'fullName' },
-        faq_data:                  { label: 'שאלת תשובה',          nameField: 'question' },
-        solution_comments:         { label: 'תגובה',               nameField: 'text' }
-    };
-
-    /**
-     * Move a single item to recycle bin before deleting.
-     * Returns the deleted item data, or null.
-     */
-    function _moveToRecycleBin(storeKey, id) {
-        const item = DataStore.getById(storeKey, id);
-        if (!item) return null;
-        const meta = _ENTITY_META[storeKey] || { label: storeKey, nameField: 'name' };
-        DataStore.create(DataStore.KEYS.RECYCLE_BIN, {
-            originalId: id,
-            originalStoreKey: storeKey,
-            originalEntityType: meta.label,
-            data: JSON.parse(JSON.stringify(item)),
-            deletedBy: currentUser ? currentUser.id : null,
-            deletedByName: currentUser ? currentUser.fullName : '',
-            deletedAt: new Date().toISOString()
-        });
-        DataStore.remove(storeKey, id);
-        return item;
-    }
-
-    /**
-     * Move all items of a store to recycle bin, then clear.
-     */
-    function _moveAllToRecycleBin(storeKey) {
-        const items = DataStore.getAll(storeKey) || [];
-        const meta = _ENTITY_META[storeKey] || { label: storeKey, nameField: 'name' };
-        items.forEach(function(item) {
-            DataStore.create(DataStore.KEYS.RECYCLE_BIN, {
-                originalId: item.id,
-                originalStoreKey: storeKey,
-                originalEntityType: meta.label,
-                data: JSON.parse(JSON.stringify(item)),
-                deletedBy: currentUser ? currentUser.id : null,
-                deletedByName: currentUser ? currentUser.fullName : '',
-                deletedAt: new Date().toISOString()
-            });
-        });
-        DataStore.saveAll(storeKey, []);
-        return items.length;
-    }
-
-    //  RECYCLE BIN (סל מחזור)
-    // ================================================================
-    function renderRecycleBin() {
-        const allItems = (DataStore.getAll(DataStore.KEYS.RECYCLE_BIN) || []).sort((a,b) => new Date(b.deletedAt||0) - new Date(a.deletedAt||0));
-        // Count by type
-        const typeCounts = {};
-        allItems.forEach(function(r) { typeCounts[r.originalEntityType] = (typeCounts[r.originalEntityType] || 0) + 1; });
-        const types = Object.keys(typeCounts).sort();
-        const activeType = window._recycleFilter || '';
-        const search = window._recycleSearch || '';
-        const filtered = allItems.filter(function(r) {
-            if (activeType && r.originalEntityType !== activeType) return false;
-            if (search) {
-                const d = r.data || {};
-                const meta = _ENTITY_META[r.originalStoreKey] || { nameField: 'name' };
-                const name = (d[meta.nameField] || '').toLowerCase();
-                return name.includes(search);
-            }
-            return true;
-        });
-
-        let filterTabs = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">';
-        filterTabs += '<button class="btn btn-sm ' + (!activeType ? 'btn-primary' : 'btn-outline') + '" onclick="window._recycleFilter=\'\';App.renderRecycleBin();">הכל (' + allItems.length + ')</button>';
-        types.forEach(function(t) {
-            filterTabs += '<button class="btn btn-sm ' + (activeType === t ? 'btn-primary' : 'btn-outline') + '" onclick="window._recycleFilter=\'' + t + '\';App.renderRecycleBin();">' + t + ' (' + typeCounts[t] + ')</button>';
-        });
-        filterTabs += '</div>';
-
-        const emptyBtn = allItems.length ? '<button class="btn btn-danger btn-sm" style="margin-right:auto;" onclick="App.emptyRecycleBin()">🗑️ ריקון סל מחזור</button>' : '';
-
-        document.getElementById('section-recycle-bin').innerHTML = `
-            ${_lookupTableHeader('סל מחזור', allItems.length, '🗑️', '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.printSection()">🖨️ הדפסה</button>')}
-            <div class="card"><div class="card-body">
-                ${allItems.length ? '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px;">פריטים שנמחקו נשמרים כאן. ניתן לשחזר אותם למערכת.</p>' : ''}
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                    <input type="text" class="form-input" style="max-width:260px;" placeholder="🔍 חיפוש לפי שם..." value="${escAttr(search)}" oninput="window._recycleSearch=this.value.toLowerCase();App.renderRecycleBin();">
-                    ${emptyBtn}
-                </div>
-                ${filterTabs}
-                <div id="recycleTableDiv">${_renderRecycleTable(filtered)}</div>
-            </div></div>`;
-    }
-
-    function _renderRecycleTable(items) {
-        if (!items.length) return '<div class="empty-state"><div class="empty-icon">♻️</div><h3>סל המחזור ריק</h3><p style="color:var(--gray-500);">אין פריטים שנמחקו</p></div>';
-        return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr>
-            <th>סוג</th><th>שם</th><th>מחק ע"י</th><th>תאריך מחיקה</th><th>פעולות</th>
-        </tr></thead><tbody>${items.map(r => {
-            const d = r.data || {};
-            const meta = _ENTITY_META[r.originalStoreKey] || { nameField: 'name' };
-            const itemName = d[meta.nameField] || '—';
-            const subInfo = r.originalStoreKey === 'solutions' && d.solutionNumber ? '<br><small style="color:var(--gray-400);">מספר: ' + escAttr(d.solutionNumber) + '</small>' :
-                             r.originalStoreKey === 'lookup_schools' && d.code ? '<br><small style="color:var(--gray-400);">סמל: ' + escAttr(d.code) + '</small>' :
-                             r.originalStoreKey === 'registrations' && d.phone ? '<br><small style="color:var(--gray-400);">' + escAttr(d.phone) + '</small>' : '';
-            return `<tr>
-                <td><span style="background:var(--primary-bg);color:var(--primary-dark);padding:2px 8px;border-radius:12px;font-size:12px;white-space:nowrap;">${escAttr(r.originalEntityType || '—')}</span></td>
-                <td><strong>${escAttr(itemName)}</strong>${subInfo}</td>
-                <td>${escAttr(r.deletedByName || '—')}</td>
-                <td style="font-size:12px;">${formatDate(r.deletedAt)}</td>
-                <td><div style="display:flex;gap:4px;">
-                    <button class="btn btn-success btn-sm" onclick="App.restoreFromRecycleBin('${r.id}')" title="שחזר">♻️ שחזר</button>
-                    <button class="btn btn-danger btn-sm" onclick="App.permanentDeleteFromRecycleBin('${r.id}')" title="מחיקה לצמיתות">🗑️ לצמיתות</button>
-                </div></td></tr>`;
-        }).join('')}</tbody></table></div>`;
-    }
-
-    function restoreFromRecycleBin(recycleId) {
-        const item = DataStore.getById(DataStore.KEYS.RECYCLE_BIN, recycleId);
-        if (!item || !item.data) return;
-        const storeKey = item.originalStoreKey;
-        const meta = _ENTITY_META[storeKey] || { nameField: 'name' };
-        const itemName = (item.data[meta.nameField] || '').substring(0, 40);
-        confirmDialog('לשחזר פריט זה (' + (meta.label || '') + ') למערכת?', function() {
-            const restoreData = { ...item.data };
-            delete restoreData.id;
-            DataStore.create(storeKey, restoreData);
-            logActivity('restore_item', 'שחזור ' + (meta.label || '') + ': ' + itemName, storeKey, recycleId);
-            DataStore.remove(DataStore.KEYS.RECYCLE_BIN, recycleId);
-            showToast('הפריט שוחזר בהצלחה', 'success');
-            renderRecycleBin();
-            _refreshSectionAfterRestore(storeKey);
-        });
-    }
-
-    function _refreshSectionAfterRestore(storeKey) {
-        // Refresh the relevant section after restore so the user sees the item reappear
-        if (storeKey === DataStore.KEYS.SOLUTIONS) { renderSolutions(); updateSolutionsCount(); }
-        else if (storeKey === DataStore.KEYS.MENTORS) { renderMentors(); }
-        else if (storeKey === DataStore.KEYS.GUIDES_REPO) { renderGuidesRepo(); }
-        else if (storeKey === DataStore.KEYS.BUDGETS) { renderBudgets(); }
-        else if (storeKey === DataStore.KEYS.PERIODS) { renderPeriods(); }
-        else if (storeKey === DataStore.KEYS.REGISTRATIONS) { renderRegistrations(); }
-        else if (storeKey === DataStore.KEYS.FAQ_DATA) { renderFAQ(); }
-        else if (storeKey === DataStore.KEYS.INSPECTORS || storeKey === DataStore.KEYS.PEDAGOGICAL_EXECUTORS || storeKey === DataStore.KEYS.LOOKUP_SCHOOLS) { renderLookupTables(); }
-    }
-
-    function permanentDeleteFromRecycleBin(recycleId) {
-        confirmDialog('⚠️ מחיקה לצמיתות! פעולה זו בלתי הפיכה.', function() {
-            DataStore.remove(DataStore.KEYS.RECYCLE_BIN, recycleId);
-            showToast('נמחק לצמיתות', 'success');
-            renderRecycleBin();
-        });
-    }
-
-    function emptyRecycleBin() {
-        const items = DataStore.getAll(DataStore.KEYS.RECYCLE_BIN) || [];
-        if (!items.length) { showToast('הסל כבר ריק', 'info'); return; }
-        confirmDialog('⚠️ למחוק לצמיתות את כל ' + items.length + ' הפריטים בסל המחזור? פעולה זו בלתי הפיכה!', function() {
-            DataStore.saveAll(DataStore.KEYS.RECYCLE_BIN, []);
-            logActivity('empty_recycle_bin', 'ריקון סל מחזור (' + items.length + ' פריטים)', 'recycle_bin', '');
-            showToast('סל המחזור רוקן', 'success');
-            renderRecycleBin();
-        });
-    }
-
-
-    // ================================================================
-    //  FAQ — שאלות נפוצות ותשובות
-    // ================================================================
-    let _faqQuillAr = null, _faqQuillHe = null;
-    let _faqDragId = null;
-
-    function renderFAQ() {
-        const items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-        const container = document.getElementById('section-faq');
-        const hasItems = items.length > 0;
-
-        container.innerHTML = `
-            ${_lookupTableHeader('שאלות נפוצות ותשובות', items.length, '❓')}
-            <div style="font-size:14px;color:var(--gray-500);margin-bottom:12px;">כאן תוכלו למצוא שאלות נפוצות הנוגעות לתחום הפיתוח המקצועי למורים, לצד תשובות והדרכה מותאמות בנושא.</div>
-            ${_buildActionBar('faq', 'App.openFAQModal()', 'App.deleteAllFAQ()', items.length)}
-            <div class="toolbar">${_colVisBtnHtml('faq')}</div>
-            ${hasItems ? `<div id="faqBulkBar" style="display:none;margin-bottom:10px;padding:8px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:var(--border-radius);align-items:center;gap:10px;flex-wrap:wrap;">
-                <span style="font-size:13px;font-weight:600;color:#856404;" id="faqSelectedCount">0 נבחרו</span>
-                <button class="btn btn-danger btn-sm" onclick="App.deleteSelectedFAQs()">🗑️ מחק נבחרים</button>
-                <button class="btn btn-outline btn-sm" onclick="App.toggleFaqSelectAll(false)">בטל בחירה</button>
-            </div>` : ''}
-            <div class="card"><div class="card-body" style="padding:0;overflow-x:auto;">
-                <table class="data-table" style="min-width:700px;">
-                    <thead><tr>
-                        ${hasItems ? '<th style="width:36px;"><input type="checkbox" id="faqSelectAll" onchange="App.toggleFaqSelectAll(this.checked)" style="cursor:pointer;"></th>' : ''}
-                        <th style="width:40px;">סדר</th>
-                        <th>כותרת (ערבית)</th>
-                        <th>כותרת (עברית)</th>
-                        <th style="width:160px;">פעולות</th>
-                    </tr></thead>
-                    <tbody id="faqTableBody">${!hasItems ? '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400);">אין שאלות עדיין. לחצו על "הוספת שאלה" להתחלה.</td></tr>' :
-                        items.map(item => `<tr draggable="true" ondragstart="App._faqDragStart(event,'${escAttr(item.id)}')" ondragover="App._faqDragOver(event)" ondrop="App._faqDrop(event,'${escAttr(item.id)}')" ondragend="App._faqDragEnd(event)" style="cursor:grab;">
-                            <td style="text-align:center;"><input type="checkbox" class="faq-check" data-id="${escAttr(item.id)}" style="cursor:pointer;"></td>
-                            <td style="text-align:center;">${item.order || 0}</td>
-                            <td dir="rtl">${escAttr(item.titleAr || '—')}</td>
-                            <td>${escAttr(item.titleHe || '—')}</td>
-                            <td>
-                                <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
-                                    <button class="btn btn-outline btn-sm" onclick="App.openFAQModal('${escAttr(item.id)}')" title="עריכה" style="padding:4px 8px;">✏️</button>
-                                    <button class="btn btn-danger btn-sm" onclick="App.deleteFAQ('${escAttr(item.id)}')" title="מחיקה" style="padding:4px 8px;">🗑️</button>
-                                    <button class="btn btn-outline btn-sm" onclick="App.moveFAQ('${escAttr(item.id)}','up')" title="למעלה" style="padding:4px 8px;">▲</button>
-                                    <button class="btn btn-outline btn-sm" onclick="App.moveFAQ('${escAttr(item.id)}','down')" title="למטה" style="padding:4px 8px;">▼</button>
-                                </div>
-                            </td>
-                        </tr>`).join('')
-                    }</tbody>
-                </table>
-            </div></div>`;
-
-        // Bind checkbox changes for bulk bar
-        if (hasItems) {
-            container.querySelectorAll('.faq-check').forEach(function(cb) {
-                cb.addEventListener('change', _updateFaqBulkBar);
-            });
-        }
-        _applyTableFeatures('faq');
-    }
-
-    function _updateFaqBulkBar() {
-        var checked = document.querySelectorAll('.faq-check:checked');
-        var bar = document.getElementById('faqBulkBar');
-        var countEl = document.getElementById('faqSelectedCount');
-        var selectAll = document.getElementById('faqSelectAll');
-        if (!bar) return;
-        if (checked.length > 0) {
-            bar.style.display = 'flex';
-            countEl.textContent = checked.length + ' נבחרו';
-        } else {
-            bar.style.display = 'none';
-        }
-        if (selectAll) {
-            var total = document.querySelectorAll('.faq-check').length;
-            selectAll.checked = total > 0 && checked.length === total;
-        }
-    }
-
-    function toggleFaqSelectAll(state) {
-        var checkboxes = document.querySelectorAll('.faq-check');
-        checkboxes.forEach(function(cb) { cb.checked = state; });
-        _updateFaqBulkBar();
-    }
-
-    function deleteSelectedFAQs() {
-        var checked = document.querySelectorAll('.faq-check:checked');
-        if (!checked.length) { showToast('לא נבחרו שאלות', 'warning'); return; }
-        confirmDialog('למחוק ' + checked.length + ' שאלות נבחרות?', function() {
-            checked.forEach(function(cb) {
-                _moveToRecycleBin(DataStore.KEYS.FAQ_DATA, cb.dataset.id);
-            });
-            logActivity('delete_faq_bulk', 'מחיקת ' + checked.length + ' שאלות', 'faq');
-            renderFAQ();
-            showToast(checked.length + ' שאלות נמחקו', 'success');
-        });
-    }
-
-    function deleteAllFAQ() {
-        var items = DataStore.getAll(DataStore.KEYS.FAQ_DATA) || [];
-        if (!items.length) { showToast('אין רשומות למחיקה', 'warning'); return; }
-        confirmDialog('למחוק את כל ' + items.length + ' השאלות? פעולה זו בלתי הפיכה!', function() {
-            _moveAllToRecycleBin(DataStore.KEYS.FAQ_DATA);
-            logActivity('delete_faq_all', 'מחיקת כל השאלות (' + items.length + ')', 'faq');
-            renderFAQ();
-            showToast('כל השאלות נמחקו', 'success');
-        });
-    }
-
-    function moveFAQ(id, direction) {
-        var items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-        var idx = items.findIndex(i => i.id === id);
-        if (idx < 0) return;
-        var targetIdx;
-        if (direction === 'up' && idx > 0) targetIdx = idx - 1;
-        else if (direction === 'down' && idx < items.length - 1) targetIdx = idx + 1;
-        else return;
-        var itemA = items[idx];
-        var itemB = items[targetIdx];
-        var tempOrder = itemA.order;
-        DataStore.update(DataStore.KEYS.FAQ_DATA, itemA.id, { order: itemB.order });
-        DataStore.update(DataStore.KEYS.FAQ_DATA, itemB.id, { order: tempOrder });
-        renderFAQ();
-    }
-
-    function _faqDragStart(e, id) {
-        _faqDragId = id;
-        e.dataTransfer.effectAllowed = 'move';
-        e.target.style.opacity = '0.4';
-    }
-
-    function _faqDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    }
-
-    function _faqDrop(e, targetId) {
-        e.preventDefault();
-        if (!_faqDragId || _faqDragId === targetId) return;
-        var items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-        var fromIdx = items.findIndex(i => i.id === _faqDragId);
-        var toIdx = items.findIndex(i => i.id === targetId);
-        if (fromIdx < 0 || toIdx < 0) return;
-        var moved = items.splice(fromIdx, 1)[0];
-        items.splice(toIdx, 0, moved);
-        items.forEach(function(item, i) {
-            DataStore.update(DataStore.KEYS.FAQ_DATA, item.id, { order: i + 1 });
-        });
-        renderFAQ();
-    }
-
-    function _faqDragEnd(e) {
-        _faqDragId = null;
-        e.target.style.opacity = '1';
-    }
-
-    function openFAQModal(editId) {
-        const item = editId ? DataStore.getById(DataStore.KEYS.FAQ_DATA, editId) : null;
-        const title = item ? 'עריכת שאלה' : 'הוספת שאלה חדשה';
-        const items = DataStore.getAll(DataStore.KEYS.FAQ_DATA) || [];
-        const maxOrder = items.reduce((max, i) => Math.max(max, i.order || 0), 0);
-
-        document.getElementById('modalBody').innerHTML = `
-            <div class="form-group"><label>כותרת בערבית</label><input type="text" id="fFaqTitleAr" class="form-input" value="${escAttr(item ? item.titleAr || '' : '')}" dir="rtl"></div>
-            <div class="form-group"><label>כותרת בעברית</label><input type="text" id="fFaqTitleHe" class="form-input" value="${escAttr(item ? item.titleHe || '' : '')}"></div>
-            <div class="form-group"><label>תשובה בערבית</label><div id="fFaqAnswerAr" style="min-height:200px;border:1px solid var(--gray-200);border-radius:var(--border-radius);"></div></div>
-            <div class="form-group"><label>תשובה בעברית</label><div id="fFaqAnswerHe" style="min-height:200px;border:1px solid var(--gray-200);border-radius:var(--border-radius);"></div></div>
-            <div class="form-group"><label>סדר תצוגה</label><input type="number" id="fFaqOrder" class="form-input" value="${item ? (item.order || 0) : maxOrder + 1}" style="max-width:120px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-                <button class="btn btn-primary" onclick="App.saveFAQ('${editId || ''}')">💾 שמור</button>
-                <button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>
-            </div>`;
-        document.getElementById('modalTitle').textContent = title;
-        document.getElementById('modalFooter').innerHTML = '';
-        document.getElementById('modalOverlay').classList.add('active');
-
-        // Init Quill editors (RTL support)
-        setTimeout(() => {
-            if (_faqQuillAr) { _faqQuillAr = null; }
-            if (_faqQuillHe) { _faqQuillHe = null; }
-            const arEl = document.getElementById('fFaqAnswerAr');
-            const heEl = document.getElementById('fFaqAnswerHe');
-            if (arEl) {
-                _faqQuillAr = new Quill(arEl, {
-                    theme: 'snow',
-                    direction: 'rtl',
-                    placeholder: 'أدخل الإجابة بالعربية...',
-                    modules: { toolbar: [['bold','italic','underline','strike'], [{'list':'ordered'},{'list':'bullet'}], ['link'], ['clean']] }
-                });
-                if (item && item.answerAr) _faqQuillAr.root.innerHTML = item.answerAr;
-            }
-            if (heEl) {
-                _faqQuillHe = new Quill(heEl, {
-                    theme: 'snow',
-                    direction: 'rtl',
-                    placeholder: 'הזן את התשובה בעברית...',
-                    modules: { toolbar: [['bold','italic','underline','strike'], [{'list':'ordered'},{'list':'bullet'}], ['link'], ['clean']] }
-                });
-                if (item && item.answerHe) _faqQuillHe.root.innerHTML = item.answerHe;
-            }
-        }, 100);
-    }
-
-    function saveFAQ(editId) {
-        const titleAr = document.getElementById('fFaqTitleAr').value.trim();
-        const titleHe = document.getElementById('fFaqTitleHe').value.trim();
-        const answerAr = _faqQuillAr ? _faqQuillAr.root.innerHTML : '';
-        const answerHe = _faqQuillHe ? _faqQuillHe.root.innerHTML : '';
-        const order = parseInt(document.getElementById('fFaqOrder').value) || 0;
-
-        if (!titleAr && !titleHe) { showToast('יש להזין לפחות כותרת אחת', 'error'); return; }
-
-        const data = { titleAr, titleHe, answerAr, answerHe, order };
-
-        if (editId) {
-            DataStore.update(DataStore.KEYS.FAQ_DATA, editId, data);
-            logActivity('edit_faq', 'עריכת שאלה: ' + (titleHe || titleAr), 'faq', editId);
-        } else {
-            DataStore.create(DataStore.KEYS.FAQ_DATA, data);
-            logActivity('add_faq', 'הוספת שאלה: ' + (titleHe || titleAr), 'faq');
-        }
-        closeModal();
-        renderFAQ();
-        showToast(editId ? 'השאלה עודכנה' : 'השאלה נוספה', 'success');
-    }
-
-    function deleteFAQ(id) {
-        confirmDialog('⚠️ למחוק שאלה זו?', function() {
-            _moveToRecycleBin(DataStore.KEYS.FAQ_DATA, id);
-            logActivity('delete_faq', 'מחיקת שאלה', 'faq', id);
-            renderFAQ();
-            showToast('השאלה נמחקה', 'success');
-        });
-    }
-
-    // ================================================================
-    //  SETTINGS — Card-Based Modular Dashboard
-    // ================================================================
-
-    // ---- WhatsApp Template: per-template modal editing ----
-    var _waEditIdx = -1;
-
-    function _openWaEditModal(idx) {
-        var templates = _getWaTemplates();
-        if (idx < 0 || idx >= templates.length) return;
-        _waEditIdx = idx;
-        var t = templates[idx];
-        var langLabel = t.lang === 'ar' ? '🇸🇦 ערבית' : '🇮🇱 עברית';
-        var periodLabels = { morning: 'בוקר', afternoon: 'צהריים', evening: 'ערב', night: 'לילה' };
-        var pLabel = periodLabels[t.period] || t.period;
-        showModal('עריכת תבנית — ' + langLabel + ' · ' + pLabel,
-            '<div class="form-group">' +
-            '<label>נוסח הפנייה</label>' +
-            '<p style="font-size:12px;color:var(--gray-400);margin-bottom:6px;">השתמשו ב-<strong>[שם]</strong> או <strong>[اسم]</strong> כ-placeholder לשם המשתלם.</p>' +
-            '<textarea id="fWaEditText" class="form-input" rows="4" style="resize:vertical;">' + escAttr(t.text) + '</textarea>' +
-            '</div>',
-            '<button class="btn btn-primary" onclick="App._saveWaEditModal()">💾 שמור</button>' +
-            '<button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>'
-        );
-    }
-
-    function _saveWaEditModal() {
-        if (_waEditIdx < 0) return;
-        var textEl = document.getElementById('fWaEditText');
-        if (!textEl) return;
-        var templates = _getWaTemplates();
-        if (_waEditIdx < templates.length) {
-            templates[_waEditIdx].text = textEl.value.trim() || templates[_waEditIdx].text;
-            DataStore.updateSettings({ waTemplates: templates });
-            showToast('התבנית נשמרה', 'success');
-            var editor = document.getElementById('waTemplateEditor');
-            if (editor) editor.innerHTML = _renderWaTemplateEditor();
-        }
-        closeModal();
-        _waEditIdx = -1;
-    }
-
-    function _resetSingleWaTemplate(idx) {
-        var templates = _getWaTemplates();
-        if (idx < 0 || idx >= templates.length) return;
-        confirmDialog('לאפס תבנית זו לברירת מחדל?', function() {
-            var def = _WA_DEFAULT_TEMPLATES.find(function(d) { return d.id === templates[idx].id; });
-            if (def) {
-                templates[idx].text = def.text;
-                DataStore.updateSettings({ waTemplates: templates });
-                showToast('התבנית אופסה', 'success');
-                var editor = document.getElementById('waTemplateEditor');
-                if (editor) editor.innerHTML = _renderWaTemplateEditor();
-            } else {
-                showToast('תבנית מותאמת אישית — לא ניתן לאפס אוטומטית', 'warning');
-            }
-        });
-    }
-
-    function _renderWaTemplateEditor() {
-        var templates = _getWaTemplates();
-        var periodLabels = { morning: 'בוקר', afternoon: 'צהריים', evening: 'ערב', night: 'לילה' };
-        var periodIcons = { morning: '🌅', afternoon: '☀️', evening: '🌆', night: '🌙' };
-        var html = '<p style="color:var(--gray-500);font-size:13px;margin-bottom:14px;">ניתן לערוך כל תבנית בנפרד. השתמשו ב-<strong>[שם]</strong> או <strong>[اسم]</strong> כ-placeholder.</p>';
-        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">';
-        templates.forEach(function(t, i) {
-            var langLabel = t.lang === 'ar' ? '🇸🇦 ערבית' : '🇮🇱 עברית';
-            var pLabel = periodLabels[t.period] || t.period;
-            var pIcon = periodIcons[t.period] || '📝';
-            var preview = (t.text || '').substring(0, 55);
-            if ((t.text || '').length > 55) preview += '...';
-            html += '<div style="border:1px solid var(--gray-200);border-radius:8px;padding:14px;background:white;display:flex;flex-direction:column;gap:8px;">';
-            html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
-            html += '<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--gray-700);">';
-            html += '<span>' + pIcon + '</span><span>' + langLabel + ' · ' + escAttr(pLabel) + '</span></div>';
-            html += '<div style="display:flex;gap:2px;">';
-            html += '<button onclick="App._openWaEditModal(' + i + ')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:4px;border-radius:4px;" title="ערוך">✏️</button>';
-            html += '<button onclick="App._resetSingleWaTemplate(' + i + ')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:4px;border-radius:4px;" title="אפס לברירת מחדל">🔄</button>';
-            html += '</div></div>';
-            html += '<div style="font-size:12px;color:var(--gray-500);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escAttr(preview) + '</div>';
-            html += '</div>';
-        });
-        html += '</div>';
-        html += '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">';
-        html += '<button class="btn btn-outline btn-sm" onclick="App._addWaTemplate()">➕ הוסף תבנית</button>';
-        html += '<button class="btn btn-outline btn-sm" onclick="App._resetWaTemplates()">↩️ אפס הכל לברירת מחדל</button>';
-        html += '</div>';
-        return html;
-    }
-
-    function _saveWaTemplates() {
-        var templates = _getWaTemplates();
-        DataStore.updateSettings({ waTemplates: templates });
-        showToast('התבניות נשמרו בהצלחה', 'success');
-    }
-
-    function _resetWaTemplates() {
-        confirmDialog('לשחזר את תבניות ברירת המחדל?', function() {
-            DataStore.updateSettings({ waTemplates: [] });
-            showToast('התבניות שוחזרו לברירת מחדל', 'success');
-            var editor = document.getElementById('waTemplateEditor');
-            if (editor) editor.innerHTML = _renderWaTemplateEditor();
-        });
-    }
-
-    function _addWaTemplate() {
-        var templates = _getWaTemplates();
-        var newId = 'custom_' + Date.now();
-        templates.push({ id: newId, lang: 'he', period: 'morning', hourFrom: 6, hourTo: 11, text: 'חג שמח [שם],' });
-        DataStore.updateSettings({ waTemplates: templates });
-        var editor = document.getElementById('waTemplateEditor');
-        if (editor) editor.innerHTML = _renderWaTemplateEditor();
-        showToast('תבנית חדשה נוספה — ערכו את התוכן ושמרו', 'info');
-    }
-
-    // ---- Backup helpers: timestamp tracking ----
-    function _getBackupStatus(tableKey) {
-        var settings = DataStore.getSettings();
-        var ts = settings.backupTimestamps || {};
-        var dateStr = ts[tableKey];
-        if (!dateStr) return { status: 'none', label: 'ללא גיבוי', date: '', color: 'var(--gray-300)' };
-        var diff = Date.now() - new Date(dateStr).getTime();
-        var days = diff / (1000 * 60 * 60 * 24);
-        var d = new Date(dateStr);
-        var dateLabel = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
-        if (days <= 7) return { status: 'fresh', label: 'עדכני', date: dateLabel, color: '#22c55e' };
-        if (days <= 30) return { status: 'old', label: 'ישן', date: dateLabel, color: '#eab308' };
-        return { status: 'stale', label: 'מאוד ישן', date: dateLabel, color: 'var(--gray-400)' };
-    }
-
-    function _backupTableCard(tableKey) {
-        var sel = document.getElementById('fBackupTable');
-        if (sel) sel.value = tableKey;
-        backupTable(tableKey);
-    }
-
-    function _backupFullCard() {
-        backupFull();
-    }
-
-    function _updateBackupStatusUI() {
-        var tableKeys = Object.keys(BACKUP_TABLE_META);
-        var freshCount = 0, oldCount = 0, staleCount = 0, noneCount = 0;
-        
-        tableKeys.forEach(function(k) {
-            var st = _getBackupStatus(k);
-            var dot = document.getElementById('backup-dot-' + k);
-            var dateEl = document.getElementById('backup-date-' + k);
-            if (dot) { dot.style.background = st.color; dot.title = st.label; }
-            if (dateEl) dateEl.textContent = st.date || '—';
-            
-            // Count status types
-            if (st.status === 'fresh') freshCount++;
-            else if (st.status === 'old') oldCount++;
-            else if (st.status === 'stale') staleCount++;
-            else noneCount++;
-        });
-        
-        // Update summary badge
-        var badge = document.getElementById('backupSummaryBadge');
-        var summaryText = document.getElementById('backupSummaryText');
-        if (badge && summaryText) {
-            if (noneCount > 0) {
-                badge.style.background = '#fee2e2';
-                badge.style.color = '#991b1b';
-                badge.textContent = 'דרוש גיבוי';
-                summaryText.textContent = noneCount + ' טבלאות ללא גיבוי';
-            } else if (staleCount > 0) {
-                badge.style.background = '#fef3c7';
-                badge.style.color = '#92400e';
-                badge.textContent = 'גיבוי ישן';
-                summaryText.textContent = staleCount + ' טבלאות עם גיבוי ישן (>30 יום)';
-            } else if (oldCount > 0) {
-                badge.style.background = '#fef3c7';
-                badge.style.color = '#92400e';
-                badge.textContent = 'שים לב';
-                summaryText.textContent = oldCount + ' טבלאות עם גיבוי עד 30 יום';
-            } else {
-                badge.style.background = '#dcfce7';
-                badge.style.color = '#166534';
-                badge.textContent = 'תקין';
-                summaryText.textContent = 'כל הטבלאות מעודכנות (עד 7 ימים)';
-            }
-        }
-    }
-
-    function _triggerFullRestore() {
-        var input = document.getElementById('fRestoreFullFile');
-        if (input) { input.value = ''; input.click(); }
-    }
-
-    function _triggerTableRestore(tableKey) {
-        var sel = document.getElementById('fRestoreTable');
-        if (sel) sel.value = tableKey;
-        var input = document.getElementById('fRestoreTableFile');
-        if (input) { input.value = ''; input.click(); }
-    }
-
-    // ---- Data management helpers ----
-    function _triggerDataImport() {
-        var input = document.getElementById('fSettingsImportFile');
-        if (input) { input.value = ''; input.click(); }
-    }
-
-    function _checkDataIntegrity() {
-        var keys = Object.keys(BACKUP_TABLE_META);
-        var issues = [];
-        keys.forEach(function(k) {
-            var data = DataStore.getAll(k);
-            if (!data || (Array.isArray(data) && data.length === 0)) {
-                issues.push(BACKUP_TABLE_META[k] + ': ריקה');
-            }
-        });
-        if (issues.length === 0) {
-            showToast('כל ' + keys.length + ' הטבלאות תקינות ✓', 'success');
-        } else {
-            var listHtml = issues.map(function(i) { return '<li style="margin-bottom:3px;font-size:13px;">' + i + '</li>'; }).join('');
-            showModal('בדיקת תקינות',
-                '<p style="margin-bottom:10px;color:var(--gray-600);">נמצאו <strong>' + issues.length + '</strong> טבלאות ריקות:</p>' +
-                '<ul style="max-height:250px;overflow-y:auto;direction:rtl;text-align:right;padding-right:16px;color:var(--gray-700);">' + listHtml + '</ul>',
-                '<button class="btn btn-primary" onclick="App.closeModal()">סגור</button>'
-            );
-        }
-    }
-
-    // ---- Main render ----
-    function renderSettings() {
-        const settings = DataStore.getSettings();
-
-        // Build table backup cards
-        var tableKeys = Object.keys(BACKUP_TABLE_META);
-        var tableCardsHtml = '';
-        tableKeys.forEach(function(k) {
-            var st = _getBackupStatus(k);
-            var label = BACKUP_TABLE_META[k];
-            var data = DataStore.getAll(k);
-            var recordCount = Array.isArray(data) ? data.length : (typeof data === 'object' && data !== null ? Object.keys(data).length : 0);
-            var statusTooltip = st.status === 'none' ? 'לא בוצע גיבוי' : 'גיבוי אחרון: ' + st.date + ' (' + st.label + ')';
-            tableCardsHtml += '<div style="border:1px solid var(--gray-200);border-radius:10px;padding:12px 14px;background:white;display:flex;flex-direction:column;gap:8px;transition:box-shadow 0.15s;" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.06)\'" onmouseout="this.style.boxShadow=\'none\'" title="' + escAttr(statusTooltip) + '">';
-            tableCardsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">';
-            tableCardsHtml += '<span style="font-size:13px;font-weight:600;color:var(--gray-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escAttr(label) + '">' + escAttr(label) + '</span>';
-            tableCardsHtml += '<span id="backup-dot-' + k + '" style="width:10px;height:10px;border-radius:50%;background:' + st.color + ';flex-shrink:0;" title="' + escAttr(st.label) + '"></span>';
-            tableCardsHtml += '</div>';
-            tableCardsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;">';
-            tableCardsHtml += '<span id="backup-date-' + k + '" style="font-size:11px;color:var(--gray-400);">' + (st.date || '—') + '</span>';
-            tableCardsHtml += '<span style="font-size:11px;color:var(--gray-400);background:var(--gray-100);padding:1px 7px;border-radius:8px;">' + recordCount + ' רשומות</span>';
-            tableCardsHtml += '</div>';
-            tableCardsHtml += '<div style="display:flex;gap:6px;">';
-            tableCardsHtml += '<button class="btn btn-outline btn-sm" style="flex:1;font-size:12px;padding:6px 8px;" onclick="App._backupTableCard(\'' + k + '\')" title="הורד גיבוי של ' + escAttr(label) + '">💾 גיבוי</button>';
-            tableCardsHtml += '<button class="btn btn-outline btn-sm" style="flex:1;font-size:12px;padding:6px 8px;" onclick="App._triggerTableRestore(\'' + k + '\')" title="טען גיבוי ל- ' + escAttr(label) + '">🔄 שחזור</button>';
-            tableCardsHtml += '</div></div>';
-        });
-
-        document.getElementById('section-settings').innerHTML =
-            // Hidden elements needed by existing functions
-            '<select id="fBackupTable" style="display:none;"><option value="">--</option></select>' +
-            '<select id="fRestoreTable" style="display:none;"><option value="">--</option></select>' +
-            '<input type="file" id="fRestoreFullFile" accept=".json" style="display:none;" onchange="App.restoreFull()">' +
-            '<input type="file" id="fRestoreTableFile" accept=".json" style="display:none;" onchange="App.restoreTable()">' +
-            '<input type="file" id="fSettingsImportFile" accept=".json" style="display:none;" onchange="App.importJSON(this)">' +
-
-            // ===== Card 1: Site Title & Copyright (Teal) =====
-            '<div class="card" style="border-top:4px solid #0ca7aa;margin-bottom:24px;">' +
-                '<div class="card-header"><span class="card-title">🌐 כותרת אתר וזכויות יוצרים</span></div>' +
-                '<div class="card-body">' +
-                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
-                        '<div class="form-group"><label>שם האתר – עברית</label><input type="text" id="fSiteNameHe" class="form-input" value="' + escAttr(settings.siteNameHe || '') + '" dir="rtl"></div>' +
-                        '<div class="form-group"><label>اسم الموقع – بالعربية</label><input type="text" id="fSiteNameAr" class="form-input" value="' + escAttr(settings.siteNameAr || '') + '" dir="rtl"></div>' +
-                        '<div class="form-group"><label>טקסט זכויות יוצרים – עברית</label><input type="text" id="fCopyrightHe" class="form-input" value="' + escAttr(settings.copyrightHe || '') + '" dir="rtl"></div>' +
-                        '<div class="form-group"><label>نص حقوق النشر – بالعربية</label><input type="text" id="fCopyrightAr" class="form-input" value="' + escAttr(settings.copyrightAr || '') + '" dir="rtl"></div>' +
-                    '</div>' +
-                    '<div class="form-group">' +
-                        '<label>לוגו האתר</label>' +
-                        '<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
-                            '<input type="file" id="fLogoFile" accept="image/*" style="font-size:13px;">' +
-                            '<div id="fLogoPreview" style="width:40px;height:40px;border-radius:8px;border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;background:var(--gray-50);">' + (settings.logoUrl ? '<img src="'+settings.logoUrl+'" style="width:100%;height:100%;object-fit:cover;">' : '🧭') + '</div>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div style="display:flex;justify-content:flex-start;margin-top:8px;">' +
-                        '<button class="btn btn-primary" onclick="App.saveSiteSettings()">💾 שמור שינויים</button>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-
-            // ===== Card 2: WhatsApp Templates (Green) =====
-            '<div class="card" style="border-top:4px solid #25D366;margin-bottom:24px;">' +
-                '<div class="card-header"><span class="card-title">💬 תבניות הפנייה אישית – WhatsApp</span></div>' +
-                '<div class="card-body">' +
-                    '<div id="waTemplateEditor">' + _renderWaTemplateEditor() + '</div>' +
-                '</div>' +
-            '</div>' +
-
-            // ===== Card 3: Data Management & Backup/Restore (Combined) =====
-            '<div class="card" style="border-top:4px solid #6b7280;margin-bottom:24px;">' +
-                '<div class="card-header"><span class="card-title">💾 ניהול נתונים, גיבוי ושחזור</span></div>' +
-                '<div class="card-body">' +
-                    // Description
-                    '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:20px;direction:rtl;text-align:right;">' +
-                        '<p style="margin:0 0 6px 0;font-size:13px;color:var(--gray-600);line-height:1.6;">' +
-                            '💾 <strong>גיבוי מלא</strong> — יוצר עותק מלא של כל ' + tableKeys.length + ' הטבלאות במערכת ומוריד למחשב כקובץ JSON.' +
-                        '</p>' +
-                        '<p style="margin:0;font-size:13px;color:var(--gray-600);line-height:1.6;">' +
-                            '🔄 <strong>שחזור מלא</strong> — טוען קובץ גיבוי ומשחזר את כל הטבלאות שנכללו בו. <span style="color:#991b1b;font-weight:500;">⚠️ הנתונים הקיימים יוחלפו לחלוטין.</span>' +
-                        '</p>' +
-                    '</div>' +
-                    // Main action buttons
-                    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--gray-200);">' +
-                        '<button class="btn btn-primary" id="btnBackupFull" onclick="App._backupFullCard()" style="font-size:14px;padding:10px 20px;" title="יצירת גיבוי מלא של כל הטבלאות והורדה למחשב">💾 גיבוי מלא – כל הנתונים</button>' +
-                        '<button class="btn btn-outline" onclick="App._triggerFullRestore()" style="font-size:14px;padding:10px 20px;" title="טעינת קובץ גיבוי ושחזור מלא של כל הטבלאות">🔄 שחזור מלא מקובץ גיבוי</button>' +
-                        '<button class="btn btn-outline" onclick="App.exportJSON()" style="font-size:13px;">📤 ייצוא נתונים</button>' +
-                        '<button class="btn btn-outline" onclick="App._triggerDataImport()" style="font-size:13px;">📥 ייבוא נתונים</button>' +
-                        '<button class="btn btn-outline" onclick="App._checkDataIntegrity()" style="font-size:13px;">✅ בדיקת תקינות</button>' +
-                        '<button class="btn btn-danger" onclick="App.clearData()" style="font-size:13px;">🗑️ נקה הכל</button>' +
-                    '</div>' +
-                    // Enhanced description with export/import clarification
-                    '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:16px;direction:rtl;text-align:right;">' +
-                        '<p style="margin:0;font-size:12px;color:#0369a1;line-height:1.6;">' +
-                            '📤 <strong>ייצוא נתונים</strong> — מייצא את כל הנתונים לקובץ CSV/Excel לצורך ניתוח או דיווח חיצוני. לא מתאים לשחזור!<br>' +
-                            '📥 <strong>ייבוא נתונים</strong> — מיזוג נתונים מקובץ חיצוני לתוך הטבלאות הקיימות. לא מחליף נתונים קיימים!' +
-                        '</p>' +
-                    '</div>' +
-                    // Compact status summary
-                    '<div style="background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;margin-bottom:16px;">' +
-                        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">' +
-                            '<div style="display:flex;align-items:center;gap:10px;">' +
-                                '<span style="font-size:13px;font-weight:600;color:var(--gray-600);">📊 מצב גיבוי כללי:</span>' +
-                                '<span id="backupSummaryBadge" style="font-size:12px;padding:4px 10px;border-radius:12px;background:#dcfce7;color:#166534;font-weight:600;">תקין</span>' +
-                            '</div>' +
-                            '<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--gray-500);">' +
-                                '<span id="backupSummaryText">כל הטבלאות מעודכנות</span>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>' +
-                    '<p style="font-size:12px;color:var(--gray-400);margin-bottom:10px;">מצב גיבוי לכל טבלה (לחצו על "גיבוי" להורדה או "שחזור" לטעינה):</p>' +
-                    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;max-height:360px;overflow-y:auto;padding:2px;">' +
-                        tableCardsHtml +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-
-            // ===== Card 5: Server Health Check (Steel Blue) =====
-            '<div class="card" style="border-top:4px solid #475569;">' +
-                '<div class="card-header">' +
-                    '<span class="card-title">\u{1FA7A} \u05D0\u05D1\u05D7\u05D5\u05DF \u05EA\u05E7\u05D9\u05E0\u05D5\u05EA \u05E9\u05E8\u05EA</span>' +
-                '</div>' +
-                '<div class="card-body">' +
-                    '<div id="healthCheckSummary" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:600;"></div>' +
-                    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">' +
-                        '<button class="btn btn-primary" id="btnRunHealthCheck" onclick="App._runHealthCheck()" style="font-size:13px;">\u{1FA7A} \u05D1\u05E6\u05E2 \u05D0\u05D1\u05D7\u05D5\u05DF \u05E9\u05E8\u05EA</button>' +
-                        '<button class="btn btn-outline" onclick="App._showErrorLog()" style="font-size:13px;">\u{1F4CB} \u05D4\u05E6\u05D2 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05D0\u05D7\u05E8\u05D5\u05E0\u05D5\u05EA</button>' +
-                        '<button class="btn btn-outline" id="btnAutoFix" onclick="App._attemptAutoFix()" style="font-size:13px;display:none;">\u{1F527} \u05EA\u05D9\u05E7\u05D5\u05DF \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA</button>' +
-                    '</div>' +
-                    '<div id="healthCheckResults" class="health-check-results" style="display:none;"></div>' +
-                    '<div id="hcCpanelConfig" style="margin-top:16px;padding:12px 16px;border-radius:8px;background:#f0f4f8;border:1px solid #cbd5e1;direction:rtl;text-align:right;">' +
-                        '<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">\u2139\uFE0F \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA cPanel (\u05D0\u05D5\u05E4\u05E6\u05D9\u05D5\u05E0\u05DC\u05D9)</div>' +
-                        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
-                            '<input type="text" id="hcCpanelUrl" placeholder="\u05DB\u05EA\u05D5\u05D1\u05EA cPanel, \u05D3\u05D5\u05D2\u05DE\u05D4: https://cpanel.example.com:2083" ' +
-                                'style="flex:1;min-width:200px;padding:7px 12px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;direction:ltr;text-align:left;font-family:monospace;" ' +
-                                'onchange="localStorage.setItem(\'hc_cpanel_url\',this.value)" />' +
-                            '<button class="btn btn-outline" style="font-size:11px;white-space:nowrap;" onclick="App._openCpanelLink(\'errors\')">\u{1F4CB} \u05D3\u05E3 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA cPanel</button>' +
-                            '<button class="btn btn-outline" style="font-size:11px;white-space:nowrap;" onclick="App._openCpanelLink(\'filemanager\')">\u{1F4C1} \u05DE\u05E0\u05D4\u05DC \u05E7\u05D1\u05E6\u05D9\u05DD</button>' +
-                        '</div>' +
-                        '<p style="font-size:11px;color:#64748b;margin:6px 0 0 0;">\u05D4\u05DB\u05E0\u05E1\u05D5 \u05D0\u05EA \u05DB\u05EA\u05D5\u05D1\u05EA cPanel \u05E9\u05DC\u05DB\u05DD (\u05DB\u05D5\u05DC\u05DC \u05D4\u05E4\u05D5\u05E8\u05D8 \u05D5-:2083) \u05DB\u05D3\u05D9 \u05DC\u05E7\u05D1\u05DC \u05D2\u05D9\u05E9\u05D4 \u05D9\u05E9\u05D9\u05E8\u05D4 \u05DC-\u05D3\u05E4\u05D9 \u05D4-\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05D5\u05DE\u05E0\u05D4\u05DC \u05D4-\u05E7\u05D1\u05E6\u05D9\u05DD \u05E9\u05DC cPanel.</p>' +
-                    '</div>' +
-                    '<p style="font-size:12px;color:var(--gray-400);margin-bottom:0;">\u05D1\u05D3\u05D9\u05E7\u05D4 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05E9\u05DC \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA \u05DB\u05EA\u05D9\u05D1\u05D4, \u05E0\u05EA\u05D9\u05D1\u05D9\u05DD, \u05D6\u05D9\u05DB\u05E8\u05D5\u05DF, \u05D1\u05E2\u05DC\u05D5\u05EA (Ownership) \u05D5\u05E7\u05D1\u05E6\u05D9 \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD. \u05DE\u05D5\u05EA\u05D0\u05DD \u05DC\u05E9\u05E8\u05EA\u05D9 cPanel/suPHP \u2013 \u05D9\u05D0\u05D1\u05D7 \u05D1\u05E2\u05D9\u05D5\u05EA \u05D1\u05E2\u05DC\u05D5\u05EA \u05D5\u05D9\u05E6\u05D9\u05D2 \u05D4\u05E0\u05D7\u05D9\u05D5\u05EA \u05DC\u05EA\u05D9\u05E7\u05D5\u05DF.</p>' +
-                '</div>' +
-            '</div>';
-
-        _populateBackupTableSelects();
-        _restoreCpanelUrl();
-    }
-
-    // ===== Settings Sub-Section Navigation =====
-    function _switchSettingsSub(subSection) {
-        App._settingsSubSection = subSection;
-        
-        // Hide all sub-sections
-        document.querySelectorAll('.settings-sub-section').forEach(function(el) {
-            el.style.display = 'none';
-        });
-        
-        // Show active sub-section
-        var activeEl = document.getElementById('settings-sub-' + subSection);
-        if (activeEl) activeEl.style.display = 'block';
-        
-        // Update tab buttons styling
-        var buttons = document.querySelectorAll('#section-settings .btn');
-        buttons.forEach(function(btn) {
-            var isTarget = btn.textContent.includes(_getSubSectionLabel(subSection));
-            if (isTarget) {
-                btn.classList.remove('btn-ghost');
-                btn.classList.add('btn-primary');
-            } else {
-                // Only update buttons that are sub-section navigators
-                if (btn.onclick && btn.onclick.toString().includes('_switchSettingsSub')) {
-                    btn.classList.remove('btn-primary');
-                    btn.classList.add('btn-ghost');
-                }
-            }
-        });
-        
-        // Scroll to top of settings
-        document.querySelector('.main-content').scrollTop = 0;
+function _renderMappingWizard() {
+    let wizardType = importWizardData.type;
+    const headers = importWizardData.headers;
+    
+    // 🔑 תיקון קריטי: אם הסוג הוא 'lookup_values', השתמש ב-_importTargetKey
+    if (wizardType === 'lookup_values' && _importTargetKey) {
+        wizardType = _importTargetKey;
     }
     
-    function _getSubSectionLabel(sub) {
-        var labels = {
-            'general': 'הגדרות כלליות',
-            'whatsapp': 'תבניות WhatsApp',
-            'backup': 'גיבוי ושחזור',
-            'health': 'אבחון שרת'
-        };
-        return labels[sub] || '';
+    console.log('🔍 [Import Debug] מנסה לייבא מסוג:', wizardType);
+    console.log('🔍 [Import Debug] מפתחות זמינים ב-IMPORT_CONFIGS:', Object.keys(IMPORT_CONFIGS));
+    
+    const wizardConfig = IMPORT_CONFIGS[wizardType];
+    if (!wizardConfig || !wizardConfig.fields) {
+        const errorMsg = 'שגיאה קריטית: אין הגדרת ייבוא לסוג "' + wizardType + '". בדוק את הקונסול.';
+        console.error('❌', errorMsg);
+        showToast(errorMsg, 'error');
+        return;
     }
+    const fields = wizardConfig.fields;
+    
+    let html = '<div style="direction:rtl;text-align:right;">';
+    html += '<p style="margin-bottom:16px;color:var(--gray-600);">נמצאו <strong>' + importWizardData.rows.length + '</strong> רשומות. המערכת זיהתה את העמודות אוטומטית. אנא ודאו שהמיפוי נכון:</p>';
+    html += '<div style="max-height:400px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:16px;background:var(--gray-50);">';
+    
+	 // 🔑 תיקון קריטי: מניעת מיפוי כפול של עמודות
+	 const usedHeaders = new Set();
+	 fields.forEach(field => {
+		 const isRequired = field.key === 'idNumber' || field.key === 'code' || field.key === 'username' || field.key === 'value' || field.key === 'title' || field.key === 'solutionName';
+		 html += '<div style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">';
+		 html += '<label style="font-weight:600;min-width:140px;">' + field.label + (isRequired ? ' <span style="color:red">*</span>' : '') + '</label>';
+		 html += '<select id="map_' + field.key + '" class="form-select" style="flex:1;min-width:200px;">';
+		 html += '<option value="">-- אל תייבא שדה זה --</option>';
+		 let bestMatchIndex = -1;
+		 headers.forEach((h, i) => {
+			 // 🔑 דילוג על עמודות שכבר מופו לשדה אחר
+			 if (usedHeaders.has(i)) {
+				 html += '<option value="' + i + '" disabled style="color:#ccc;">' + escAttr(h) + ' (כבר מופה)</option>';
+				 return;
+			 }
+			 const lowerH = h.toLowerCase();
+			 const isMatch = field.keywords.some(kw => lowerH.includes(kw.toLowerCase()));
+			 const isSelected = isMatch && bestMatchIndex === -1 ? ' selected' : '';
+			 if (isMatch && bestMatchIndex === -1) {
+				 bestMatchIndex = i;
+				 usedHeaders.add(i); // 🔑 סימון העמודה כ"תפוסה"
+			 }
+			 html += '<option value="' + i + '"' + isSelected + '>' + escAttr(h) + '</option>';
+		 });
+		 html += '</select>';
+		 html += '</div>';
+	 });
+    
+    html += '</div>';
+    html += '<div style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:8px;font-size:13px;color:#856404;">';
+    html += '💡 <strong>טיפ:</strong> אם שם העמודה בקובץ שונה מעט, בחרו אותו ידנית מהרשימה.';
+    html += '</div>';
+    html += '</div>';
+    
+    showModal('🗺️ מיפוי עמודות לייבוא', html,
+        '<button class="btn btn-primary" onclick="App.executeImport()">▶️ אשר קליטה וייבוא</button>' +
+        '<button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>');
+}
 
-    // ======================== אבחון תקינות שרת ========================
-    var _lastHealthData = null;
-
-    function _runHealthCheck() {
-        var btn = document.getElementById('btnRunHealthCheck');
-        var resultsEl = document.getElementById('healthCheckResults');
-        var summaryEl = document.getElementById('healthCheckSummary');
-        if (!btn || !resultsEl || !summaryEl) return;
-
-        btn.disabled = true;
-        btn.textContent = '\u{1F504} \u05DE\u05D0\u05D1\u05D7...';
-        summaryEl.style.display = 'none';
-        resultsEl.style.display = 'none';
-        document.getElementById('btnAutoFix').style.display = 'none';
-
-        fetch('/api/health-check?XTransformPort=3001', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        }).then(function(r) { return r.json(); }).then(function(data) {
-            btn.disabled = false;
-            btn.textContent = '\u{1FA7A} \u05D1\u05E6\u05E2 \u05D0\u05D1\u05D7\u05D5\u05DF \u05E9\u05E8\u05EA';
-            _lastHealthData = data;
-            _renderHealthResults(data);
-        }).catch(function(err) {
-            btn.disabled = false;
-            btn.textContent = '\u{1FA7A} \u05D1\u05E6\u05E2 \u05D0\u05D1\u05D7\u05D5\u05DF \u05E9\u05E8\u05EA';
-            summaryEl.style.display = 'block';
-            summaryEl.style.background = '#fef2f2';
-            summaryEl.style.color = '#991b1b';
-            summaryEl.style.border = '1px solid #fecaca';
-            summaryEl.innerHTML = '\u274C \u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D7\u05D9\u05D1\u05D5\u05EA \u05D4\u05E9\u05E8\u05EA: ' + escAttr(err.message) + '. \u05D9\u05D9\u05EA\u05DB\u05DF \u05E9\u05D4\u05E9\u05E8\u05EA \u05D0\u05D9\u05E0\u05D5 \u05E4\u05E2\u05D9\u05DC \u05D1\u05E1\u05D1\u05D9\u05D1\u05D4 \u05D4\u05E0\u05D5\u05DB\u05D7\u05D9\u05EA.';
-        });
+// ================================================================
+// פונקציית ייבוא מלאה - תומכת בייבוא המוני (Batch)
+// מונעת קריסת דפדפן בייבוא קבצים גדולים (17,000+ רשומות)
+// ================================================================
+function executeImport() {
+    var type = importWizardData.type;
+    var rows = importWizardData.rows;
+    
+    // 1. קביעת סוג היעד והמפתח האמיתי
+    let actualType = type;
+    let targetStoreKey = null;
+    if (type === 'lookup_values' && _importTargetKey) {
+        actualType = _importTargetKey;
+        targetStoreKey = _importTargetKey;
+    } else if (type === 'schools') {
+        targetStoreKey = DataStore.KEYS.LOOKUP_SCHOOLS;
+    } else if (type === 'pedagogical_executors') {
+        targetStoreKey = DataStore.KEYS.PEDAGOGICAL_EXECUTORS;
+    } else if (type === 'catalog_entries') {
+        targetStoreKey = DataStore.KEYS.CATALOG_ENTRIES;
+    } else {
+        targetStoreKey = DataStore.KEYS[actualType.toUpperCase()] || actualType;
     }
-
-    function _renderHealthResults(data) {
-        var summaryEl = document.getElementById('healthCheckSummary');
-        var resultsEl = document.getElementById('healthCheckResults');
-        var autoFixBtn = document.getElementById('btnAutoFix');
-        var hasFail = data.results.some(function(r) { return r.status === 'fail'; });
-        var hasWarn = data.results.some(function(r) { return r.status === 'warn'; });
-
-        // Summary
-        summaryEl.style.display = 'block';
-        if (data.allPassed && !hasWarn) {
-            summaryEl.style.background = '#f0fdf4';
-            summaryEl.style.color = '#166534';
-            summaryEl.style.border = '1px solid #bbf7d0';
-            summaryEl.innerHTML = '\u2705 \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05EA\u05E7\u05D9\u05E0\u05D4 – \u05DB\u05DC \u05D4\u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D1\u05E8\u05D5 \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4. <span style="font-weight:400;font-size:12px;opacity:0.7;">(' + new Date(data.timestamp).toLocaleString('he-IL') + ')</span>';
-        } else if (!hasFail && hasWarn) {
-            summaryEl.style.background = '#fffbeb';
-            summaryEl.style.color = '#92400e';
-            summaryEl.style.border = '1px solid #fde68a';
-            summaryEl.innerHTML = '\u26A0\uFE0F \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05E4\u05E2\u05D9\u05DC\u05D4 \u05E2\u05DD \u05D0\u05D6\u05D4\u05E8\u05D5\u05EA – \u05D9\u05E9 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05E4\u05E8\u05D8\u05D9\u05DD.';
-        } else {
-            summaryEl.style.background = '#fef2f2';
-            summaryEl.style.color = '#991b1b';
-            summaryEl.style.border = '1px solid #fecaca';
-            summaryEl.innerHTML = '\u274C \u05E0\u05DE\u05E6\u05D0\u05D5 \u05D1\u05E2\u05D9\u05D5\u05EA – \u05D9\u05E9 \u05DC\u05E4\u05E2\u05D5\u05DC \u05D1\u05D4\u05EA\u05D0\u05DD \u05DC\u05D4\u05D5\u05E8\u05D0\u05D5\u05EA.';
-            if (autoFixBtn) autoFixBtn.style.display = '';
+    
+    // 2. בדיקת הגדרות מיפוי
+    let config = IMPORT_CONFIGS[actualType];
+    if (!config || !config.fields) {
+        showToast('אין הגדרת ייבוא לסוג זה (' + actualType + ')', 'error');
+        return;
+    }
+    
+    // 3. בניית המיפוי מהטופס
+    var fieldMappings = [];
+    config.fields.forEach(function(field) {
+        var sel = document.getElementById('map_' + field.key);
+        if (sel && sel.value !== '') {
+            fieldMappings.push({ fieldKey: field.key, colIdx: parseInt(sel.value) });
         }
-
-        // Results list
-        var html = '';
-        data.results.forEach(function(r) {
-            var icon, bgColor, borderColor, textColor;
-            if (r.status === 'ok') {
-                icon = '\u2705'; bgColor = '#f0fdf4'; borderColor = '#bbf7d0'; textColor = '#166534';
-            } else if (r.status === 'warn') {
-                icon = '\u26A0\uFE0F'; bgColor = '#fffbeb'; borderColor = '#fde68a'; textColor = '#92400e';
-            } else if (r.status === 'fail') {
-                icon = '\u274C'; bgColor = '#fef2f2'; borderColor = '#fecaca'; textColor = '#991b1b';
-            } else {
-                icon = '\u2139\uFE0F'; bgColor = '#f8fafc'; borderColor = '#e2e8f0'; textColor = '#475569';
+    });
+    
+    if (!fieldMappings.length) {
+        showToast('לא מופו שדות - יש לבחור לפחות עמודה אחת', 'warning');
+        return;
+    }
+    
+    // 🔑 4. אתחול מונים
+    var count = 0;
+    var updatedCount = 0;
+    var skippedCount = 0;
+    
+    // 5. לולאת עיבוד השורות
+    rows.forEach(function(rowValues, rowIdx) {
+        var record = {};
+        fieldMappings.forEach(function(fm) {
+            if (fm.colIdx < rowValues.length) {
+                record[fm.fieldKey] = String(rowValues[fm.colIdx] || '').trim();
             }
-            html += '<div class="hc-result-item" data-check-id="' + escAttr(r.id) + '" data-status="' + r.status + '" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;margin-bottom:8px;border-radius:8px;background:' + bgColor + ';border:1px solid ' + borderColor + ';direction:rtl;text-align:right;">';
-            html += '<span style="font-size:18px;flex-shrink:0;margin-top:1px;">' + icon + '</span>';
-            html += '<div style="flex:1;min-width:0;">';
-            html += '<div style="font-size:13px;font-weight:600;color:' + textColor + ';margin-bottom:4px;">' + escAttr(r.label) + '</div>';
-            if (r.status === 'info') {
-                html += '<div style="font-size:12px;color:var(--gray-600);direction:ltr;text-align:left;font-family:monospace;background:white;padding:6px 10px;border-radius:4px;word-break:break-all;">' + escAttr(r.detail) + '</div>';
-            } else {
-                html += '<div style="font-size:12px;color:' + textColor + ';opacity:0.85;line-height:1.6;">' + escAttr(r.detail) + '</div>';
-            }
-            // cPanel ownership check: add actionable guidance
-            if (r.id === 'cpanel_owner' && r.status === 'fail') {
-                html += '<div class="hc-cpanel-guidance">';
-                html += '<strong>\u{1F527} \u05E4\u05E2\u05D5\u05DC\u05D5\u05EA \u05DE\u05D5\u05DE\u05DC\u05E6\u05D5\u05EA \u05DC\u05EA\u05D9\u05E7\u05D5\u05DF \u05D4\u05D1\u05E2\u05D9\u05D4:</strong>';
-                html += '<ol style="margin:6px 0 0 0;padding-right:18px;line-height:2;">';
-                html += '<li>\u05D4\u05EA\u05D7\u05D1\u05E8\u05D5 \u05DC-cPanel > \u05DE\u05E0\u05D4\u05DC \u05D4\u05E7\u05D1\u05E6\u05D9\u05DD (File Manager)</li>';
-                html += '<li>\u05D1\u05D7\u05E8\u05D5 \u05D1-\u05EA\u05D9\u05E7\u05D9\u05D9\u05EA data/ \u2013 \u05D1\u05D3\u05E7\u05D5 \u05D0\u05EA \u05D4\u05E2\u05DE\u05D5\u05D3\u05D4 "\u05D1\u05E2\u05DC\u05D5\u05EA" (Owner)</li>';
-                html += '<li>\u05D0\u05DD \u05D4\u05D1\u05E2\u05DC\u05D5\u05EA \u05DE\u05D5\u05D2\u05D3\u05E8\u05EA \u05DC-<strong>nobody</strong> \u2013 \u05D4\u05D7\u05DC\u05D9\u05E4\u05D5 \u05DC\u05E9\u05DD \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9 \u05E9\u05DC\u05DB\u05DD \u05D1-cPanel</li>';
-                html += '<li>\u05DC\u05D0\u05D7\u05E8 \u05D4\u05E9\u05D9\u05E0\u05D5\u05D9: \u05EA\u05D9\u05E7\u05D9\u05D5\u05EA <strong>755</strong>, \u05E7\u05D1\u05E6\u05D9\u05DD <strong>644</strong> \u05D0\u05D5 <strong>664</strong></li>';
-                html += '</ol></div>';
-            }
-            html += '</div></div>';
         });
-
-        resultsEl.innerHTML = html;
-        resultsEl.style.display = 'block';
-    }
-
-    function _showErrorLog() {
-        showModal('\u{1F4CB} \u05D9\u05D5\u05DE\u05DF \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05D0\u05D7\u05E8\u05D5\u05E0\u05D5\u05EA',
-            '<div id="healthLogContent" style="direction:rtl;text-align:center;padding:20px 0;"><div style="font-size:24px;margin-bottom:12px;">\u{1F504}</div>\u05D8\u05D5\u05E2\u05DF...</div>',
-            '<button class="btn btn-outline" onclick="App.closeModal()">\u05E1\u05D2\u05D9\u05E8\u05D4</button>'
-        );
-
-        fetch('/api/health-log?XTransformPort=3001', { method: 'GET' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var container = document.getElementById('healthLogContent');
-                if (!container) return;
-                if (!data.entries || data.entries.length === 0) {
-                    container.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--gray-400);">\u2705 \u05D0\u05D9\u05DF \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05DE\u05EA\u05D5\u05E2\u05D3\u05D5\u05EA.</div>';
-                    return;
-                }
-                var html = '<div style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">\u05E1\u05D4\u05DB\u05EA \u05DB\u05DC \u05D4\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA: ' + (data.total || 0) + '</div>';
-                html += '<div style="max-height:350px;overflow-y:auto;">';
-                data.entries.forEach(function(entry) {
-                    html += '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all;color:var(--gray-700);">' + escAttr(entry) + '</div>';
-                });
-                html += '</div>';
-                html += '<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">';
-                html += '<button class="btn btn-outline btn-sm" onclick="App._copyErrorLog()" style="font-size:12px;">\u{1F4CB} \u05D4\u05E2\u05EA\u05E7 \u05D4\u05E2\u05EA\u05E7</button>';
-                html += '<button class="btn btn-outline btn-sm" onclick="App._clearErrorLog()" style="font-size:12px;color:var(--danger);">\u{1F5D1}\uFE0F \u05E0\u05E7\u05D4 \u05DC\u05D5\u05D2</button>';
-                html += '</div>';
-                // cPanel guidance box with quick links
-                var cpanelUrl = (document.getElementById('hcCpanelUrl') && document.getElementById('hcCpanelUrl').value) || localStorage.getItem('hc_cpanel_url') || '';
-                cpanelUrl = cpanelUrl.trim().replace(/\/+$/, '');
-                html += '<div style="margin-top:16px;padding:12px 16px;border-radius:8px;background:#f0f4f8;border:1px solid #cbd5e1;direction:rtl;text-align:right;">';
-                html += '<div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;">\u2139\uFE0F \u05D4\u05E4\u05E0\u05D9\u05D4 \u05DC\u05E9\u05E8\u05EA\u05D9 cPanel</div>';
-                html += '<div style="font-size:12px;color:#475569;line-height:1.7;">';
-                html += '\u05D1\u05E9\u05E8\u05EA\u05D9 cPanel \u05E7\u05D9\u05D9\u05DD \u05DE\u05E0\u05D2\u05E0\u05D5\u05DF \u05D9\u05D5\u05DE\u05DF \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05DE\u05D5\u05D1\u05E0\u05D4 \u05EA\u05D7\u05EA <strong>Metrics > Errors</strong> \u05D1\u05DC\u05D5\u05D7 \u05D4\u05D1\u05E7\u05E8\u05D4. ';
-                html += '\u05D9\u05D9\u05EA\u05DB\u05DF \u05E9\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05E0\u05D5\u05E1\u05E4\u05D5\u05EA \u05E9\u05D0\u05D9\u05E0\u05DF \u05DE\u05D5\u05E4\u05D9\u05E2\u05D5\u05EA \u05DB\u05D0\u05DF \u05E2\u05DC \u05D5\u05EA\u05D4 \u05D1\u05E2\u05DC\u05D5\u05EA \u05D5\u05D1\u05E2\u05DC\u05D5\u05EA (Ownership). ';
-                html += '\u05DE\u05D5\u05DE\u05DC\u05E5 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D2\u05DD \u05D0\u05EA \u05D9\u05D5\u05DE\u05DF \u05D4\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05E9\u05DC Apache/PHP \u05D1\u05EA\u05D9\u05E7\u05D9\u05D9\u05EA \u05D4\u05D0\u05EA\u05E8.';
-                html += '</div>';
-                if (cpanelUrl) {
-                    html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-start;">';
-                    html += '<a href="' + escAttr(cpanelUrl) + '/frontend/metrics/errors" target="_blank" class="btn btn-outline" style="font-size:11px;text-decoration:none;">\u{1F4CB} \u05E4\u05EA\u05D7 \u05D3\u05E3 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA cPanel</a>';
-                    html += '<a href="' + escAttr(cpanelUrl) + '/frontend/files" target="_blank" class="btn btn-outline" style="font-size:11px;text-decoration:none;">\u{1F4C1} \u05DE\u05E0\u05D4\u05DC \u05E7\u05D1\u05E6\u05D9\u05DD</a>';
-                    html += '</div>';
-                } else {
-                    html += '<div style="margin-top:10px;font-size:11px;color:#64748b;">\u{1F4A1} \u05DC\u05E7\u05D1\u05DC\u05EA \u05E7\u05D9\u05E9\u05D5\u05E8 \u05D9\u05E9\u05D9\u05E8 \u05DC\u05D3\u05E3 \u05D4\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA, \u05D4\u05D2\u05D3\u05D9\u05E8\u05D5 \u05D0\u05EA \u05DB\u05EA\u05D5\u05D1\u05EA cPanel \u05D1\u05DB\u05E8\u05D8\u05D9\u05E1 \u05D0\u05D1\u05D7\u05D5\u05DF \u05D4\u05E9\u05E8\u05EA.</div>';
-                }
-                html += '</div>';
-                container.innerHTML = html;
-            })
-            .catch(function(err) {
-                var container = document.getElementById('healthLogContent');
-                if (container) container.innerHTML = '<div style="color:var(--danger);text-align:center;">\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05D4\u05DC\u05D5\u05D2: ' + escAttr(err.message) + '</div>';
-            });
-    }
-
-    function _copyErrorLog() {
-        fetch('/api/health-log?XTransformPort=3001', { method: 'GET' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.entries || data.entries.length === 0) { showToast('\u05D0\u05D9\u05DF \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05DC\u05D4\u05E2\u05EA\u05E7\u05D4', 'info'); return; }
-                var text = data.entries.join('\n');
-                navigator.clipboard.writeText(text).then(function() {
-                    showToast('\u05D4\u05DC\u05D5\u05D2 \u05D4\u05D5\u05E2\u05EA\u05E7 \u05DC\u05DC\u05D5\u05D7', 'success');
-                }).catch(function() {
-                    showToast('\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D4\u05E2\u05EA\u05E7\u05D4', 'error');
-                });
-            });
-    }
-
-    function _clearErrorLog() {
-        confirmDialog('\u05DC\u05E0\u05E7\u05D5\u05EA \u05D0\u05EA \u05D9\u05D5\u05DE\u05DF \u05D4\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA?', function() {
-            fetch('/api/health-log?XTransformPort=3001', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'clear' })
-            }).then(function() {
-                showToast('\u05D9\u05D5\u05DE\u05DF \u05D4\u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05E0\u05DE\u05D7\u05E7', 'success');
-                App.closeModal();
-            }).catch(function() {
-                showToast('\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E0\u05D9\u05E7\u05D5\u05D9', 'error');
-            });
-        });
-    }
-
-    function _attemptAutoFix() {
-        confirmDialog('\u05EA\u05D9\u05E7\u05D5\u05DF \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA',
-            '<div style="padding:8px 0;">' +
-            '<p style="color:var(--gray-600);margin-bottom:12px;">\u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05EA\u05E0\u05E1\u05D4 \u05DC\u05D4\u05D2\u05D3\u05D9\u05E8 \u05D0\u05EA \u05D4\u05D4\u05E8\u05E9\u05D0\u05D5\u05EA:</p>' +
-            '<ul style="text-align:right;color:var(--gray-700);font-size:13px;padding-right:20px;line-height:2;">' +
-            '<li>\u05EA\u05D9\u05E7\u05D9\u05D9\u05EA data/ \u05DC-755</li>' +
-            '<li>\u05E7\u05D1\u05E6\u05D9 JSON \u05DC-664</li>' +
-            '</ul>' +
-            '<div style="margin-top:12px;padding:10px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;direction:rtl;text-align:right;">' +
-            '<div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">\u26A0\uFE0F \u05D4\u05E2\u05E8\u05EA \u05DC\u05E9\u05E8\u05EA\u05D9 cPanel \u2013 \u05E9\u05D9\u05DE\u05D5 \u05DC\u05D1\u05D3:</div>' +
-            '<ol style="text-align:right;color:#92400e;font-size:12px;padding-right:18px;line-height:2;margin:0;">' +
-            '<li>\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DC-cPanel > \u05DE\u05E0\u05D4\u05DC \u05D4\u05E7\u05D1\u05E6\u05D9\u05DD (File Manager)</li>' +
-            '<li>\u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D1\u05E2\u05DC\u05D5\u05EA (Owner) \u05E9\u05DC \u05EA\u05D9\u05E7\u05D9\u05D9\u05EA data/ \u2013 \u05D0\u05DD \u05D4\u05D9\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u05DC-<strong>nobody</strong>, \u05E9\u05E0\u05D4 \u05DC\u05E9\u05DD \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9 \u05E9\u05DC\u05DA</li>' +
-            '<li>\u05D4\u05D2\u05D3\u05E8 \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA: \u05EA\u05D9\u05E7\u05D9\u05D5\u05EA <strong>755</strong>, \u05E7\u05D1\u05E6\u05D9\u05DD <strong>644</strong> \u05D0\u05D5 <strong>664</strong></li>' +
-            '</ol>' +
-            '<p style="color:#b45309;font-size:11px;margin:8px 0 0 0;">\u{1F6AB} \u05D0\u05D9\u05DF \u05DC\u05D4\u05E9\u05EA\u05DE\u05E9 \u05D1-777 \u2013 \u05D1-cPanel \u05D4\u05D3\u05D1\u05E8 \u05E2\u05DC\u05D5\u05DC \u05DC\u05D7\u05E1\u05D5\u05DD \u05D0\u05EA \u05D4\u05D0\u05EA\u05E8 \u05D1\u05D2\u05DC\u05DC \u05DE\u05D3\u05D9\u05E0\u05D5\u05EA \u05D4\u05D0\u05D1\u05D8\u05D7\u05D4 \u05E9\u05DC suPHP/PHP-FPM.</p>' +
-            '</div>' +
-            '<p style="color:var(--gray-500);font-size:12px;margin-top:8px;">\u05E4\u05E2\u05D5\u05DC\u05D4 \u05D6\u05D5 \u05E2\u05DC\u05D5\u05DC\u05D4 \u05DC\u05D4\u05E9\u05EA\u05E0\u05D5\u05EA \u05D1\u05D0\u05D9\u05E9\u05D5\u05E8. \u05D4\u05D0\u05D1\u05D7\u05D5\u05DF \u05D9\u05D1\u05D3\u05D5\u05E7 \u05D2\u05DD \u05D7\u05D5\u05E1\u05E8 \u05D1\u05E2\u05DC\u05D5\u05EA (Ownership).</p>' +
-            '</div>',
-            '<button class="btn btn-warning" onclick="App._doAutoFix()">\u{1F527} \u05D1\u05E6\u05E2 \u05EA\u05D9\u05E7\u05D5\u05DF</button><button class="btn btn-outline" onclick="App.closeModal()">\u05D1\u05D9\u05D8\u05D5\u05DC</button>'
-        );
-    }
-
-    function _doAutoFix() {
-        closeModal();
-        var btn = document.getElementById('btnAutoFix');
-        if (btn) { btn.disabled = true; btn.textContent = '\u{1F527} \u05DE\u05EA\u05E7\u05DF...'; }
-
-        fetch('/api/health-log?XTransformPort=3001', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'fix_perms' })
-        }).then(function(r) { return r.json(); }).then(function(data) {
-            if (btn) { btn.disabled = false; btn.textContent = '\u{1F527} \u05EA\u05D9\u05E7\u05D5\u05DF \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA'; }
-            if (data.success) {
-                showToast('\u{1F527} \u05D4\u05EA\u05D9\u05E7\u05D5\u05DF \u05D4\u05D5\u05E9\u05DC\u05DD! ' + (data.fixed ? data.fixed.length : 0) + ' \u05E7\u05D1\u05E6\u05D9\u05DD \u05EA\u05D5\u05E7\u05E0\u05D5. \u05DE\u05D1\u05E6\u05E2 \u05D0\u05D1\u05D7\u05D5\u05DF \u05D7\u05D5\u05D6\u05E8...', 'success');
-                setTimeout(function() { _runHealthCheck(); }, 1500);
-            } else {
-                var msg = '\u05D7\u05DC\u05E7 \u05DE\u05D4\u05E0\u05D9\u05E1\u05D9\u05D5\u05E0\u05D5\u05EA \u05E0\u05DB\u05E9\u05DC\u05D5: ';
-                if (data.failed && data.failed.length > 0) msg += data.failed.join(', ');
-                if (data.ownershipWarning) {
-                    msg += ' | ' + data.ownershipWarning;
-                    setTimeout(function() { _runHealthCheck(); }, 3000);
-                }
-                showToast(msg, 'error');
-            }
-        }).catch(function(err) {
-            if (btn) { btn.disabled = false; btn.textContent = '\u{1F527} \u05EA\u05D9\u05E7\u05D5\u05DF \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05D4\u05E8\u05E9\u05D0\u05D5\u05EA'; }
-            showToast('\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05EA\u05D9\u05E7\u05D5\u05DF: ' + err.message, 'error');
-        });
-    }
-
-    function _openCpanelLink(type) {
-        var url = (document.getElementById('hcCpanelUrl') && document.getElementById('hcCpanelUrl').value) || localStorage.getItem('hc_cpanel_url') || '';
-        url = url.trim().replace(/\/+$/, '');
-        if (!url) {
-            showToast('\u05D9\u05E9 \u05DC\u05D4\u05DB\u05E0\u05D9\u05E1 \u05D0\u05EA \u05DB\u05EA\u05D5\u05D1\u05EA cPanel \u05D1\u05E9\u05D3\u05D4 \u05D4\u05DE\u05D9\u05D5\u05E2\u05D3\u05EA \u05DC\u05DE\u05E2\u05DC\u05D4', 'info');
-            var inp = document.getElementById('hcCpanelUrl');
-            if (inp) inp.focus();
+        
+        // ניקוי שדות נפוצים
+        if (record.idNumber) record.idNumber = record.idNumber.replace(/^\$+/, '');
+        if (record.phone) record.phone = record.phone.replace(/^\$+/, '');
+        
+        var hasValue = fieldMappings.some(function(fm) { return record[fm.fieldKey]; });
+        if (!hasValue) {
+            skippedCount++;
             return;
         }
-        if (type === 'errors') {
-            window.open(url + '/frontend/metrics/errors', '_blank');
-        } else if (type === 'filemanager') {
-            window.open(url + '/frontend/files', '_blank');
-        }
-    }
-
-    function _restoreCpanelUrl() {
-        var saved = localStorage.getItem('hc_cpanel_url');
-        var inp = document.getElementById('hcCpanelUrl');
-        if (inp && saved) inp.value = saved;
-    }
-
-    function saveSiteSettings() {
-        const fileInput = document.getElementById('fLogoFile');
-        const currentSettings = DataStore.getSettings();
-        const saveData = {
-            siteNameHe: document.getElementById('fSiteNameHe').value.trim(),
-            siteNameAr: document.getElementById('fSiteNameAr').value.trim(),
-            copyrightHe: document.getElementById('fCopyrightHe').value.trim(),
-            copyrightAr: document.getElementById('fCopyrightAr').value.trim()
-        };
-        if (fileInput && fileInput.files && fileInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                saveData.logoUrl = e.target.result;
-                DataStore.updateSettings(saveData);
-                showToast('ההגדרות נשמרו (כולל לוגו)', 'success');
-                renderSettings();
+        
+        // ============================================================
+        // 🔑 טיפול ייעודי: פתרונות למידה (Solutions)
+        // ============================================================
+        if (actualType === 'solutions' || targetStoreKey === DataStore.KEYS.SOLUTIONS) {
+            var solutionData = {
+                responsibilityType: record.responsibilityType || '',
+                schoolName: record.schoolName || '',
+                solutionName: record.solutionName || '',
+                solutionNumber: record.solutionNumber || '',
+                description: record.description || '',
+                guideId: record.guideId || '',
+                domain: record.domain || '',
+                topic: record.topic || '',
+                educationStage: record.educationStage || '',
+                educationType: record.educationType || '',
+                startDate: record.startDate || '',
+                endDate: record.endDate || '',
+                weekDay: record.weekDay || '',
+                meetingType: record.meetingType || '',
+                academicHours: record.academicHours || '',
+                instructors: record.instructors || '',
+                whatsappLink: record.whatsappLink || '',
+                earlyRegistrationLink: record.earlyRegistrationLink || '',
+                showInCatalog: record.showInCatalog || 'hide',
+                generalNote: record.generalNote || '',
+                isActive: true
             };
-            reader.readAsDataURL(fileInput.files[0]);
-        } else {
-            saveData.logoUrl = currentSettings.logoUrl || '';
-            DataStore.updateSettings(saveData);
-            showToast('ההגדרות נשמרו', 'success');
-        }
-    }
-
-    // ======================== גיבוי ושחזור ========================
-    const BACKUP_TABLE_META = {
-        users: 'משתמשים', categories: 'קטגוריות', solutions: 'פתרונות למידה',
-        mentors: 'מנחים', guides_repo: 'מאגר מדריכים', budgets: 'תקצבים', lookup_schools: 'בתי ספר',
-        periods: 'תקופות', solution_instructors: 'מדריכים-פתרונות',
-        lookup_domains: 'תחומים', lookup_education_stages: 'שלבי חינוך',
-        lookup_education_types: 'סוגי חינוך', lookup_budget_types: 'סוגי תקציב',
-        lookup_allocation_status: 'סטטוס הקצאה', lookup_solution_status: 'סטטוס פתרון',
-        lookup_performer_types: 'סוגי מבצע', lookup_lecturer_status: 'סטטוס מרצה',
-        lookup_field_knowledge: 'תחומי ידע', lookup_role_holders: 'נושאי תפקיד',
-        lookup_broad_topics: 'נושאים רחבים', lookup_designated_programs: 'תוכניות ייעוד',
-        lookup_week_days: 'ימים בשבוע', lookup_meeting_types: 'סוגי מפגש',
-        solution_comments: 'הערות פתרונות',
-        catalog_entries: 'רשומות קטלוג', catalog_items: 'פריטי קטלוג', registrations: 'נרשמים לפתרונות למידה',
-        settings: 'הגדרות אתר',
-        recycle_bin: 'סל מחזור', inspectors: 'מפקחים',
-        pedagogical_executors: 'מבצעים פדגוגיים',
-        lookup_responsibility_types: 'סוגי אחריות',
-        homepage: 'דף שער', faq_data: 'שאלות נפוצות',
-        custom_pages: 'דפים מותאמים'
-    };
-
-    function _populateBackupTableSelects() {
-        var sel1 = document.getElementById('fBackupTable');
-        var sel2 = document.getElementById('fRestoreTable');
-        if (sel1 && sel1.options.length <= 1) {
-            Object.keys(BACKUP_TABLE_META).forEach(function(k) {
-                var o1 = document.createElement('option'); o1.value = k; o1.textContent = BACKUP_TABLE_META[k]; sel1.appendChild(o1);
-                var o2 = document.createElement('option'); o2.value = k; o2.textContent = BACKUP_TABLE_META[k]; sel2.appendChild(o2);
-            });
-        }
-    }
-
-    function _collectBackupData(keys) {
-        var data = {};
-        keys.forEach(function(k) {
-            var val = DataStore.getAll(k);
-            if (val !== undefined && val !== null) data[k] = val;
-        });
-        return data;
-    }
-
-    function _downloadJSON(data, filename) {
-        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a'); a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    function _readBackupFile(fileInput) {
-        return new Promise(function(resolve, reject) {
-            if (!fileInput || !fileInput.files || !fileInput.files[0]) { reject('לא נבחר קובץ'); return; }
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                try { resolve(JSON.parse(e.target.result)); }
-                catch (err) { reject('קובץ לא תקין: ' + err.message); }
-            };
-            reader.onerror = function() { reject('שגיאה בקריאת הקובץ'); };
-            reader.readAsText(fileInput.files[0]);
-        });
-    }
-
-    function _applyBackupData(data, selectedKeys) {
-        var keysToApply = selectedKeys || Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
-        var applied = 0;
-        keysToApply.forEach(function(k) {
-            if (k === '__backup_meta') return;
-            if (data[k] === undefined) return;
-            try {
-                DataStore.saveAll(k, data[k]);
-                applied++;
-            } catch(e) { console.error('[Backup] Error restoring table', k, e); }
-        });
-        return applied;
-    }
-
-    function _formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    }
-
-    function _getBackupTimestamp() {
-        var now = new Date();
-        var y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0');
-        var h = String(now.getHours()).padStart(2,'0'), min = String(now.getMinutes()).padStart(2,'0');
-        return y + '-' + m + '-' + d + '_' + h + '-' + min;
-    }
-
-    function _downloadJSON(data, filename) {
-        var jsonStr = JSON.stringify(data, null, 2);
-        var bytes = new Blob([jsonStr], { type: 'application/json' }).size;
-        var url = URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' }));
-        var a = document.createElement('a'); a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        return bytes;
-    }
-
-    function _countRecords(data) {
-        var count = 0;
-        Object.keys(data).forEach(function(k) {
-            if (k === '__backup_meta') return;
-            if (Array.isArray(data[k])) count += data[k].length;
-            else if (typeof data[k] === 'object' && data[k] !== null) count += Object.keys(data[k]).length;
-            else count++;
-        });
-        return count;
-    }
-
-    function backupFull() {
-        var btn = document.getElementById('btnBackupFull');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-sm" style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;"></span> מכין גיבוי...'; }
-        setTimeout(function() {
-            try {
-                var keys = Object.keys(BACKUP_TABLE_META);
-                var data = _collectBackupData(keys);
-                data.__backup_meta = { type: 'full', timestamp: new Date().toISOString(), version: '2.0', tableCount: keys.length };
-                var totalRecords = _countRecords(data);
-                var fileSize = _downloadJSON(data, 'matspanet_backup_' + _getBackupTimestamp() + '.json');
-                var settings = DataStore.getSettings();
-                var ts = settings.backupTimestamps || {};
-                var now = new Date().toISOString();
-                keys.forEach(function(k) { ts[k] = now; });
-                DataStore.updateSettings({ backupTimestamps: ts });
-                logActivity('backup_full', 'גיבוי מלא (' + keys.length + ' טבלאות, ' + totalRecords + ' רשומות, ' + _formatFileSize(fileSize) + ')', 'settings');
-                showToast('✅ גיבוי מלא הורד בהצלחה — ' + _formatFileSize(fileSize) + ', ' + totalRecords + ' רשומות', 'success');
-                _updateBackupStatusUI();
-            } catch(e) {
-                showToast('שגיאה ביצירת גיבוי: ' + e.message, 'error');
-            }
-            if (btn) { btn.disabled = false; btn.innerHTML = '💾 גיבוי מלא – כל הנתונים'; }
-        }, 100);
-    }
-
-    function backupTable(tableKey) {
-        var key = tableKey || document.getElementById('fBackupTable').value;
-        if (!key) { showToast('יש לבחר טבלה', 'error'); return; }
-        var data = _collectBackupData([key]);
-        data.__backup_meta = { type: 'table', table: key, label: BACKUP_TABLE_META[key] || key, timestamp: new Date().toISOString(), version: '2.0' };
-        var count = _countRecords(data);
-        var fileSize = _downloadJSON(data, 'matspanet_' + key + '_' + _getBackupTimestamp() + '.json');
-        var settings = DataStore.getSettings();
-        var ts = settings.backupTimestamps || {};
-        ts[key] = new Date().toISOString();
-        DataStore.updateSettings({ backupTimestamps: ts });
-        logActivity('backup_table', 'גיבוי טבלה: ' + (BACKUP_TABLE_META[key] || key) + ' (' + count + ' רשומות, ' + _formatFileSize(fileSize) + ')', 'settings');
-        showToast('✅ גיבוי טבלה ' + (BACKUP_TABLE_META[key] || key) + ' — ' + _formatFileSize(fileSize) + ', ' + count + ' רשומות', 'success');
-        _updateBackupStatusUI();
-    }
-
-    function _showSelectiveRestoreModal(data) {
-        var meta = data.__backup_meta || {};
-        var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
-        var tableCheckboxes = '';
-        tablesInFile.forEach(function(k) {
-            var label = BACKUP_TABLE_META[k] || k;
-            var count = Array.isArray(data[k]) ? data[k].length : (typeof data[k] === 'object' && data[k] !== null ? Object.keys(data[k]).length : 1);
-            var isSettings = (k === 'settings');
-            tableCheckboxes += '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--gray-50)\'" onmouseout="this.style.background=\'transparent\'">' +
-                '<input type="checkbox" class="restore-table-cb" value="' + escAttr(k) + '" checked style="width:16px;height:16px;accent-color:var(--primary-color);"' + (isSettings ? '' : '') + '>' +
-                '<span style="flex:1;font-size:13px;font-weight:500;">' + escAttr(label) + '</span>' +
-                '<span style="font-size:12px;color:var(--gray-400);background:var(--gray-100);padding:2px 8px;border-radius:10px;">' + count + ' רשומות</span>' +
-                '</label>';
-        });
-
-        var tsFormatted = meta.timestamp ? new Date(meta.timestamp).toLocaleDateString('he-IL') + ' ' + new Date(meta.timestamp).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit'}) : 'לא ידוע';
-
-        var modalHtml =
-            '<div style="direction:rtl;text-align:right;">' +
-            '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:16px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
-                    '<div><strong style="font-size:13px;">📅 תאריך גיבוי:</strong> <span style="font-size:13px;">' + tsFormatted + '</span></div>' +
-                    '<div><strong style="font-size:13px;">📊 טבלאות:</strong> <span style="font-size:13px;">' + tablesInFile.length + '</span></div>' +
-                    '<div><strong style="font-size:13px;">📦 גרסה:</strong> <span style="font-size:13px;">' + (meta.version || '1.0') + '</span></div>' +
-                '</div>' +
-            '</div>' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-                '<span style="font-size:14px;font-weight:600;">בחירת טבלאות לשחזור:</span>' +
-                '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--gray-500);cursor:pointer;">' +
-                    '<input type="checkbox" id="restoreSelectAll" checked onchange="document.querySelectorAll(\'.restore-table-cb\').forEach(function(cb){cb.checked=this.checked;});" style="accent-color:var(--primary-color);"> בחר הכל' +
-                '</label>' +
-            '</div>' +
-            '<div id="restoreTablesList" style="max-height:280px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:6px;margin-bottom:16px;">' +
-                tableCheckboxes +
-            '</div>' +
-            '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;">' +
-                '<p style="margin:0;font-size:13px;color:#991b1b;font-weight:500;">⚠️ אזהרה: הנתונים הנבחרים יוחלפו לחלוטין בנתוני הגיבוי. פעולה זו אינה ניתנת לביטול.</p>' +
-            '</div>' +
-            '<div id="restoreProgressArea" style="display:none;margin-bottom:16px;">' +
-                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
-                    '<span class="spinner-sm" style="display:inline-block;width:16px;height:16px;border:2px solid var(--primary-color);border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;flex-shrink:0;"></span>' +
-                    '<span id="restoreProgressText" style="font-size:13px;color:var(--gray-600);">משחזר נתונים...</span>' +
-                '</div>' +
-                '<div style="height:6px;background:var(--gray-200);border-radius:3px;overflow:hidden;">' +
-                    '<div id="restoreProgressBar" style="height:100%;background:var(--primary-color);border-radius:3px;width:0%;transition:width 0.3s ease;"></div>' +
-                '</div>' +
-            '</div>' +
-            '</div>';
-
-        showModal('🔄 שחזור מגיבוי', modalHtml,
-            '<button class="btn btn-primary" id="btnDoRestore" onclick="App._executeSelectiveRestore()">🔄 בצע שחזור</button>' +
-            '<button class="btn btn-outline" onclick="App.closeModal()" style="margin-right:8px;">ביטול</button>'
-        );
-
-        App._pendingRestoreData = data;
-    }
-
-    function _executeSelectiveRestore() {
-        var data = App._pendingRestoreData;
-        if (!data) return;
-        var checkboxes = document.querySelectorAll('.restore-table-cb:checked');
-        var selectedKeys = [];
-        checkboxes.forEach(function(cb) { selectedKeys.push(cb.value); });
-        if (selectedKeys.length === 0) { showToast('יש לבחר לפחות טבלה אחת', 'warning'); return; }
-
-        var btn = document.getElementById('btnDoRestore');
-        if (btn) { btn.disabled = true; btn.textContent = 'משחזר...'; }
-        var progressArea = document.getElementById('restoreProgressArea');
-        var progressBar = document.getElementById('restoreProgressBar');
-        var progressText = document.getElementById('restoreProgressText');
-        if (progressArea) progressArea.style.display = 'block';
-
-        var applied = 0;
-        var total = selectedKeys.length;
-
-        function processNext() {
-            if (applied >= total) {
-                if (progressBar) progressBar.style.width = '100%';
-                if (progressText) progressText.textContent = 'הושלם! ' + total + ' טבלאות שוחזרו בהצלחה.';
-                logActivity('restore_full', 'שחזור סלקטיבי (' + total + ' טבלאות)', 'settings');
-                showToast('✅ שחזור הושלם — ' + total + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success');
-                setTimeout(function() { window.location.reload(); }, 2000);
+            
+            // 🔑 בדיקה שיש שם פתרון
+            if (!solutionData.solutionName || solutionData.solutionName.trim() === '') {
+                skippedCount++;
+                console.warn('⚠️ שורה ' + (rowIdx + 2) + ' דולגה: חסר שם פתרון למידה', record);
                 return;
             }
-            var key = selectedKeys[applied];
-            if (progressText) progressText.textContent = 'משחזר: ' + (BACKUP_TABLE_META[key] || key) + ' (' + (applied + 1) + '/' + total + ')';
-            if (progressBar) progressBar.style.width = Math.round(((applied + 1) / total) * 100) + '%';
-            try { DataStore.saveAll(key, data[key]); } catch(e) { console.error('[Restore] Error restoring', key, e); }
-            applied++;
-            setTimeout(processNext, 80);
-        }
-        setTimeout(processNext, 100);
-    }
-
-    async function restoreFull() {
-        var fileInput = document.getElementById('fRestoreFullFile');
-        try {
-            var data = await _readBackupFile(fileInput);
-            if (!data.__backup_meta) { showToast('❌ קובץ הגיבוי אינו תקין – חסר metadata', 'error'); return; }
-            // שחזור מלא - משחזר את כל הטבלאות ללא בחירה
-            var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
-            confirmDialog('⚠️ שחזור מלא של ' + tablesInFile.length + ' טבלאות\\nהנתונים הקיימים יוחלפו לחלוטין. להמשיך?', function() {
-                var applied = 0;
-                tablesInFile.forEach(function(k) {
-                    try { DataStore.saveAll(k, data[k]); applied++; } catch(e) { console.error('[Restore] Error restoring', k, e); }
-                });
-                logActivity('restore_full', 'שחזור מלא (' + applied + ' טבלאות)', 'settings');
-                showToast('✅ שחזור מלא הושלם — ' + applied + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success');
-                setTimeout(function() { window.location.reload(); }, 1500);
+            
+            var existingSolutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+            var existingItem = existingSolutions.find(function(item) { 
+                return item.solutionName === solutionData.solutionName; 
             });
-            fileInput.value = '';
-        } catch (err) {
-            showToast('❌ ' + err, 'error');
-        }
-    }
-
-    async function restoreTable() {
-        var fileInput = document.getElementById('fRestoreTableFile');
-        var tableKey = document.getElementById('fRestoreTable').value;
-        if (!tableKey) { showToast('יש לבחר טבלה לשחזור', 'error'); return; }
-        try {
-            var data = await _readBackupFile(fileInput);
-            if (!data[tableKey] && !data.__backup_meta) { showToast('❌ הטבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' לא נמצאה בקובץ הגיבוי', 'error'); return; }
-            var count = Array.isArray(data[tableKey]) ? data[tableKey].length : (typeof data[tableKey] === 'object' ? Object.keys(data[tableKey]).length : 1);
-            confirmDialog('⚠️ שחזור טבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' (' + count + ' רשומות)\nהנתונים הקיימים בטבלה זו יוחלפו. להמשיך?', function() {
-                if (data[tableKey] !== undefined) {
-                    DataStore.saveAll(tableKey, data[tableKey]);
-                }
-                logActivity('restore_table', 'שחזור טבלה: ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' (' + count + ' רשומות)', 'settings');
-                showToast('✅ שחזור טבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' בוצע בהצלחה. מרענן...', 'success');
-                fileInput.value = '';
-                setTimeout(function() { window.location.reload(); }, 1500);
-            });
-        } catch (err) {
-            showToast('❌ ' + err, 'error');
-        }
-    }
-
-    function resetData() {
-        // פונקציה זו הוסרה - אין יותר נתוני הדגמה במערכת
-        console.warn('resetData() deprecated - demo data removed');
-    }
-
-    function clearData() {
-        const TABLES_TO_CLEAR = [
-            // טבלאות ערכים
-            'inspectors', 'pedagogical_executors', 'schools', 
-            'lookup_solution_status', 'lookup_education_stages', 'lookup_education_types',
-            'lookup_week_days', 'lookup_meeting_types', 'lookup_budget_types', 'lookup_field_knowledge',
-            'lookup_allocation_status', 'lookup_performer_types', 'lookup_lecturer_status',
-            'lookup_certified_lecturer', 'lookup_expert_field', 'lookup_domains',
-            'lookup_role_holders', 'lookup_broad_topics', 'lookup_designated_programs',
-            'lookup_responsibility_types',
-            // קטלוג פתרונות למידה
-            'solutions', 'solution_instructors', 'solution_comments', 'catalog_items',
-            // מאגר מרצים
-            'mentors',
-            // מאגר מדריכים
-            'guides_repo',
-            // שאלות נפוצות
-            'faq_data',
-            // יצירת דף חדש
-            'custom_pages',
-            // ניהול משתמשים
-            'users',
-            // תקציבים
-            'budgets',
-            // תקופות
-            'periods',
-            // נרשמים לפתרונות למידה
-            'registrations',
-            // מעקב והיסטוריה
-            'activity_log',
-            // סל מחזור
-            'recycle_bin'
-        ];
-        
-        showModal('⚠️ מחיקת כל הנתונים', 
-            '<div style="text-align:center;padding:12px 0;">' +
-            '<div style="font-size:48px;margin-bottom:12px;">⚠️</div>' +
-            '<p style="color:var(--danger);font-weight:600;font-size:15px;margin-bottom:8px;">פעולה בלתי הפיכה!</p>' +
-            '<p style="color:var(--gray-500);margin-bottom:16px;font-size:13px;">פעולה זו תמחק את כל הנתונים מהמערכת לצמיתות, כולל:</p>' +
-            '<div style="text-align:right;background:var(--gray-50);padding:12px;border-radius:8px;font-size:12px;color:var(--gray-600);max-height:200px;overflow-y:auto;">' +
-            '<strong>📋 רשימת הטבלאות שימחקו (' + TABLES_TO_CLEAR.length + '):</strong><br>' +
-            '• טבלאות ערכים (מפקחים, מבצעים, בתי ספר, שלבים, סוגים, ימים, מפגשים, סוגי תקציב, תחומי דעת, תקצוב, סטטוסים, מרצים, מומחים, תחומי דעת, בעלי תפקידים, נושאי רוחב, תוכניות ייעודיות, סוגי אחריות)<br>' +
-            '• קטלוג פתרונות למידה (כולל מדריכים ו הערות)<br>' +
-            '• מאגר מרצים<br>' +
-            '• מאגר מדריכים<br>' +
-            '• שאלות נפוצות ותשובות<br>' +
-            '• דפים מותאמים אישית<br>' +
-            '• משתמשים רשומים<br>' +
-            '• תקציבים ותקופות<br>' +
-            '• נרשמים לפתרונות<br>' +
-            '• יומן פעילות והיסטוריה<br>' +
-            '• סל מחזור' +
-            '</div>' +
-            '<div class="form-group" style="margin-top:16px;"><label>הזן סיסמת אישור</label><input type="password" id="fClearPass" class="form-input" placeholder="סיסמת אישור" style="text-align:center;font-size:16px;"></div>' +
-            '</div>',
-            '<button class="btn btn-danger" onclick="App._doClearAll()">🗑️ אישור מחיקה</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>'
-        );
-        setTimeout(function() { var el = document.getElementById('fClearPass'); if (el) el.focus(); }, 100);
-    }
-
-    function _doClearAll() {
-        var pass = document.getElementById('fClearPass').value;
-        if (pass !== 'Adan.3011$') {
-            showToast('סיסמת אישור שגויה!', 'error');
+            
+            if (existingItem) {
+                console.log('🔄 שורה ' + (rowIdx + 2) + ' עודכנה (כפולה): "' + solutionData.solutionName + '"');
+                DataStore.update(DataStore.KEYS.SOLUTIONS, existingItem.id, solutionData);
+                updatedCount++;
+            } else {
+                DataStore.create(DataStore.KEYS.SOLUTIONS, solutionData);
+                count++;
+            }
             return;
         }
-        closeModal();
-        confirmDialog('⚠️ למחוק את כל הנתונים לצמיתות? פעולה זו בלתי הפיכה!', function() {
-            // רשימה מלאה של כל הטבלאות למחיקה (למעט users - מטופל בנפרד)
-            const TABLES_TO_CLEAR = [
-                // טבלאות ערכים
-                'inspectors', 'pedagogical_executors', 'schools', 
-                'lookup_solution_status', 'lookup_education_stages', 'lookup_education_types',
-                'lookup_week_days', 'lookup_meeting_types', 'lookup_budget_types', 'lookup_field_knowledge',
-                'lookup_allocation_status', 'lookup_performer_types', 'lookup_lecturer_status',
-                'lookup_certified_lecturer', 'lookup_expert_field', 'lookup_domains',
-                'lookup_role_holders', 'lookup_broad_topics', 'lookup_designated_programs',
-                'lookup_responsibility_types', 'lookup_user_roles', 'lookup_schools',
-                // קטלוג פתרונות למידה
-                'solutions', 'solution_instructors', 'solution_comments', 'catalog_items', 'catalog_entries',
-                // מאגר מרצים
-                'mentors',
-                // מאגר מדריכים
-                'guides_repo',
-                // שאלות נפוצות
-                'faq_data',
-                // יצירת דף חדש
-                'custom_pages',
-                // קטגוריות
-                'categories',
-                // תקציבים ותקופות
-                'budgets', 'periods',
-                // נרשמים לפתרונות למידה
-                'registrations',
-                // מעקב והיסטוריה
-                'activity_log',
-                // סל מחזור
-                'recycle_bin',
-                // הגדרות ודף שער
-                'settings', 'homepage',
-                // מוסדות
-                'institutions', 'institutions_east_jerusalem'
-            ];
+        
+        // ============================================================
+        // שאר הטבלאות (טיפול רגיל)
+        // ============================================================
+        
+        // א. מבצעים פדגוגיים
+        if (actualType === 'pedagogical_executors' || targetStoreKey === DataStore.KEYS.PEDAGOGICAL_EXECUTORS) {
+            var execData = {
+                companyNumber: record.companyNumber || '',
+                institutionName: record.institutionName || '',
+                groupName: record.groupName || '',
+                hourlyCost: parseFloat(String(record.hourlyCost || '').replace(/[^\d.-]/g, '')) || 0,
+                notes: record.notes || ''
+            };
+            if (!execData.institutionName && !execData.companyNumber) { skippedCount++; return; }
             
-            let totalDeleted = 0;
-            
-            // שלב 1: ניקוי מיידי של localStorage - זה חייב להצליח
-            TABLES_TO_CLEAR.forEach(function(key) {
-                var storeKey = 'matspanet_' + key;
-                var data = localStorage.getItem(storeKey);
-                if (data) {
-                    try {
-                        var parsed = JSON.parse(data);
-                        var count = Array.isArray(parsed) ? parsed.length : (typeof parsed === 'object' && parsed !== null ? Object.keys(parsed).length : 0);
-                        totalDeleted += count;
-                    } catch(e) {
-                        totalDeleted += 0;
-                    }
-                    localStorage.removeItem(storeKey);
-                }
+            var existingExecs = DataStore.getAll(DataStore.KEYS.PEDAGOGICAL_EXECUTORS) || [];
+            var existingExec = existingExecs.find(function(e) { 
+                return e.companyNumber === execData.companyNumber || e.institutionName === execData.institutionName; 
             });
             
-            // שלב 2: שמירת מערכים ריקים בשרת לכל הטבלאות (fire-and-forget)
-            TABLES_TO_CLEAR.forEach(function(key) {
-                try {
-                    DataStore.saveAll(key, []);
-                } catch(e) {
-                    // מתעלמים משגיאות שמירה לשרת - הנתונים כבר נמחקו מ-localStorage
-                }
-            });
-            
-            // שלב 3: טיפול מיוחד ב-users.json - שמירה על משתמש admin בלבד
-            try {
-                var usersData = localStorage.getItem('matspanet_users');
-                if (usersData) {
-                    try {
-                        var users = JSON.parse(usersData);
-                        var adminUser = users.find(function(u) { return u.username === 'admin'; });
-                        // אם אין admin, ניצור אחד ברירת מחדל
-                        if (!adminUser) {
-                            adminUser = {
-                                id: 'usr_admin_001',
-                                username: 'admin',
-                                password: 'admin123',
-                                fullName: 'מנהל מערכת',
-                                email: 'admin@matspanet.co.il',
-                                role: 'system_admin',
-                                isActive: true,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString()
-                            };
-                        }
-                        // נשמור רק את ה-admin
-                        DataStore.saveAll('users', [adminUser]);
-                        totalDeleted += (users.length - 1); // נחסיר את ה-admin מהספירה
-                    } catch(e) {
-                        // אם יש שגיאה, נשמור admin ברירת מחדל
-                        DataStore.saveAll('users', [{
-                            id: 'usr_admin_001',
-                            username: 'admin',
-                            password: 'admin123',
-                            fullName: 'מנהל מערכת',
-                            email: 'admin@matspanet.co.il',
-                            role: 'system_admin',
-                            isActive: true,
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        }]);
-                    }
-                }
-            } catch(e) {
-                // מתעלמים משגיאות בטיפול ב-users
-            }
-            
-            logActivity('clear_all', 'נקה הכל - נמחקו ' + totalDeleted + ' רשומות מ-' + (TABLES_TO_CLEAR.length + 1) + ' טבלאות', 'settings');
-            showToast('הכל נמחק! ' + totalDeleted + ' רשומות נמחקו. משתמש admin נשמר. מרענן...', 'success');
-            setTimeout(function() { window.location.reload(); }, 1500);
-        });
-    }
-
-
-    function resetUserPassword(id) {
-        confirmDialog('לאפס את סיסמת המשתמש ל-1234?', function() {
-            const result = DataStore.update(DataStore.KEYS.USERS, id, { password: '1234' });
-            if (result) {
-                showToast('הסיסמה אופסה בהצלחה ל-1234', 'success');
-                renderGuides();
+            if (existingExec) {
+                DataStore.update(DataStore.KEYS.PEDAGOGICAL_EXECUTORS, existingExec.id, execData);
+                updatedCount++;
             } else {
-                showToast('שגיאה: המשתמש לא נמצא', 'error');
+                DataStore.create(DataStore.KEYS.PEDAGOGICAL_EXECUTORS, execData);
+                count++;
             }
+            return;
+        }
+        
+        // ב. בתי ספר
+        if (actualType === 'schools' || targetStoreKey === DataStore.KEYS.LOOKUP_SCHOOLS) {
+            var schoolData = {
+                code: record.code || '',
+                name: record.name || '',
+                legalStatus: record.legalStatus || '',
+                educationType: record.educationType || '',
+                educationStage: record.educationStage || '',
+                principalName: record.principalName || '',
+                inspectorName: record.inspectorName || '',
+                isActive: true
+            };
+            if (!schoolData.code) { skippedCount++; return; }
+            
+            var existingSchools = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
+            var existingSchool = existingSchools.find(function(s) { return s.code === schoolData.code; });
+            
+            if (existingSchool) {
+                DataStore.update(DataStore.KEYS.LOOKUP_SCHOOLS, existingSchool.id, schoolData);
+                updatedCount++;
+            } else {
+                DataStore.create(DataStore.KEYS.LOOKUP_SCHOOLS, schoolData);
+                count++;
+            }
+            return;
+        }
+        
+        // ג. שאלות נפוצות (FAQ)
+        if (actualType === 'faq' || targetStoreKey === DataStore.KEYS.FAQ_DATA) {
+            var faqData = {
+                titleHe: record.titleHe || '',
+                titleAr: record.titleAr || '',
+                answerHe: record.answerHe || '',
+                answerAr: record.answerAr || '',
+                order: parseInt(record.order) || 0
+            };
+            if (!faqData.titleHe && !faqData.titleAr) { skippedCount++; return; }
+            
+            var existingFaqs = DataStore.getAll(DataStore.KEYS.FAQ_DATA) || [];
+            var existingFaq = existingFaqs.find(function(f) { 
+                return (faqData.titleHe && f.titleHe === faqData.titleHe) || 
+                       (faqData.titleAr && f.titleAr === faqData.titleAr); 
+            });
+            
+            if (existingFaq) {
+                if (faqData.titleHe) existingFaq.titleHe = faqData.titleHe;
+                if (faqData.titleAr) existingFaq.titleAr = faqData.titleAr;
+                if (faqData.answerHe) existingFaq.answerHe = faqData.answerHe;
+                if (faqData.answerAr) existingFaq.answerAr = faqData.answerAr;
+                if (faqData.order) existingFaq.order = faqData.order;
+                DataStore.update(DataStore.KEYS.FAQ_DATA, existingFaq.id, existingFaq);
+                updatedCount++;
+            } else {
+                if (!faqData.order) {
+                    var maxOrder = existingFaqs.reduce(function(max, f) { return Math.max(max, f.order || 0); }, 0);
+                    faqData.order = maxOrder + 1;
+                }
+                DataStore.create(DataStore.KEYS.FAQ_DATA, faqData);
+                count++;
+            }
+            return;
+        }
+        
+        // ד. שאר טבלאות הערכים (Lookup Tables)
+        if (targetStoreKey && targetStoreKey.startsWith('lookup_')) {
+            var lookupData = {
+                value: record.value || '',
+                label: record.label || '',
+                labelAr: record.labelAr || '',
+                isActive: true
+            };
+            if (!lookupData.value && !lookupData.label) { skippedCount++; return; }
+            
+            var existingItems = DataStore.getAll(targetStoreKey) || [];
+            var existingItem = existingItems.find(function(item) { 
+                return String(item.value || '').trim() === String(lookupData.value || '').trim(); 
+            });
+            
+            if (existingItem) {
+                DataStore.update(targetStoreKey, existingItem.id, lookupData);
+                updatedCount++;
+            } else {
+                DataStore.create(targetStoreKey, lookupData);
+                count++;
+            }
+            return;
+        }
+    }); // סוף לולאת השורות
+    
+    // 6. הצגת סיכום
+    closeModal();
+    var regularMsg = count + ' רשומות חדשות נוספו';
+    if (updatedCount > 0) regularMsg += ', ' + updatedCount + ' רשומות קיימות עודכנו';
+    if (skippedCount > 0) regularMsg += ', ' + skippedCount + ' רשומות דולגו (חסר נתון חובה)';
+    
+    showToast(regularMsg, skippedCount > 0 ? 'warning' : 'success');
+    importWizardData = { type: null, headers: [], rows: [], mappings: {} };
+    
+    // רענון התצוגה המתאימה
+    if (actualType === 'solutions' && typeof renderSolutions === 'function') renderSolutions();
+    else if (typeof renderLookupTables === 'function') renderLookupTables();
+}
+
+// 🔑 פונקציה להורדת דו"ח רשומות שדולגו
+function _downloadSkippedReport() {
+    if (!window._lastSkippedRows || window._lastSkippedRows.length === 0) {
+        showToast('אין רשומות שדולגו להורדה', 'info');
+        return;
+    }
+    
+    var csv = '\uFEFF'; // UTF-8 BOM
+    csv += 'שורה,סיבה,נתונים\n';
+    
+    window._lastSkippedRows.forEach(function(skipped) {
+        var dataStr = JSON.stringify(skipped.data).replace(/"/g, '""');
+        csv += '"' + skipped.rowNum + '","' + skipped.reason.replace(/"/g, '""') + '","' + dataStr + '"\n';
+    });
+    
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'רשומות_שדולגו_' + new Date().toISOString().split('T')[0] + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showToast('הדו"ח הורד בהצלחה', 'success');
+}
+
+
+// ================================================================
+// פונקציית עזר: רענון התצוגה אחרי ייבוא
+// ================================================================
+function _refreshViewAfterImport(wizardType) {
+    try {
+        if (wizardType === 'mentors' || wizardType === 'instructors') {
+            if (typeof renderMentors === 'function') renderMentors();
+        } else if (wizardType === 'guides_repo') {
+            if (typeof renderGuidesRepo === 'function') renderGuidesRepo();
+        } else if (wizardType === 'budgets') {
+            if (typeof renderBudgets === 'function') renderBudgets();
+        } else if (wizardType === 'users') {
+            if (typeof renderGuides === 'function') renderGuides();
+        } else if (wizardType === 'faq') {
+            if (typeof renderFAQ === 'function') renderFAQ();
+        } else if (wizardType === 'solutions') {
+            if (typeof renderSolutions === 'function') renderSolutions();
+        } else if (wizardType === 'catalog_entries') {
+            if (typeof renderCatalog === 'function') renderCatalog();
+        } else if (wizardType === 'schools' || wizardType === 'pedagogical_executors' || wizardType.startsWith('lookup_')) {
+            if (typeof renderLookupTables === 'function') renderLookupTables();
+        }
+    } catch (e) {
+        console.warn('שגיאה ברענון תצוגה אחרי ייבוא:', e);
+    }
+}
+
+// פונקציה חדשה לייבוא מדורג של מרצים
+function _executeChunkedMentorsImport(fieldMappings, rows) {
+    var batchSize = 100;
+    var totalRows = rows.length;
+    var totalBatches = Math.ceil(totalRows / batchSize);
+    var currentBatch = 0;
+    var newCount = 0;
+    var updatedCount = 0;
+    var errorCount = 0;
+    
+    // Get existing mentors from localStorage
+    var allMentors = [];
+    try {
+        var stored = localStorage.getItem('matspanet_mentors');
+        if (stored) {
+            allMentors = JSON.parse(stored);
+        }
+    } catch(e) {
+        console.error('[ChunkedImport] Error loading existing mentors:', e);
+    }
+    
+    // Build id map
+    var mentorIdMap = {};
+    allMentors.forEach(function(m) {
+        if (m.idNumber) mentorIdMap[m.idNumber] = m.id;
+    });
+    
+    // Show progress modal
+    closeModal();
+    var progressHtml = '<div style="text-align:center;direction:rtl;">';
+    progressHtml += '<div style="font-size:48px;margin-bottom:12px;">⏳</div>';
+    progressHtml += '<div id="chunked_import_status" style="font-weight:600;font-size:15px;margin-bottom:16px;">מכין ייבוא...</div>';
+    progressHtml += '<div style="background:var(--gray-200);border-radius:10px;height:24px;overflow:hidden;margin-bottom:10px;">';
+    progressHtml += '<div id="chunked_import_bar" style="background:var(--primary-color);height:100%;width:0%;border-radius:10px;transition:width 0.3s ease;"></div>';
+    progressHtml += '</div>';
+    progressHtml += '<div id="chunked_import_detail" style="font-size:12px;color:var(--gray-500);">0 / ' + totalRows + ' רשומות</div>';
+    progressHtml += '</div>';
+    showModal('ייבוא מדורג — מאגר מרצים', progressHtml, '', true);
+    
+    function processBatch() {
+        var startIdx = currentBatch * batchSize;
+        var endIdx = Math.min(startIdx + batchSize, totalRows);
+        var batchRows = rows.slice(startIdx, endIdx);
+        
+        // Update progress
+        var progress = Math.round((startIdx / totalRows) * 100);
+        var bar = document.getElementById('chunked_import_bar');
+        var status = document.getElementById('chunked_import_status');
+        var detail = document.getElementById('chunked_import_detail');
+        
+        if (bar) bar.style.width = progress + '%';
+        if (status) status.textContent = 'מעבד batch ' + (currentBatch + 1) + ' מתוך ' + totalBatches + '...';
+        if (detail) detail.textContent = startIdx + ' / ' + totalRows + ' רשומות';
+        
+        // Process batch
+        batchRows.forEach(function(rowValues) {
+            try {
+                var record = {};
+                fieldMappings.forEach(function(fm) {
+                    if (fm.colIdx < rowValues.length) {
+                        record[fm.fieldKey] = String(rowValues[fm.colIdx] || '').trim();
+                    }
+                });
+                
+                if (record.idNumber) record.idNumber = record.idNumber.replace(/^\$+/, '');
+                if (record.phone) record.phone = record.phone.replace(/^\$+/, '');
+                
+                var idNumber = record.idNumber || '';
+                if (!idNumber) {
+                    errorCount++;
+                    return;
+                }
+                
+                // Check if exists
+                var existingId = mentorIdMap[idNumber];
+                if (existingId) {
+                    // Update
+                    var idx = allMentors.findIndex(function(m) { return m.id === existingId; });
+                    if (idx >= 0) {
+                        allMentors[idx] = Object.assign({}, allMentors[idx], record, { updatedAt: new Date().toISOString() });
+                    }
+                    updatedCount++;
+                } else {
+                    // Create
+                    var newId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+                    var newMentor = Object.assign({}, record, {
+                        id: newId,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    });
+                    allMentors.push(newMentor);
+                    mentorIdMap[idNumber] = newId;
+                    newCount++;
+                }
+            } catch(err) {
+                errorCount++;
+                console.error('[ChunkedImport] Error in row', startIdx, err);
+            }
+        });
+        
+        // Sync to server (without saving to localStorage)
+        _syncBatchToServer('mentors.json', allMentors);
+        
+        // Move to next batch
+        currentBatch++;
+        
+        if (currentBatch < totalBatches) {
+            // Schedule next batch with delay to let browser breathe
+            setTimeout(processBatch, 50);
+        } else {
+            // Import complete
+            _onChunkedImportComplete(newCount, updatedCount, errorCount);
+        }
+    }
+    
+    // Start first batch
+    setTimeout(processBatch, 100);
+}
+
+// פונקציה לסנכרון batch לשרת
+function _syncBatchToServer(filename, data) {
+    var pathParts = window.location.pathname.split('/');
+    pathParts.pop();
+    var basePath = pathParts.join('/') + '/';
+    var url = basePath + 'api/data-save.php';
+    
+    try {
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: filename, data: data })
+        }).catch(function(err) {
+            console.warn('[ChunkedImport] Sync error:', err);
+        });
+    } catch(e) {
+        console.warn('[ChunkedImport] Sync error:', e);
+    }
+}
+
+// פונקציה לסיום הייבוא
+function _onChunkedImportComplete(newCount, updatedCount, errorCount) {
+    closeModal();
+    
+    var html = '<div style="direction:rtl;text-align:right;">';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">';
+    html += '<div style="padding:16px;background:var(--success-bg);border-radius:8px;text-align:center;">';
+    html += '<div style="font-size:28px;font-weight:700;color:var(--success);">' + newCount + '</div>';
+    html += '<div style="font-size:13px;color:var(--gray-600);">רשומות חדשות</div>';
+    html += '</div>';
+    html += '<div style="padding:16px;background:var(--info-bg);border-radius:8px;text-align:center;">';
+    html += '<div style="font-size:28px;font-weight:700;color:var(--info);">' + updatedCount + '</div>';
+    html += '<div style="font-size:13px;color:var(--gray-600);">רשומות עודכנו</div>';
+    html += '</div>';
+    html += '<div style="padding:16px;background:var(--warning-bg);border-radius:8px;text-align:center;">';
+    html += '<div style="font-size:28px;font-weight:700;color:var(--warning);">' + errorCount + '</div>';
+    html += '<div style="font-size:13px;color:var(--gray-600);">שגיאות</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '<p style="text-align:center;font-size:14px;color:var(--gray-600);">הייבוא הושלם. הדף ירוענן אוטומטית בעוד 2 שניות...</p>';
+    html += '</div>';
+    
+    showModal('✅ ייבוא הושלם בהצלחה!', html, '<button class="btn btn-primary" onclick="window.location.reload()">רענון ידני</button>');
+    
+	// 🔑 תיקון: רענון מקומי ששומר את הטאב הפעיל
+	setTimeout(function() {
+		try {
+			sessionStorage.setItem('matspanet_last_section', currentSection);
+			if (typeof window._activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+			}
+		} catch(e) {}
+		
+		// רענון מקומי במקום רענון מלא
+		if (currentSection === 'lookup-tables') {
+			renderLookupTables();
+		} else if (currentSection === 'instructors') {
+			renderMentors();
+		} else if (currentSection === 'guides-repo') {
+			renderGuidesRepo();
+		} else {
+			showSection(currentSection);
+		}
+	}, 1500);
+}
+
+
+function _importMentorsBatched() {
+    var rows = importWizardData.rows;
+    var fields = IMPORT_FIELD_MAPS['mentors'];
+    
+    var fieldMappings = [];
+    fields.forEach(function(f, fi) {
+        var sel = document.getElementById('import_field_' + fi);
+        if (sel && sel.value !== '') {
+            fieldMappings.push({ fieldKey: f.key, colIdx: parseInt(sel.value) });
+        }
+    });
+
+    closeModal();
+    
+    showModal('ייבוא מרצים', 
+        '<div style="text-align:center;padding:20px;">' +
+        '<div style="font-size:48px;margin-bottom:12px;">⏳</div>' +
+        '<div id="batch_status" style="font-weight:600;margin-bottom:12px;">מכין ייבוא...</div>' +
+        '<div style="background:var(--gray-200);border-radius:10px;height:24px;overflow:hidden;">' +
+        '<div id="batch_bar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>' +
+        '</div>' +
+        '<div id="batch_detail" style="font-size:12px;color:var(--gray-500);margin-top:8px;">0 / ' + rows.length + '</div>' +
+        '</div>', 
+        '<button class="btn btn-outline" onclick="window._cancelMentorImport=true;">ביטול</button>', true
+    );
+
+    var batchSize = 500; // מעבד 500 רשומות בכל מחזור כדי לאפשר לדפדפן "לנשום"
+    var totalBatches = Math.ceil(rows.length / batchSize);
+    var currentBatch = 0;
+    var newCount = 0;
+    var updatedCount = 0;
+    window._cancelMentorImport = false;
+
+    var existingMentors = DataStore.getAll(DataStore.KEYS.MENTORS) || [];
+    var mentorMap = {};
+    existingMentors.forEach(function(m, idx) {
+        if (m.idNumber) mentorMap[m.idNumber] = idx;
+    });
+
+    function processNextBatch() {
+        if (window._cancelMentorImport) {
+            _finishMentorImport(newCount, updatedCount, true);
+            return;
+        }
+
+        var startIdx = currentBatch * batchSize;
+        var endIdx = Math.min(startIdx + batchSize, rows.length);
+        
+        for (var i = startIdx; i < endIdx; i++) {
+            var row = rows[i];
+            var record = {};
+            fieldMappings.forEach(function(fm) {
+                if (fm.colIdx < row.length) {
+                    var val = row[fm.colIdx];
+                    record[fm.fieldKey] = val ? String(val).trim() : '';
+                }
+            });
+
+            var idNum = record.idNumber ? record.idNumber.replace(/^\$+/, '') : '';
+            if (!idNum) continue;
+            record.phone = record.phone ? record.phone.replace(/^\$+/, '') : '';
+
+            var existingIdx = mentorMap[idNum];
+            if (existingIdx !== undefined) {
+                var existing = existingMentors[existingIdx];
+                var changed = false;
+                ['fullNameHe', 'fullNameAr', 'phone', 'email', 'isCertifiedLecturer', 'expertInField', 'lecturerStatus'].forEach(function(key) {
+                    var oldVal = (existing[key] || '').toString().trim();
+                    var newVal = (record[key] || '').toString().trim();
+                    if (oldVal !== newVal) {
+                        existing[key] = newVal;
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    existing.updatedAt = new Date().toISOString();
+                    updatedCount++;
+                }
+            } else {
+                var newMentor = {
+                    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
+                    idNumber: idNum,
+                    fullNameHe: record.fullNameHe || '',
+                    fullNameAr: record.fullNameAr || '',
+                    phone: record.phone || '',
+                    email: record.email || '',
+                    isCertifiedLecturer: record.isCertifiedLecturer || '',
+                    expertInField: record.expertInField || '',
+                    lecturerStatus: record.lecturerStatus || '',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                existingMentors.push(newMentor);
+                mentorMap[idNum] = existingMentors.length - 1;
+                newCount++;
+            }
+        }
+
+        // שמירה ל-localStorage וסנכרון לשרת פעם אחת בלבד לכל 500 רשומות (במקום 18,000 פעמים!)
+        try {
+            DataStore.saveAll(DataStore.KEYS.MENTORS, existingMentors);
+        } catch (e) {
+            console.error('Batch save failed:', e);
+        }
+
+        currentBatch++;
+        var pct = Math.round((currentBatch / totalBatches) * 100);
+        var processed = Math.min(currentBatch * batchSize, rows.length);
+
+        var bar = document.getElementById('batch_bar');
+        var status = document.getElementById('batch_status');
+        var detail = document.getElementById('batch_detail');
+        if (bar) bar.style.width = pct + '%';
+        if (status) status.textContent = 'מעבד מחזור ' + currentBatch + ' מתוך ' + totalBatches + '...';
+        if (detail) detail.textContent = processed + ' / ' + rows.length + ' רשומות';
+
+        if (currentBatch < totalBatches) {
+            setTimeout(processNextBatch, 50); // השהיה קצרה למניעת קריסת הדפדפן
+        } else {
+            _finishMentorImport(newCount, updatedCount, false);
+        }
+    }
+
+    setTimeout(processNextBatch, 100);
+}
+
+function _finishMentorImport(newCount, updatedCount, cancelled) {
+    importWizardData = { type: null, headers: [], rows: [], mappings: {} };
+    var msg = cancelled ? 'הייבוא בוטל. ' : '';
+    msg += newCount + ' רשומות חדשות נוספו, ' + updatedCount + ' רשומות קיימות עודכנו.';
+    
+    closeModal();
+    showToast(msg, cancelled ? 'warning' : 'success');
+    renderMentors();
+}
+
+
+// Excel export for מדריכים
+function exportExcelGuides() {
+    const items = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
+    if (!items.length) { showToast('אין נתונים', 'warning'); return; }
+    if (typeof XLSX === 'undefined') { showToast('ספריית XLSX לא נטענה', 'error'); return; }
+    const data = items.map(g => ({
+        'ת.ז.': g.idNumber || '',
+        'שם מלא (עברית)': g.fullName || '',
+        'שם מלא (ערבית)': g.fullNameAr || '',
+        'תפקיד': g.position || '',
+        'טלפון': g.phone || '',
+        'דוא"ל': g.email || '',
+        'תחומי התמחות': g.specializations || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'מדריכים');
+    XLSX.writeFile(wb, `matspanet_guides_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('יוצא בהצלחה', 'success');
+}
+
+// Rich Text comment modal
+function openCommentModal(solutionId) {
+    const comments = (DataStore.getAll(DataStore.KEYS.SOLUTION_COMMENTS) || []).filter(c => c.solutionId === solutionId);
+    const solution = DataStore.getById(DataStore.KEYS.SOLUTIONS, solutionId);
+    let commentsHtml = '';
+    if (comments.length === 0) {
+        commentsHtml = '<p style="color:var(--gray-400);text-align:center;padding:20px;">אין תגובות עדיין</p>';
+    } else {
+        commentsHtml = comments.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0)).map(c => {
+            return `<div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong style="font-size:13px;">${c.authorName || 'משתמש'}</strong>
+                    <span style="font-size:11px;color:var(--gray-400);">${formatDate(c.createdAt)}</span>
+                </div>
+                <div style="font-size:14px;line-height:1.6;">${c.content || ''}</div>
+                <div style="margin-top:6px;text-align:left;"><button class="btn btn-danger btn-sm" onclick="App.deleteComment('${c.id}','${solutionId}')">🗑️</button></div>
+            </div>`;
+        }).join('');
+    }
+    showModal('💬 תגובות' + (solution ? ' - ' + solution.name : ''), `
+        <div style="max-height:300px;overflow-y:auto;margin-bottom:12px;" id="commentsListDiv">${commentsHtml}</div>
+        <div style="border-top:1px solid var(--gray-200);padding-top:12px;">
+            <div style="display:flex;gap:4px;margin-bottom:8px;padding:6px;background:var(--gray-50);border-radius:6px;">
+                <button class="btn btn-outline btn-sm" onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
+                <button class="btn btn-outline btn-sm" onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
+                <button class="btn btn-outline btn-sm" onclick="document.execCommand('underline')" title="Underline"><u>U</u></button>
+                <button class="btn btn-outline btn-sm" onclick="document.execCommand('insertUnorderedList')" title="List">•</button>
+            </div>
+            <div id="commentEditor" contenteditable="true" style="min-height:80px;max-height:150px;overflow-y:auto;border:1px solid var(--gray-300);border-radius:6px;padding:10px;font-size:14px;line-height:1.6;" data-placeholder="כתוב תגובה..."></div>
+        </div>`,
+    `<button class="btn btn-primary" onclick="App.saveComment('${solutionId}')">💬 שלח תגובה</button><button class="btn btn-outline" onclick="App.closeModal()">סגור</button>`);
+}
+function saveComment(solutionId) {
+    const editor = document.getElementById('commentEditor');
+    const content = editor ? editor.innerHTML.trim() : '';
+    if (!content) { showToast('יש לכתוב תגובה', 'error'); return; }
+    DataStore.create(DataStore.KEYS.SOLUTION_COMMENTS, {
+        solutionId: solutionId,
+        content: content,
+        authorName: currentUser.fullName,
+        createdBy: currentUser.id,
+        createdAt: new Date().toISOString()
+    });
+    showToast('התגובה נוספה', 'success');
+    openCommentModal(solutionId);
+}
+function deleteComment(commentId, solutionId) {
+    _moveToRecycleBin(DataStore.KEYS.SOLUTION_COMMENTS, commentId);
+    showToast('התגובה נמחקה', 'success');
+    openCommentModal(solutionId);
+}
+
+function importJSON(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var data = JSON.parse(e.target.result);
+            if (data.__backup_meta) {
+                App._pendingRestoreData = data;
+                confirmDialog('⚠️ נמצא קובץ גיבוי עם ' + Object.keys(data).filter(function(k){return k!=='__backup_meta';}).length + ' טבלאות\nהאם לבצע שחזור מלא של כל הטבלאות?', function() {
+                    var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
+                    var applied = 0;
+                    tablesInFile.forEach(function(k) {
+                        try { DataStore.saveAll(k, data[k]); applied++; } catch(e) { console.error('[Import] Error restoring', k, e); }
+                    });
+                    logActivity('restore_full', 'ייבוא גיבוי (' + applied + ' טבלאות)', 'settings');
+                    showToast('✅ ייבוא הושלם — ' + applied + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success');
+                    setTimeout(function() { window.location.reload(); }, 1500);
+                });
+            } else {
+				// 🔑 שמירת הטאב הפעיל לפני רענון
+				try {
+					sessionStorage.setItem('matspanet_last_section', currentSection);
+					if (typeof window._activeLookupTabIndex !== 'undefined') {
+						sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+					} else if (typeof _activeLookupTabIndex !== 'undefined') {
+						sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex);
+					}
+				} catch(e) {}
+                DataStore.importData(data, true);
+                showToast('הנתונים יובאו! מרענן...', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        }
+        catch(err) { showToast('שגיאה בקריאת JSON: ' + err.message, 'error'); }
+    };
+    reader.readAsText(file); input.value = '';
+}
+
+// ================================================================
+//  REGISTRATIONS (רישומים)
+// ================================================================
+let _regSortField = 'createdAt';
+let _regSortDir = 'desc';
+function renderRegistrations() {
+    let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+    const visibleSolIds = _getGuideVisibleSolutionIds();
+    if (visibleSolIds !== null) { items = items.filter(r => visibleSolIds.includes(r.solutionId)); }
+    const totalCount = items.length;
+    const canFull = _canFullSection('registrations');
+    document.getElementById('section-registrations').innerHTML = `
+        ${_lookupTableHeader('נרשמים לפתרונות למידה', totalCount, '👥')}
+        <div class="card"><div class="card-body">
+            <div class="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--gray-50);border-radius:var(--border-radius);border:1px solid var(--gray-100);">
+                ${canFull ? `<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">📥 ייבוא<input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="App.startImport('registrations',this)"></label>` : ''}
+                <button class="btn btn-outline btn-sm" onclick="App.exportCSV('registrations')">📤 ייצוא CSV</button>
+                <button class="btn btn-outline btn-sm" onclick="App._exportRegistrationsExcel()">📊 Excel</button>
+                <button class="btn btn-outline btn-sm" onclick="App.printSection()">🖨️ הדפסה</button>
+                <button class="btn btn-outline btn-sm" style="color:#25D366;border-color:#25D366;" onclick="App._openWhatsAppModal()">💬 שליחת WhatsApp</button>
+                ${canFull ? '<button class="btn btn-primary btn-sm" onclick="App._addRegistrationManual()">➕ הוספה</button>' : ''}
+                ${canFull ? `<button class="btn btn-danger btn-sm" onclick="App.clearAllRegistrations()">🗑️ מחיקה גורפת</button>` : ''}
+            </div>
+            <div class="toolbar">
+                <input type="text" class="search-input" id="regSearch" placeholder="🔍 חיפוש חופשי לפי שם, טלפון, דוא\"ל, פתרון למידה..." oninput="App.filterRegistrations()">
+                <select class="filter-select" id="regSortF" onchange="App._sortRegistrations()">
+                    <option value="createdAt" ${_regSortField==='createdAt'?'selected':''}>מיון לפי תאריך</option>
+                    <option value="fullName" ${_regSortField==='fullName'?'selected':''}>מיון לפי שם</option>
+                    <option value="solutionName" ${_regSortField==='solutionName'?'selected':''}>מיון לפי פתרון</option>
+                </select>
+                <button class="btn btn-outline btn-sm" onclick="App._toggleRegSortDir()">${_regSortDir === 'desc' ? '↓ יורד' : '↑ עולה'}</button>
+                ${_colVisBtnHtml('registrations')}
+            </div>
+            <div id="regTableDiv">${_renderRegTable(items)}</div>
+        </div></div>`;
+    _applyTableFeatures('registrations');
+}
+
+function _addRegistrationManual() {
+    // 1. שליפת רשימת התפקידים (שנה את המפתח אם הוא שונה אצלך, למשל LOOKUP_POSITIONS)
+    const roles = DataStore.getAll(DataStore.KEYS.LOOKUP_ROLE_HOLDERS) || [];
+    const roleOpts = roles.map(r => `<option value="${escAttr(r.label)}">${escAttr(r.label)}</option>`).join('');
+
+    // 2. בניית ה-HTML של הטופס
+    const html = `
+        <div class="form-grid">
+            <div class="form-group"><label>שם מלא *</label><input type="text" id="fRegAddName" class="form-input" required></div>
+            <div class="form-group"><label>טלפון *</label><input type="text" id="fRegAddPhone" class="form-input" required></div>
+            <div class="form-group"><label>דוא"ל *</label><input type="email" id="fRegAddEmail" class="form-input" required></div>
+            <div class="form-group"><label>תפקיד *</label>
+                <select id="fRegAddRole" class="form-select" required>
+                    <option value="">-- בחר תפקיד --</option>
+                    ${roleOpts}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:16px;">
+            <label>מוסד (סמל מוסד) - הקלד לחיפוש והוסף כתגית *</label>
+            <div class="inst-autocomplete-wrapper" id="regInstWrapper">
+                <div id="regInstTags"></div>
+                <input type="text" id="regInstSearch" class="form-input" placeholder="🔍 הקלד סמל מוסד או שם..." autocomplete="off">
+            </div>
+            <div id="regInstDropdown" class="inst-autocomplete-dropdown"></div>
+        </div>
+
+        <div class="form-group" style="margin-top:16px;">
+            <label>פתרון למידה - הקלד לחיפוש והוסף כתגית *</label>
+            <div class="inst-autocomplete-wrapper" id="regSolWrapper">
+                <div id="regSolTags"></div>
+                <input type="text" id="regSolSearch" class="form-input" placeholder="🔍 הקלד שם או סמל פתרון..." autocomplete="off">
+            </div>
+            <div id="regSolDropdown" class="inst-autocomplete-dropdown"></div>
+        </div>
+    `;
+
+    // 3. הצגת המודאל
+    showModal('➕ הוספת נרשם ידני', html,
+        `<button class="btn btn-primary" onclick="App._saveManualRegistration()">💾 שמור נרשם</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`
+    );
+
+    // 4. אתחול מערכות החיפוש האוטומטי לאחר שהמודאל נטען ל-DOM
+    setTimeout(() => App._initRegAutocomplete(), 100);
+}
+
+function _initRegAutocomplete() {
+    const schools = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
+    const solutions = _getVisibleSolutions() || [];
+
+    // משתנים גלובליים זמניים לשמירת הבחירות
+    window._regManualSelectedSchools = [];
+    window._regManualSelectedSolutions = [];
+
+    // ==========================================
+    // לוגיקה למוסדות (סמל מוסד + שם מוסד)
+    // ==========================================
+    const instSearch = document.getElementById('regInstSearch');
+    const instTags = document.getElementById('regInstTags');
+    const instDropdown = document.getElementById('regInstDropdown');
+
+    if (instSearch) {
+        instSearch.addEventListener('input', function() {
+            const q = this.value.trim().toLowerCase();
+            if (q.length < 2) { instDropdown.style.display = 'none'; return; }
+
+            const matches = schools.filter(s =>
+                (s.code && s.code.toString().toLowerCase().includes(q)) ||
+                (s.name && s.name.toLowerCase().includes(q))
+            ).slice(0, 8);
+
+            if (matches.length) {
+                instDropdown.innerHTML = matches.map(s => `
+                    <div class="inst-suggestion-item" data-code="${s.code}" data-name="${s.name}">
+                        <div class="inst-sug-header">
+                            <span class="inst-sug-code">${s.code}</span>
+                            <span class="inst-sug-name">${s.name}</span>
+                        </div>
+                    </div>
+                `).join('');
+                instDropdown.style.display = 'block';
+            } else {
+                instDropdown.style.display = 'none';
+            }
+        });
+
+        instDropdown.addEventListener('click', function(e) {
+            const item = e.target.closest('.inst-suggestion-item');
+            if (!item) return;
+            const code = item.dataset.code;
+            const name = item.dataset.name;
+            
+            // הוספה רק אם לא קיים כבר
+            if (!window._regManualSelectedSchools.find(s => s.code === code)) {
+                window._regManualSelectedSchools.push({ code, name });
+                _renderRegInstTags();
+            }
+            instSearch.value = '';
+            instDropdown.style.display = 'none';
         });
     }
 
-    // ============ CUSTOM PAGES ============
-    var _cpEditorInit = false;
-    var _cpCurrentEditId = null;
-    function _cpEsc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-    function _cpLang() { return (DataStore.getSettings() || {}).language || document.documentElement.lang || 'ar'; }
-    function _cpSanitizeHtml(html) {
-        if (!html) return '';
-        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-        html = html.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-        html = html.replace(/href\s*=\s*("')javascript:[^"']*\1/gi, 'href="#"');
-        return html;
-    }
-    function _cpGetPageUrl(filename) {
-        return './pages/' + filename + '.html';
-    }
-    function _cpUpdateHomepageMenu(pageData, oldMenuLocation) {
-        // Remove old menu link if location changed
-        if (oldMenuLocation && oldMenuLocation !== 'none') {
-            var hp = DataStore.getHomepage();
-            var key = oldMenuLocation === 'top' ? 'navItems' : 'sidebarItems';
-            var items = (hp[key] || []).filter(function(i) { return i._cpPageId !== pageData.id; });
-            var updates = {};
-            updates[key] = items;
-            DataStore.updateHomepage(updates);
-        }
-        // Add new menu link if location is not none
-        if (pageData.menuLocation && pageData.menuLocation !== 'none') {
-            var hp = DataStore.getHomepage();
-            var key = pageData.menuLocation === 'top' ? 'navItems' : 'sidebarItems';
-            var items = (hp[key] || []).slice();
-            // Check if already exists
-            var exists = items.find(function(i) { return i._cpPageId === pageData.id; });
-            if (!exists) {
-                var maxOrder = items.reduce(function(max, i) { return Math.max(max, i.order || 0); }, 0);
-                items.push({
-                    id: 'cpnav_' + pageData.id,
-                    _cpPageId: pageData.id,
-                    labelHe: pageData.menuLabelHe || pageData.titleHe || pageData.filename,
-                    labelAr: pageData.menuLabelAr || pageData.titleAr || pageData.filename,
-                    url: _cpGetPageUrl(pageData.filename),
-                    order: maxOrder + 1,
-                    isActive: true
-                });
-                var updates = {};
-                updates[key] = items;
-                DataStore.updateHomepage(updates);
-            }
-        }
-    }
-    function _cpRemoveHomepageMenu(pageId) {
-        var hp = DataStore.getHomepage();
-        var navItems = (hp.navItems || []).filter(function(i) { return i._cpPageId !== pageId; });
-        var sideItems = (hp.sidebarItems || []).filter(function(i) { return i._cpPageId !== pageId; });
-        if (navItems.length !== (hp.navItems || []).length || sideItems.length !== (hp.sidebarItems || []).length) {
-            DataStore.updateHomepage({ navItems: navItems, sidebarItems: sideItems });
-        }
-    }
-    function renderCustomPages() {
-        var items = (DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []).slice().sort(function(a,b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
-        var btnNew = '➕ צור דף חדש';
-        var colName = 'שם הדף';
-        var colFilename = 'שם קובץ';
-        var colStatus = 'סטטוס';
-        var colMenu = 'תפריט';
-        var colDate = 'תאריך עדכון';
-        var colActions = 'פעולות';
-        var emptyTitle = 'אין דפים';
-        var emptySub = 'צור את הדף הראשון שלך';
-        var emptyBtn = '➕ צור דף חדש';
-        var headerLabel = 'יצירת דף חדש';
-        var html = _lookupTableHeader(headerLabel, items.length, '📄',
-            '<button class="btn btn-sm" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;font-weight:700;" onclick="App.openCustomPageModal()">' + btnNew + '</button>');
-        if (!items.length) {
-            html += '<div class="cp-empty"><div class="cp-empty-icon">📄</div><h3>' + emptyTitle + '</h3><p>' + emptySub + '</p><button class="btn btn-primary" style="margin-top:20px;" onclick="App.openCustomPageModal()">' + emptyBtn + '</button></div>';
-        } else {
-            html += '<div class="table-wrapper"><table class="data-table"><thead><tr>' +
-                '<th>' + colName + '</th><th>' + colFilename + '</th><th>' + colStatus + '</th><th>' + colMenu + '</th><th>' + colDate + '</th><th>' + colActions + '</th></tr></thead><tbody>';
-            items.forEach(function(p) {
-                var statusClass = p.status === 'published' ? 'cp-status-published' : 'cp-status-draft';
-                var statusText = p.status === 'published' ? 'מפורסם' : 'טיוטה';
-                var menuLoc = p.menuLocation || 'none';
-                var menuBadge = menuLoc === 'top' ? '<span class="cp-status-badge cp-status-published">עליון</span>' : menuLoc === 'sidebar' ? '<span class="cp-status-badge" style="background:#eff6ff;color:#2563eb;">צדדי</span>' : '<span class="cp-status-badge cp-status-draft">ללא</span>';
-                var dateStr = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('he-IL') : '-';
-                var editBtn = '✏️ עריכה';
-                var deleteBtn = '🗑️ מחיקה';
-                var previewBtn = '👁️ תצוגה';
-                var linkBtn = '🔗 קישור';
-                var pageUrl = _cpGetPageUrl(p.filename);
-                // Display title in Hebrew (admin language) with Arabic as secondary
-                var displayTitle = p.titleHe || p.titleAr || '';
-                var secondaryTitle = p.titleAr && p.titleHe ? '<br><span style="color:var(--gray-400);font-size:13px;">' + _cpEsc(p.titleAr) + '</span>' : '';
-                html += '<tr><td><strong>' + _cpEsc(displayTitle) + '</strong>' + secondaryTitle + '</td>' +
-                    '<td style="direction:ltr;unicode-bidi:embed;font-family:monospace;font-size:13px;">' + _cpEsc(p.filename) + '</td>' +
-                    '<td><span class="cp-status-badge ' + statusClass + '">' + statusText + '</span></td>' +
-                    '<td>' + menuBadge + '</td>' +
-                    '<td style="font-size:13px;color:var(--gray-500);">' + dateStr + '</td>' +
-                    '<td><div class="cp-table-actions">' +
-                    '<button class="btn btn-outline btn-sm" onclick="App.editCustomPage(\'' + p.id + '\')">' + editBtn + '</button>' +
-                    '<button class="btn btn-outline btn-sm" onclick="App.previewCustomPage(\'' + p.id + '\')">' + previewBtn + '</button>' +
-                    '<button class="btn btn-outline btn-sm" onclick="App._openPageLink(\'' + p.filename + '\')" title="פתח את הדף">' + linkBtn + '</button>' +
-                    '<button class="btn btn-outline btn-sm" onclick="App.deleteCustomPage(\'' + p.id + '\')" style="color:var(--danger, #e53e3e);">' + deleteBtn + '</button>' +
-                    '</div></td></tr>';
+    function _renderRegInstTags() {
+        if (!instTags) return;
+        instTags.innerHTML = window._regManualSelectedSchools.map(s => `
+            <div class="institution-tag">
+                <span class="tag-text">${s.code} - ${s.name}</span>
+                <button type="button" class="tag-remove" data-code="${s.code}">×</button>
+            </div>
+        `).join('');
+        
+        // חיבור אירועי מחיקה
+        instTags.querySelectorAll('.tag-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window._regManualSelectedSchools = window._regManualSelectedSchools.filter(s => s.code !== btn.dataset.code);
+                _renderRegInstTags();
             });
-            html += '</tbody></table></div>';
-        }
-        document.getElementById('section-custom-pages').innerHTML = html;
+        });
     }
-    function _cpInitEditor() {
-        if (typeof tinymce === 'undefined') return;
-        if (!_cpEditorInit) {
-            tinymce.init({
-                selector: '#cpEditor', height: 420, directionality: 'rtl',
-                menubar: 'file edit view insert format table tools',
-                plugins: 'advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste wordcount help',
-                toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | bullist numlist | outdent indent | table | link image | hr | removeformat | help',
-                content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; }',
-                branding: false, promotion: false, resize: true, statusbar: true, paste_data_images: true
-            });
-            _cpEditorInit = true;
-        }
-    }
-    function openCustomPageModal(editId) {
-        _cpCurrentEditId = editId || null;
-        var title = 'יצירת דף חדש';
-        if (editId) title = 'עריכת דף';
-        var lblFilename = 'שם קובץ (באנגלית)';
-        var lblTitleHe = 'כותרת הדף (בעברית)';
-        var lblTitleAr = 'כותרת הדף (בערבית)';
-        var lblStatus = 'סטטוס';
-        var lblMenuLoc = 'מיקום קישור בתפריט';
-        var lblMenuLabelHe = 'טקסט תפריט (בעברית)';
-        var lblMenuLabelAr = 'טקסט תפריט (בערבית)';
-        var lblContent = 'תוכן הדף';
-        var btnSave = '💾 שמור';
-        var btnCancel = '❌ ביטול';
-        var btnPreview = '👁️ תצוגה מקדימה';
-        var existing = editId ? DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES).find(function(p) { return p.id === editId; }) : null;
-        var valFilename = existing ? _cpEsc(existing.filename) : '';
-        var valTitleHe = existing ? _cpEsc(existing.titleHe || '') : '';
-        var valTitleAr = existing ? _cpEsc(existing.titleAr || '') : '';
-        var valStatus = existing ? existing.status : 'draft';
-        var valMenuLoc = existing ? (existing.menuLocation || 'none') : 'none';
-        var valMenuLabelHe = existing ? _cpEsc(existing.menuLabelHe || '') : '';
-        var valMenuLabelAr = existing ? _cpEsc(existing.menuLabelAr || '') : '';
-        var disabledAttr = existing ? 'disabled style="opacity:0.6;cursor:not-allowed;"' : '';
-        var statusOpts = (valStatus === 'published' ?
-            '<option value="published" selected>מפורסם</option><option value="draft">טיוטה</option>' :
-            '<option value="draft" selected>טיוטה</option><option value="published">מפורסם</option>');
-        var menuLocOpts = '<option value="none"' + (valMenuLoc === 'none' ? ' selected' : '') + '>ללא קישור</option>' +
-            '<option value="top"' + (valMenuLoc === 'top' ? ' selected' : '') + '>תפריט עליון</option>' +
-            '<option value="sidebar"' + (valMenuLoc === 'sidebar' ? ' selected' : '') + '>תפריט צדדי</option>';
-        var menuLabelsStyle = valMenuLoc !== 'none' ? 'display:flex;' : 'display:none;';
-        var bodyHtml = '<div class="cp-editor-wrap">' +
-            '<div class="cp-field-row">' +
-                '<div class="cp-field-group"><label>' + lblFilename + ' *</label><input type="text" id="cpFilename" placeholder="about-us" value="' + valFilename + '" ' + disabledAttr + ' pattern="^[a-z0-9][a-z0-9-]*$"></div>' +
-                '<div class="cp-field-group" style="max-width:180px;"><label>' + lblStatus + '</label><select id="cpStatus">' + statusOpts + '</select></div>' +
-            '</div>' +
-            '<div class="cp-field-row">' +
-                '<div class="cp-field-group"><label>' + lblTitleHe + ' *</label><input type="text" id="cpTitleHe" placeholder="כותרת בעברית" value="' + valTitleHe + '"></div>' +
-                '<div class="cp-field-group"><label>' + lblTitleAr + ' *</label><input type="text" id="cpTitleAr" placeholder="عنوان بالعربية" value="' + valTitleAr + '" dir="rtl"></div>' +
-            '</div>' +
-            '<div class="cp-field-row">' +
-                '<div class="cp-field-group" style="max-width:260px;"><label>' + lblMenuLoc + '</label><select id="cpMenuLocation" onchange="App._cpOnMenuLocChange()">' + menuLocOpts + '</select></div>' +
-            '</div>' +
-            '<div class="cp-field-row" id="cpMenuLabelsRow" style="' + menuLabelsStyle + '">' +
-                '<div class="cp-field-group"><label>' + lblMenuLabelHe + '</label><input type="text" id="cpMenuLabelHe" placeholder="הטקסט בעברית" value="' + valMenuLabelHe + '"></div>' +
-                '<div class="cp-field-group"><label>' + lblMenuLabelAr + '</label><input type="text" id="cpMenuLabelAr" placeholder="הטקסט בערבית" value="' + valMenuLabelAr + '" dir="rtl"></div>' +
-            '</div>' +
-            '<div class="cp-field-group" style="margin-bottom:10px;flex:none;"><label>' + lblContent + '</label></div>' +
-            '<div class="cp-editor-container"><textarea id="cpEditor">' + (existing ? existing.content : '') + '</textarea></div>' +
-            '<div class="cp-editor-actions"><button class="btn btn-outline btn-sm" onclick="App.previewCustomPage(null, true)" type="button">' + btnPreview + '</button></div>' +
-            '</div>';
-        var footerHtml = '<button class="btn btn-ghost" onclick="App.closeModal()" type="button">' + btnCancel + '</button>' +
-            '<button class="btn btn-primary" onclick="App.saveCustomPage()" type="button">' + btnSave + '</button>';
-        showModal(title, bodyHtml, footerHtml);
-        var modalEl = document.querySelector('#modalOverlay .modal');
-        if (modalEl) modalEl.style.maxWidth = '960px';
-        setTimeout(function() {
-            _cpInitEditor();
-            if (existing && existing.content && typeof tinymce !== 'undefined') {
-                var editor = tinymce.get('cpEditor');
-                if (editor) editor.setContent(existing.content);
+
+    // ==========================================
+    // לוגיקה לפתרונות למידה
+    // ==========================================
+    const solSearch = document.getElementById('regSolSearch');
+    const solTags = document.getElementById('regSolTags');
+    const solDropdown = document.getElementById('regSolDropdown');
+
+    if (solSearch) {
+        solSearch.addEventListener('input', function() {
+            const q = this.value.trim().toLowerCase();
+            if (q.length < 2) { solDropdown.style.display = 'none'; return; }
+
+            const matches = solutions.filter(s =>
+                (s.solutionName && s.solutionName.toLowerCase().includes(q)) ||
+                (s.solutionNumber && s.solutionNumber.toString().toLowerCase().includes(q))
+            ).slice(0, 8);
+
+            if (matches.length) {
+                solDropdown.innerHTML = matches.map(s => `
+                    <div class="inst-suggestion-item" data-id="${s.id}" data-name="${s.solutionName}">
+                        <div class="inst-sug-header">
+                            <span class="inst-sug-code">${s.solutionNumber || 'N/A'}</span>
+                            <span class="inst-sug-name">${s.solutionName}</span>
+                        </div>
+                    </div>
+                `).join('');
+                solDropdown.style.display = 'block';
+            } else {
+                solDropdown.style.display = 'none';
             }
-        }, 300);
+        });
+
+        solDropdown.addEventListener('click', function(e) {
+            const item = e.target.closest('.inst-suggestion-item');
+            if (!item) return;
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+            
+            if (!window._regManualSelectedSolutions.find(s => s.id === id)) {
+                window._regManualSelectedSolutions.push({ id, name });
+                _renderRegSolTags();
+            }
+            solSearch.value = '';
+            solDropdown.style.display = 'none';
+        });
     }
-    function _cpOnMenuLocChange() {
-        var sel = document.getElementById('cpMenuLocation');
-        var row = document.getElementById('cpMenuLabelsRow');
-        if (sel && row) {
-            row.style.display = sel.value !== 'none' ? 'flex' : 'none';
+
+    function _renderRegSolTags() {
+        if (!solTags) return;
+        solTags.innerHTML = window._regManualSelectedSolutions.map(s => `
+            <div class="institution-tag">
+                <span class="tag-text">${s.name}</span>
+                <button type="button" class="tag-remove" data-id="${s.id}">×</button>
+            </div>
+        `).join('');
+        
+        solTags.querySelectorAll('.tag-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window._regManualSelectedSolutions = window._regManualSelectedSolutions.filter(s => s.id !== btn.dataset.id);
+                _renderRegSolTags();
+            });
+        });
+    }
+
+    // סגירת תפריטים נפתחים בלחיצה מחוץ לאזור
+    document.addEventListener('click', function closeDropdowns(e) {
+        if (!e.target.closest('.inst-autocomplete-wrapper') && !e.target.closest('.inst-autocomplete-dropdown')) {
+            if (instDropdown) instDropdown.style.display = 'none';
+            if (solDropdown) solDropdown.style.display = 'none';
         }
+    });
+}
+
+function _saveManualRegistration() {
+    const name = (document.getElementById('fRegAddName').value || '').trim();
+    const phone = (document.getElementById('fRegAddPhone').value || '').trim();
+    const email = (document.getElementById('fRegAddEmail').value || '').trim();
+    const role = (document.getElementById('fRegAddRole').value || '').trim();
+
+    // ולידציה בסיסית
+    if (!name || !phone || !email || !role) {
+        showToast('נא למלא את כל שדות החובה (שם, טלפון, דוא"ל, תפקיד)', 'error');
+        return;
     }
-    function editCustomPage(id) { openCustomPageModal(id); }
-    function saveCustomPage() {
-        if (typeof tinymce !== 'undefined') { var editor = tinymce.get('cpEditor'); if (editor) editor.save(); }
-        var filename = document.getElementById('cpFilename').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-        var titleHe = document.getElementById('cpTitleHe').value.trim();
-        var titleAr = document.getElementById('cpTitleAr').value.trim();
-        var status = document.getElementById('cpStatus').value;
-        var menuLocation = document.getElementById('cpMenuLocation').value;
-        var menuLabelHe = document.getElementById('cpMenuLabelHe').value.trim();
-        var menuLabelAr = document.getElementById('cpMenuLabelAr').value.trim();
-        var content = document.getElementById('cpEditor').value;
-        if (!filename) { showToast('חובה להזין שם קובץ', 'error'); return; }
-        if (!titleHe && !titleAr) { showToast('חובה להזין כותרת', 'error'); return; }
-        var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || [];
-        var dup = pages.find(function(p) { return p.filename === filename && p.id !== _cpCurrentEditId; });
-        if (dup) { showToast('שם קובץ כבר קיים', 'error'); return; }
-        content = _cpSanitizeHtml(content);
-        var now = new Date().toISOString();
-        var pageData = { filename: filename, titleHe: titleHe, titleAr: titleAr, status: status, content: content, menuLocation: menuLocation, menuLabelHe: menuLabelHe, menuLabelAr: menuLabelAr, updatedAt: now };
-        var oldMenuLocation = null;
-        var savedPageId = _cpCurrentEditId;
-        if (_cpCurrentEditId) {
-            // Get old menu location before updating
-            var oldPage = pages.find(function(p) { return p.id === _cpCurrentEditId; });
-            oldMenuLocation = oldPage ? (oldPage.menuLocation || 'none') : null;
-            DataStore.update(DataStore.KEYS.CUSTOM_PAGES, _cpCurrentEditId, pageData);
-            showToast('הדף עודכן בהצלחה', 'success');
+
+    const schools = window._regManualSelectedSchools || [];
+    const solutions = window._regManualSelectedSolutions || [];
+
+    if (schools.length === 0) {
+        showToast('נא לבחור לפחות מוסד אחד מהרשימה', 'warning');
+        return;
+    }
+    if (solutions.length === 0) {
+        showToast('נא לבחור לפחות פתרון למידה אחד מהרשימה', 'warning');
+        return;
+    }
+
+    // המרת המערכים למחרוזות מופרדות (כדי לשמור עקביות עם המבנה שתוקן קודם)
+    const institutionCodes = schools.map(s => s.code).join(', ');
+    const institutionNames = schools.map(s => s.name).join(' | ');
+    const solutionIds = solutions.map(s => s.id).join(', ');
+    const solutionNames = solutions.map(s => s.name).join(' | ');
+
+    // שמירה ל-DataStore
+    DataStore.create(DataStore.KEYS.REGISTRATIONS, {
+        fullName: name,
+        phone: phone,
+        email: email,
+        role: role,
+        institutionCodes: institutionCodes,
+        institutionNames: institutionNames,
+        solutionId: solutionIds, 
+        solutionName: solutionNames,
+        createdAt: new Date().toISOString()
+    });
+
+    logActivity('add_registration', 'הוספת נרשם ידני: ' + name, 'registration', '');
+    
+    // ניקוי וסגירה
+    closeModal();
+    showToast('הנרשם נוסף בהצלחה למערכת', 'success');
+    renderRegistrations();
+
+    // איפוס המשתנים הגלובליים לשימוש עתידי
+    window._regManualSelectedSchools = [];
+    window._regManualSelectedSolutions = [];
+}
+
+function _sortRegistrations() { _regSortField = document.getElementById('regSortF').value; App.filterRegistrations(); }
+
+function _toggleRegSortDir() { _regSortDir = _regSortDir === 'desc' ? 'asc' : 'desc'; App.filterRegistrations(); }
+
+function _exportRegistrationsExcel() {
+    let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+    if (!items.length) { showToast('אין נתונים', 'warning'); return; }
+    if (typeof XLSX === 'undefined') { showToast('ספריית XLSX לא נטענה', 'error'); return; }
+    const allSchools = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
+    const schoolByCode = {}; allSchools.forEach(function(s) { schoolByCode[s.code] = s.name; });
+    const rows = [];
+    items.forEach(function(r) {
+        // 🔑 תיקון: תמיכה במחרוזת מופרדת בפסיק/pipe או במערך
+        var codes = Array.isArray(r.institutionCodes) ? r.institutionCodes : (r.institutionCodes ? String(r.institutionCodes).split(/[,|]/).map(s=>s.trim()) : (r.institutionCode ? [r.institutionCode] : []));
+        var names = Array.isArray(r.institutionNames) ? r.institutionNames : (r.institutionNames ? String(r.institutionNames).split(/[,|]/).map(s=>s.trim()) : (r.institutionName ? [r.institutionName] : []));
+        
+        if (codes.length === 0) {
+            rows.push({ 'שם': r.fullName || '', 'טלפון': r.phone || '', 'דוא"ל': r.email || '', 'סמל מוסד': '', 'בית ספר': '', 'תפקיד': r.role || '', 'פתרון / השתלמות': r.solutionName || '', 'תאריך': formatDate(r.createdAt) });
         } else {
-            var newItem = DataStore.create(DataStore.KEYS.CUSTOM_PAGES, pageData);
-            savedPageId = newItem.id;
-            showToast('הדף נוצר בהצלחה', 'success');
+            codes.forEach(function(code, idx) {
+                var name = names[idx] || schoolByCode[code] || code;
+                rows.push({ 'שם': r.fullName || '', 'טלפון': r.phone || '', 'דוא"ל': r.email || '', 'סמל מוסד': code, 'בית ספר': name, 'תפקיד': r.role || '', 'פתרון / השתלמות': r.solutionName || '', 'תאריך': formatDate(r.createdAt) });
+            });
         }
-        // Update homepage menu
-        _cpUpdateHomepageMenu({ id: savedPageId, filename: filename, titleHe: titleHe, titleAr: titleAr, menuLocation: menuLocation, menuLabelHe: menuLabelHe, menuLabelAr: menuLabelAr }, oldMenuLocation);
-        // Save HTML file to server - send Arabic title for the generated page
+    });
+    const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'רישומים');
+    XLSX.writeFile(wb, `matspanet_registrations_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('יוצא בהצלחה', 'success');
+}
+
+function _renderRegTable(items) {
+    const canFull = _canFullSection('registrations');
+    if (!items.length) return '<div class="empty-state"><div class="empty-icon">📝</div><h3>אין רישומים</h3></div>';
+    const sorted = [...items].sort((a, b) => {
+        let va = a[_regSortField] || '', vb = b[_regSortField] || '';
+        if (_regSortField === 'createdAt') return _regSortDir === 'desc' ? new Date(b.createdAt||0) - new Date(a.createdAt||0) : new Date(a.createdAt||0) - new Date(b.createdAt||0);
+        return _regSortDir === 'desc' ? vb.localeCompare(va, 'he') : va.localeCompare(vb, 'he');
+    });
+    return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr>
+        <th>שם</th><th>טלפון</th><th>דוא"ל</th><th>מוסד</th><th>בית ספר</th><th>תפקיד</th><th>פתרון / השתלמות</th><th>תאריך</th>${canFull ? '<th>פעולות</th>' : ''}
+    </tr></thead><tbody>${sorted.map(r => `<tr>
+        <td><strong>${escAttr(r.fullName)}</strong></td>
+        <td style="direction:ltr">${r.phone || '—'}</td>
+        <td>${r.email || '—'}</td>
+        <td>${Array.isArray(r.institutionCodes) ? r.institutionCodes.join(' | ') : (r.institutionCodes || r.institutionCode || '—')}</td>
+        <td>${Array.isArray(r.institutionNames) ? r.institutionNames.join(', ') : (r.institutionNames || r.institutionName || '—')}</td>
+        <td>${r.role || '—'}</td>
+        <td>${r.solutionName || '—'}</td>
+        <td style="font-size:12px;">${formatDate(r.createdAt)}</td>
+        ${canFull ? `<td><div style="display:flex;gap:4px;">
+            <button class="btn btn-outline btn-sm" onclick="App.editRegistration('${r.id}')" title="עריכה">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="App.deleteRegistration('${r.id}')" title="מחיקה">🗑️</button>
+        </div></td>` : ''}
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function filterRegistrations() {
+    const search = document.getElementById('regSearch').value.toLowerCase();
+    let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+    if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'system_admin' && currentUser.role !== 'system_operator' && currentUser.role !== 'team_leader') {
+        let userGuideIds = (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || []).filter(g => g.userId === currentUser.id).map(g => g.id);
+        if (userGuideIds.length === 0 && currentUser.fullName) {
+            const normalizedName = currentUser.fullName.trim();
+            userGuideIds = (DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || []).filter(g => (g.fullName || '').trim() === normalizedName).map(g => g.id);
+        }
+        if (userGuideIds.length > 0) {
+            const mySolutionIds = (DataStore.getAll(DataStore.KEYS.SOLUTIONS) || []).filter(s => userGuideIds.includes(s.guideId)).map(s => s.id);
+            items = items.filter(r => mySolutionIds.includes(r.solutionId));
+        }
+    }
+    if (search) {
+        items = items.filter(r => {
+            const s = search;
+            if ((r.fullName||'').toLowerCase().includes(s)) return true;
+            if ((r.phone||'').includes(s)) return true;
+            if ((r.email||'').toLowerCase().includes(s)) return true;
+            if ((r.solutionName||'').toLowerCase().includes(s)) return true;
+            // 🔑 תיקון: תמיכה גם בשדות החדשים וגם בישנים
+            const codes = Array.isArray(r.institutionCodes) ? r.institutionCodes.join(' ') : (r.institutionCodes || r.institutionCode || '');
+            const names = Array.isArray(r.institutionNames) ? r.institutionNames.join(' ') : (r.institutionNames || r.institutionName || '');
+            if (codes.toLowerCase().includes(s)) return true;
+            if (names.toLowerCase().includes(s)) return true;
+            return false;
+        });
+    }
+    _resetPagination('registrations');
+    document.getElementById('regTableDiv').innerHTML = _renderRegTable(items);
+    _applyTableFeatures('registrations');
+}
+
+function editRegistration(id) {
+    const r = DataStore.getById(DataStore.KEYS.REGISTRATIONS, id);
+    if (!r) return;
+    editingItem = r;
+    showModal('עריכת רישום', `
+        <div class="form-grid">
+            <div class="form-group"><label>שם מלא *</label><input type="text" id="fRegName" class="form-input" value="${escAttr(r.fullName)}" required></div>
+            <div class="form-group"><label>טלפון</label><input type="text" id="fRegPhone" class="form-input" value="${r.phone || ''}"></div>
+            <div class="form-group"><label>דוא"ל</label><input type="email" id="fRegEmail" class="form-input" value="${r.email || ''}"></div>
+            <div class="form-group"><label>תפקיד</label><input type="text" id="fRegRole" class="form-input" value="${escAttr(r.role || '')}"></div>
+        </div>`,
+    `<button class="btn btn-primary" onclick="App.saveEditRegistration()">💾 שמור</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>`);
+}
+
+function saveEditRegistration() {
+    const name = document.getElementById('fRegName').value.trim();
+    if (!name) { showToast('יש להזין שם', 'error'); return; }
+    DataStore.update(DataStore.KEYS.REGISTRATIONS, editingItem.id, {
+        fullName: name,
+        phone: document.getElementById('fRegPhone').value.trim(),
+        email: document.getElementById('fRegEmail').value.trim(),
+        role: document.getElementById('fRegRole').value.trim()
+    });
+    logActivity('edit_registration', 'עריכת נרשם: ' + name, 'registration', editingItem.id);
+    editingItem = null; closeModal(); showToast('הרישום עודכן', 'success'); renderRegistrations();
+}
+
+function deleteRegistration(id) {
+    const r = DataStore.getById(DataStore.KEYS.REGISTRATIONS, id);
+    confirmDialog('למחוק רישום זה?', () => {
+        _moveToRecycleBin(DataStore.KEYS.REGISTRATIONS, id);
+        logActivity('delete_registration', 'מחיקת נרשם: ' + (r ? r.fullName : ''), 'registration', id);
+        showToast('הרישום נמחק', 'success'); renderRegistrations();
+    });
+}
+
+function clearAllRegistrations() {
+    let items = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+    const visibleSolIds = _getGuideVisibleSolutionIds();
+    if (visibleSolIds !== null) items = items.filter(r => visibleSolIds.includes(r.solutionId));
+    if (!items.length) return;
+    confirmDialog(`⚠️ למחוק את כל ${items.length} הרשומות?\nפעולה זו אינה ניתנת לביטול!`, () => {
+        const visibleIds = new Set(items.map(i => i.id));
+        const allItems = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+        DataStore.saveAll(DataStore.KEYS.REGISTRATIONS, allItems.filter(i => !visibleIds.has(i.id)));
+        logActivity('bulk_delete_registrations', 'מחיקה גורפת של ' + items.length + ' נרשמים', 'registration', '');
+        showToast(items.length + ' רשומות נמחקו', 'success'); renderRegistrations();
+    });
+}
+
+// ================================================================
+//  WHATSAPP MESSAGING
+// ================================================================
+const _WA_DEFAULT_TEMPLATES = [
+    { id: 'he_morning', lang: 'he', period: 'morning', hourFrom: 6, hourTo: 11, text: 'בוקר טוב [שם],' },
+    { id: 'he_afternoon', lang: 'he', period: 'afternoon', hourFrom: 12, hourTo: 16, text: 'צהריים טובים [שם],' },
+    { id: 'he_evening', lang: 'he', period: 'evening', hourFrom: 17, hourTo: 20, text: 'ערב טוב [שם],' },
+    { id: 'he_night', lang: 'he', period: 'night', hourFrom: 21, hourTo: 5, text: 'לילה טוב [שם],' },
+    { id: 'ar_morning', lang: 'ar', period: 'morning', hourFrom: 6, hourTo: 11, text: 'صباح الخير [اسم],' },
+    { id: 'ar_afternoon', lang: 'ar', period: 'afternoon', hourFrom: 12, hourTo: 16, text: 'مساء الخير [اسم],' },
+    { id: 'ar_evening', lang: 'ar', period: 'evening', hourFrom: 17, hourTo: 20, text: 'مساء الخير [اسم],' },
+    { id: 'ar_night', lang: 'ar', period: 'night', hourFrom: 21, hourTo: 5, text: 'تصبح على خير [اسم],' }
+];
+function _getWaLang() { var settings = DataStore.getSettings(); return (settings && settings.language) || document.documentElement.lang || 'he'; }
+function _getWaTemplates() { var settings = DataStore.getSettings(); return (settings && settings.waTemplates && settings.waTemplates.length) ? settings.waTemplates : _WA_DEFAULT_TEMPLATES; }
+function _getAutoGreeting() {
+    var lang = _getWaLang(); var templates = _getWaTemplates(); var hour = new Date().getHours();
+    for (var i = 0; i < templates.length; i++) {
+        var t = templates[i]; if (t.lang !== lang) continue;
+        if (t.hourFrom <= t.hourTo) { if (hour >= t.hourFrom && hour <= t.hourTo) return t; }
+        else { if (hour >= t.hourFrom || hour <= t.hourTo) return t; }
+    }
+    return templates.find(function(t) { return t.lang === lang; }) || templates[0];
+}
+function _applyWaGreeting(template, name) { if (!template || !name) return ''; return template.text.replace('[שם]', name).replace('[اسم]', name); }
+function _renderWaGreetingOptions() {
+    var lang = _getWaLang(); var templates = _getWaTemplates(); var autoT = _getAutoGreeting();
+    var autoLabel = autoT ? autoT.text.replace('[שם]', '...').replace('[اسم]', '...') : '—';
+    var opts = '<option value="auto">' + (lang === 'ar' ? '✅ تلقائي (موصى به): ' : '✅ אוטומטי (מומלץ): ') + escAttr(autoLabel) + '</option>';
+    var heTemplates = templates.filter(function(t) { return t.lang === 'he'; });
+    var arTemplates = templates.filter(function(t) { return t.lang === 'ar'; });
+    if (heTemplates.length) { opts += '<optgroup label="עברית">'; heTemplates.forEach(function(t) { opts += '<option value="' + t.id + '">' + escAttr(t.text.replace('[שם]', '...').replace('[اسم]', '...')) + '</option>'; }); opts += '</optgroup>'; }
+    if (arTemplates.length) { opts += '<optgroup label="العربية">'; arTemplates.forEach(function(t) { opts += '<option value="' + t.id + '">' + escAttr(t.text.replace('[שם]', '...').replace('[اسم]', '...')) + '</option>'; }); opts += '</optgroup>'; }
+    opts += '<option value="custom">' + (lang === 'ar' ? '✏️ كتابة حرة' : '✏️ כתיבה חופשית') + '</option>';
+    return opts;
+}
+function _onWaGreetingChange() {
+    var sel = document.getElementById('waGreetingMode'); var customDiv = document.getElementById('waCustomGreetingDiv'); var previewDiv = document.getElementById('waGreetingPreview');
+    if (!sel) return; var val = sel.value;
+    if (customDiv) customDiv.style.display = val === 'custom' ? 'block' : 'none';
+    if (previewDiv) {
+        var templates = _getWaTemplates(); var t = val === 'auto' ? _getAutoGreeting() : templates.find(function(x) { return x.id === val; });
+        if (t) { var example = t.lang === 'ar' ? 'أحمد' : 'דני'; previewDiv.textContent = _applyWaGreeting(t, example); previewDiv.style.display = 'block'; }
+        else { previewDiv.style.display = 'none'; }
+    }
+}
+function _openWhatsAppModal() {
+    let regs = DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || [];
+    const visibleSolIds = _getGuideVisibleSolutionIds();
+    if (visibleSolIds !== null) regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
+    const solMap = {}; const allSolutions = DataStore.getAll(DataStore.KEYS.SOLUTIONS) || [];
+    regs.forEach(r => { if (r.solutionId && !solMap[r.solutionId]) { const sol = allSolutions.find(s => s.id === r.solutionId); if (sol) solMap[r.solutionId] = sol.name || r.solutionName || ''; } });
+    const solutions = Object.entries(solMap).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    if (!solutions.length) { showToast('אין פתרונות למידה עם נרשמים', 'warning'); return; }
+    const solOpts = solutions.map(s => `<option value="${s.id}" data-name="${escAttr(s.name || '')}">${escAttr(s.name || 'בחר פתרון למידה')}</option>`).join('');
+    showModal('💬 שליחת הודעת WhatsApp', `
+        <div class="form-grid">
+            <div class="form-group full-width"><label>בחירת פתרון למידה *</label>
+                <select id="waSolution" class="form-select" onchange="App._onWaSolutionChange()"><option value="">— בחר פתרון למידה —</option>${solOpts}</select>
+            </div>
+            <div class="form-group full-width" id="waRecipientsDiv" style="display:none;">
+                <label>רשימת נמענים <span id="waRecipCount" style="color:var(--gray-500);font-weight:normal;"></span></label>
+                <div id="waRecipientsList" style="max-height:180px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--border-radius);padding:8px;"></div>
+            </div>
+            <div class="form-group full-width"><label>תוכן ההודעה *</label>
+                <textarea id="waMessage" class="form-input" rows="4" placeholder="${_getWaLang() === 'ar' ? 'اكتب محتوى الرسالة هنا...' : 'כתוב את תוכן ההודעה כאן...'}" style="resize:vertical;"></textarea>
+            </div>
+            <div class="form-group full-width"><label>👤 ${_getWaLang() === 'ar' ? 'تحية شخصية' : 'הפנייה אישית'}</label>
+                <select id="waGreetingMode" class="form-select" onchange="App._onWaGreetingChange()">${_renderWaGreetingOptions()}</select>
+                <div id="waCustomGreetingDiv" style="display:none;margin-top:8px;">
+                    <input type="text" id="waCustomGreeting" class="form-input" placeholder="${_getWaLang() === 'ar' ? 'اكتب تحية مخصصة... (استخدم [שם] أو [اسم] للاسم)' : 'כתוב פנייה מותאמת... (השתמש ב-[שם] או [اسم] לשם המשתלם)'}">
+                </div>
+                <div id="waGreetingPreview" style="margin-top:6px;padding:8px 12px;background:var(--gray-50);border-radius:var(--border-radius);font-size:13px;color:var(--gray-600);display:none;"></div>
+            </div>
+        </div>`,
+    `<button class="btn btn-primary" style="background:#25D366;border-color:#25D366;" onclick="App._sendWhatsAppMessages()">💬 ${_getWaLang() === 'ar' ? 'إرسال' : 'שליחה'}</button><button class="btn btn-outline" onclick="App.closeModal()">${_getWaLang() === 'ar' ? 'إلغاء' : 'ביטול'}</button>`);
+    setTimeout(function() { App._onWaGreetingChange(); }, 50);
+}
+function _onWaSolutionChange() {
+    const sel = document.getElementById('waSolution'); const div = document.getElementById('waRecipientsDiv'); const list = document.getElementById('waRecipientsList'); const count = document.getElementById('waRecipCount');
+    if (!sel || !sel.value) { div.style.display = 'none'; return; }
+    const solId = sel.value;
+    let regs = (DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || []).filter(r => r.solutionId === solId);
+    const visibleSolIds = _getGuideVisibleSolutionIds();
+    if (visibleSolIds !== null) regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
+    div.style.display = 'block'; count.textContent = '(' + regs.length + ' נמענים)';
+    if (!regs.length) { list.innerHTML = '<div style="color:var(--gray-500);text-align:center;padding:12px;">אין נרשמים לפתרון למידה זה</div>'; return; }
+    list.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--gray-50);"><th style="padding:6px 8px;text-align:right;">שם</th><th style="padding:6px 8px;text-align:right;">טלפון</th></tr></thead><tbody>' +
+        regs.map(r => `<tr style="border-bottom:1px solid var(--gray-100);"><td style="padding:5px 8px;">${escAttr(r.fullName)}</td><td style="padding:5px 8px;direction:ltr;text-align:left;">${r.phone || '—'}</td></tr>`).join('') + '</tbody></table>';
+}
+function _sendWhatsAppMessages() {
+    const solSel = document.getElementById('waSolution'); const message = (document.getElementById('waMessage').value || '').trim(); const greetingMode = (document.getElementById('waGreetingMode') || {}).value || 'auto';
+    if (!solSel || !solSel.value) { showToast(_getWaLang() === 'ar' ? 'يجب اختيار حل تعلم' : 'יש לבחור פתרון למידה', 'error'); return; }
+    if (!message) { showToast(_getWaLang() === 'ar' ? 'يجب كتابة محتوى الرسالة' : 'יש לכתוב תוכן הודעה', 'error'); return; }
+    const solId = solSel.value;
+    let regs = (DataStore.getAll(DataStore.KEYS.REGISTRATIONS) || []).filter(r => r.solutionId === solId);
+    const visibleSolIds = _getGuideVisibleSolutionIds();
+    if (visibleSolIds !== null) regs = regs.filter(r => visibleSolIds.includes(r.solutionId));
+    if (!regs.length) { showToast(_getWaLang() === 'ar' ? 'لا يوجد مسجلون لهذا الحل' : 'אין נרשמים לפתרון למידה זה', 'warning'); return; }
+    const validRegs = regs.filter(r => r.phone && r.phone.replace(/[\s\-\(\)\+]/g, '').length >= 9);
+    if (!validRegs.length) { showToast(_getWaLang() === 'ar' ? 'لم يتم العثور على مستلمين برقم هاتف صالح' : 'לא נמצאו נמענים עם מספר טלפון תקין', 'warning'); return; }
+    var greetingTemplate = null, customGreetingText = null;
+    if (greetingMode === 'auto') greetingTemplate = _getAutoGreeting();
+    else if (greetingMode === 'custom') { var customEl = document.getElementById('waCustomGreeting'); customGreetingText = customEl ? customEl.value.trim() : ''; if (!customGreetingText) { showToast(_getWaLang() === 'ar' ? 'يجب كتابة تحية مخصصة' : 'יש לכתוב פנייה מותאמת', 'error'); return; } }
+    else { var templates = _getWaTemplates(); greetingTemplate = templates.find(function(t) { return t.id === greetingMode; }); }
+    let sentCount = 0;
+    validRegs.forEach((r, idx) => {
+        let fullMsg = message; var greeting = '';
+        if (greetingMode === 'custom' && customGreetingText && r.fullName) greeting = customGreetingText.replace('[שם]', r.fullName).replace('[اسم]', r.fullName);
+        else if (greetingTemplate && r.fullName) greeting = _applyWaGreeting(greetingTemplate, r.fullName);
+        if (greeting) fullMsg = greeting + ' ' + fullMsg;
+        let phone = r.phone.replace(/[\s\-\(\)\.]/g, '');
+        if (!phone.startsWith('+') && !phone.startsWith('972')) { if (phone.startsWith('0')) phone = '972' + phone.substring(1); else phone = '972' + phone; }
+        if (phone.startsWith('+')) phone = phone.substring(1);
+        const waUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(fullMsg);
+        setTimeout(() => { window.open(waUrl, '_blank'); }, idx * 300);
+        sentCount++;
+    });
+    logActivity('whatsapp_send', 'שליחת WhatsApp ל-' + sentCount + ' נרשמים', 'registration', solId);
+    closeModal(); showToast('נפתחו ' + sentCount + ' הודעות WhatsApp בלשוניות חדשות', 'success');
+}
+
+// ================================================================
+//  ADVANCED PERMISSIONS
+// ================================================================
+let _permsSelectedUserId = null;
+function renderPermissions() {
+    const users = (DataStore.getAll(DataStore.KEYS.USERS) || []).filter(u => u.isActive !== false);
+    const isAdminUser = currentUser && (currentUser.role === 'admin' || currentUser.role === 'system_admin');
+    if (!isAdminUser) { document.getElementById('section-permissions').innerHTML = '<div class="empty-state"><div class="empty-icon">🔒</div><h3>גישה מוגבלת</h3><p>רק מנהל מערכת יכול לנהל הרשאות</p></div>'; return; }
+    const permCount = users.filter(u => u.permissions && Object.keys(u.permissions).length > 0).length;
+    let html = `${_lookupTableHeader('הרשאות מתקדמות', permCount, '🔐')}
+    <div class="card"><div class="card-body">
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;margin-bottom:6px;">בחר משתמש</label>
+            <select id="permsUserSelect" class="form-select" onchange="App._permsOnUserChange()" style="max-width:400px;">
+                <option value="">-- בחר משתמש --</option>
+                ${users.map(u => `<option value="${u.id}" ${_permsSelectedUserId === u.id ? 'selected' : ''}>${escAttr(u.fullName)} (${Auth.getRoleLabel(u.role)})</option>`).join('')}
+            </select>
+        </div>
+        <div id="permsPartsContainer">
+            <div style="text-align:center;padding:32px;color:var(--gray-400);"><div style="font-size:36px;margin-bottom:10px;">👤</div><p>בחר משתמש כדי להגדיר הרשאות</p></div>
+        </div>
+    </div></div>`;
+    document.getElementById('section-permissions').innerHTML = html;
+    if (_permsSelectedUserId) setTimeout(() => _permsOnUserChange(), 50);
+}
+function _permsOnUserChange() {
+    const sel = document.getElementById('permsUserSelect'); const userId = sel ? sel.value : ''; _permsSelectedUserId = userId || null;
+    const container = document.getElementById('permsPartsContainer'); if (!container) return;
+    if (!userId) { container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray-400);"><div style="font-size:36px;margin-bottom:10px;">👤</div><p>בחר משתמש כדי להגדיר הרשאות</p></div>'; return; }
+    const user = DataStore.getById(DataStore.KEYS.USERS, userId); if (!user) return;
+    const perms = user.permissions || {};
+    if (user.role === 'admin' || user.role === 'system_admin') {
+        container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--gray-500);"><div style="font-size:36px;margin-bottom:10px;">👑</div><p><strong>${escAttr(user.fullName)}</strong> הוא מנהל מערכת — גישה מלאה אוטומטית לכל חלקי המערכת.</p></div>`;
+        return;
+    }
+    let partsHtml = SYSTEM_PARTS.map(part => {
+        const permLevel = perms[part.id] || '';
+        const isChecked = permLevel !== ''; const isView = permLevel === 'view'; const isFull = permLevel === 'full';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--gray-200);border-radius:var(--border-radius);margin-bottom:8px;background:${isChecked ? 'var(--gray-50)' : '#fff'};flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px;">
+                <span style="font-size:20px;">${part.icon}</span>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px;">
+                    <input type="checkbox" id="perm_chk_${part.id}" ${isChecked ? 'checked' : ''} onchange="App._permTogglePart('${part.id}')" style="width:18px;height:18px;cursor:pointer;"> ${part.label}
+                </label>
+            </div>
+            <div id="perm_levels_${part.id}" style="display:flex;gap:12px;align-items:center;${isChecked ? '' : 'opacity:0.35;pointer-events:none;'}">
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;color:var(--gray-600);">
+                    <input type="radio" name="perm_level_${part.id}" value="view" ${isView ? 'checked' : ''} onchange="App._permSetLevel('${part.id}','view')"> 👁️ צפייה בלבד
+                </label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;color:var(--gray-600);">
+                    <input type="radio" name="perm_level_${part.id}" value="full" ${isFull ? 'checked' : ''} onchange="App._permSetLevel('${part.id}','full')"> ✏️ מלאה (עריכה, מחיקה, השלמת נתונים)
+                </label>
+            </div>
+        </div>`;
+    }).join('');
+    container.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <p style="color:var(--gray-500);font-size:13px;">ברירת מחדל: כל האפשרויות לא מסומנות = אין גישה.</p>
+            <div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="App._permsResetUser()">🔄 איפוס הרשאות</button></div>
+        </div>
+        ${partsHtml}
+        <div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--gray-200);">
+            <button class="btn btn-primary" onclick="App._permsSave()">💾 שמור הרשאות</button>
+            <button class="btn btn-outline" onclick="App._permsSelectedUserId=null;App.renderPermissions();" style="margin-right:8px;">ביטול</button>
+        </div>`;
+}
+function _permTogglePart(partId) {
+    const chk = document.getElementById('perm_chk_' + partId); const levels = document.getElementById('perm_levels_' + partId); if (!chk || !levels) return;
+    if (chk.checked) {
+        levels.style.opacity = '1'; levels.style.pointerEvents = 'auto';
+        const viewRadio = document.querySelector('input[name="perm_level_' + partId + '"][value="view"]');
+        if (viewRadio && !document.querySelector('input[name="perm_level_' + partId + '"]:checked')) viewRadio.checked = true;
+    } else {
+        levels.style.opacity = '0.35'; levels.style.pointerEvents = 'none';
+        document.querySelectorAll('input[name="perm_level_' + partId + '"]').forEach(r => r.checked = false);
+    }
+}
+function _permSetLevel(partId, level) {
+    const chk = document.getElementById('perm_chk_' + partId);
+    if (chk && !chk.checked) { chk.checked = true; _permTogglePart(partId); }
+}
+function _permsResetUser() {
+    if (!_permsSelectedUserId) return;
+    confirmDialog('לאפס את כל ההרשאות של משתמש זה? (כל האפשרויות יהפכו ללא גישה)', function() {
+        DataStore.update(DataStore.KEYS.USERS, _permsSelectedUserId, { permissions: {} });
+        showToast('ההרשאות אופסו', 'success'); renderPermissions();
+    });
+}
+function _permsSave() {
+    if (!_permsSelectedUserId) return;
+    const perms = {};
+    SYSTEM_PARTS.forEach(part => {
+        const chk = document.getElementById('perm_chk_' + part.id);
+        if (chk && chk.checked) {
+            const selected = document.querySelector('input[name="perm_level_' + part.id + '"]:checked');
+            perms[part.id] = selected ? selected.value : 'view';
+        }
+    });
+    DataStore.update(DataStore.KEYS.USERS, _permsSelectedUserId, { permissions: perms });
+    logActivity('update_permissions', 'עדכון הרשאות משתמש', 'user', _permsSelectedUserId);
+    showToast('ההרשאות נשמרו בהצלחה', 'success');
+}
+function _canViewSection(sectionId) {
+    if (!currentUser) return false; const role = currentUser.role || '';
+    if (role === 'admin' || role === 'system_admin') return true;
+    if (!currentUser.permissions) return true;
+    if (sectionId === 'homepage' || sectionId === 'faq') return true;
+    const perm = currentUser.permissions[sectionId]; return perm === 'view' || perm === 'full';
+}
+function _canFullSection(sectionId) {
+    if (!currentUser) return false; const role = currentUser.role || '';
+    if (role === 'admin' || role === 'system_admin') return true;
+    if (!currentUser.permissions) return true;
+    return currentUser.permissions[sectionId] === 'full';
+}
+
+// ================================================================
+//  ACTIVITY LOG
+// ================================================================
+function renderActivityLog() {
+    const items = (DataStore.getAll(DataStore.KEYS.ACTIVITY_LOG) || []).sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
+    const actionLabels = { 'login': '🔐 כניסה למערכת', 'add_solution': '➕ הוספת פתרון למידה', 'edit_solution': '✏️ עריכת פתרון למידה', 'delete_solution': '🗑️ מחיקת פתרון למידה', 'restore_solution': '♻️ שחזור פתרון מסל מחזור', 'add_registration': '➕ הוספת נרשם', 'edit_registration': '✏️ עריכת נרשם', 'delete_registration': '🗑️ מחיקת נרשם', 'bulk_delete_registrations': '🗑️ מחיקה גורפת — נרשמים', 'whatsapp_send': '💬 שליחת WhatsApp — נרשמים' };
+    document.getElementById('section-activity-log').innerHTML = `
+        ${_lookupTableHeader('מעקב והיסטוריה', items.length, '📊', '<div style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.printSection()">🖨️ הדפסה</button><button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.exportCSV(\'activity_log\')">📤 ייצוא CSV</button></div>')}
+        <div class="card"><div class="card-body">
+            <div class="toolbar">
+                <select class="filter-select" id="actTypeF" onchange="App.filterActivityLog()">
+                    <option value="">כל הפעולות</option>
+                    <option value="login">כניסה למערכת</option><option value="add_solution">הוספת פתרון</option><option value="edit_solution">עריכת פתרון</option>
+                    <option value="delete_solution">מחיקת פתרון</option><option value="restore_solution">שחזור פתרון</option><option value="add_registration">הוספת נרשם</option>
+                    <option value="edit_registration">עריכת נרשם</option><option value="delete_registration">מחיקת נרשם</option><option value="bulk_delete_registrations">מחיקה גורפת — נרשמים</option><option value="whatsapp_send">שליחת WhatsApp</option>
+                </select>
+                <input type="text" class="search-input" id="actSearch" placeholder="🔍 חיפוש לפי שם משתמש..." oninput="App.filterActivityLog()">
+            </div>
+            <div id="actTableDiv" style="max-height:500px;overflow-y:auto;">${_renderActTable(items)}</div>
+        </div></div>`;
+}
+function _renderActTable(items) {
+    if (!items.length) return '<div class="empty-state"><div class="empty-icon">📊</div><h3>אין רשומות פעילות</h3></div>';
+    const actionLabels = { 'login': '🔐', 'add_solution': '➕', 'edit_solution': '✏️', 'delete_solution': '🗑️', 'restore_solution': '♻️', 'add_registration': '➕', 'edit_registration': '✏️', 'delete_registration': '🗑️', 'bulk_delete_registrations': '🗑️', 'whatsapp_send': '💬' };
+    return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr><th>תאריך ושעה</th><th>משתמש</th><th>תפקיד</th><th>פעולה</th><th>פרטים</th></tr></thead><tbody>${items.map(a => `<tr>
+        <td style="font-size:12px;white-space:nowrap;">${new Date(a.timestamp).toLocaleString('he-IL')}</td>
+        <td><strong>${escAttr(a.userName || '—')}</strong></td>
+        <td>${a.userRole ? Auth.getRoleBadge(a.userRole) : '—'}</td>
+        <td>${actionLabels[a.actionType] || '📋'} ${a.actionType || ''}</td>
+        <td style="font-size:13px;color:var(--gray-600);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(a.description || '')}">${escAttr(a.description || '—')}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+function filterActivityLog() {
+    const type = document.getElementById('actTypeF').value; const search = document.getElementById('actSearch').value.toLowerCase();
+    let items = (DataStore.getAll(DataStore.KEYS.ACTIVITY_LOG) || []).sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
+    if (type) items = items.filter(a => a.actionType === type);
+    if (search) items = items.filter(a => (a.userName||'').toLowerCase().includes(search) || (a.description||'').toLowerCase().includes(search));
+    document.getElementById('actTableDiv').innerHTML = _renderActTable(items);
+}
+
+// ================================================================
+//  RECYCLE BIN
+// ================================================================
+const _ENTITY_META = { solutions: { label: 'פתרון למידה', nameField: 'name' }, solution_instructors: { label: 'מנחה משויך', nameField: 'fullName' }, mentors: { label: 'מרצה', nameField: 'fullName' }, guides_repo: { label: 'מדריך', nameField: 'fullName' }, budgets: { label: 'תקציב', nameField: 'budgetCode' }, periods: { label: 'תקופה', nameField: 'name' }, lookup_schools: { label: 'בית ספר', nameField: 'name' }, inspectors: { label: 'מפקח', nameField: 'fullName' }, pedagogical_executors: { label: 'מבצע פדגוגי', nameField: 'institutionName' }, registrations: { label: 'נרשם', nameField: 'fullName' }, faq_data: { label: 'שאלת תשובה', nameField: 'question' }, solution_comments: { label: 'תגובה', nameField: 'text' } };
+function _moveToRecycleBin(storeKey, id) {
+    const item = DataStore.getById(storeKey, id); if (!item) return null;
+    const meta = _ENTITY_META[storeKey] || { label: storeKey, nameField: 'name' };
+    DataStore.create(DataStore.KEYS.RECYCLE_BIN, { originalId: id, originalStoreKey: storeKey, originalEntityType: meta.label, data: JSON.parse(JSON.stringify(item)), deletedBy: currentUser ? currentUser.id : null, deletedByName: currentUser ? currentUser.fullName : '', deletedAt: new Date().toISOString() });
+    DataStore.remove(storeKey, id); return item;
+}
+function _moveAllToRecycleBin(storeKey) {
+    const items = DataStore.getAll(storeKey) || []; const meta = _ENTITY_META[storeKey] || { label: storeKey, nameField: 'name' };
+    items.forEach(function(item) { DataStore.create(DataStore.KEYS.RECYCLE_BIN, { originalId: item.id, originalStoreKey: storeKey, originalEntityType: meta.label, data: JSON.parse(JSON.stringify(item)), deletedBy: currentUser ? currentUser.id : null, deletedByName: currentUser ? currentUser.fullName : '', deletedAt: new Date().toISOString() }); });
+    DataStore.saveAll(storeKey, []); return items.length;
+}
+function renderRecycleBin() {
+    const allItems = (DataStore.getAll(DataStore.KEYS.RECYCLE_BIN) || []).sort((a,b) => new Date(b.deletedAt||0) - new Date(a.deletedAt||0));
+    const typeCounts = {}; allItems.forEach(function(r) { typeCounts[r.originalEntityType] = (typeCounts[r.originalEntityType] || 0) + 1; });
+    const types = Object.keys(typeCounts).sort(); const activeType = window._recycleFilter || ''; const search = window._recycleSearch || '';
+    const filtered = allItems.filter(function(r) {
+        if (activeType && r.originalEntityType !== activeType) return false;
+        if (search) { const d = r.data || {}; const meta = _ENTITY_META[r.originalStoreKey] || { nameField: 'name' }; return (d[meta.nameField] || '').toLowerCase().includes(search); }
+        return true;
+    });
+    let filterTabs = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">';
+    filterTabs += '<button class="btn btn-sm ' + (!activeType ? 'btn-primary' : 'btn-outline') + '" onclick="window._recycleFilter=\'\';App.renderRecycleBin();">הכל (' + allItems.length + ')</button>';
+    types.forEach(function(t) { filterTabs += '<button class="btn btn-sm ' + (activeType === t ? 'btn-primary' : 'btn-outline') + '" onclick="window._recycleFilter=\'' + t + '\';App.renderRecycleBin();">' + t + ' (' + typeCounts[t] + ')</button>'; });
+    filterTabs += '</div>';
+    const emptyBtn = allItems.length ? '<button class="btn btn-danger btn-sm" style="margin-right:auto;" onclick="App.emptyRecycleBin()">🗑️ ריקון סל מחזור</button>' : '';
+    document.getElementById('section-recycle-bin').innerHTML = `
+        ${_lookupTableHeader('סל מחזור', allItems.length, '🗑️', '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);" onclick="App.printSection()">🖨️ הדפסה</button>')}
+        <div class="card"><div class="card-body">
+            ${allItems.length ? '<p style="color:var(--gray-500);font-size:13px;margin-bottom:12px;">פריטים שנמחקו נשמרים כאן. ניתן לשחזר אותם למערכת.</p>' : ''}
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <input type="text" class="form-input" style="max-width:260px;" placeholder="🔍 חיפוש לפי שם..." value="${escAttr(search)}" oninput="window._recycleSearch=this.value.toLowerCase();App.renderRecycleBin();">
+                ${emptyBtn}
+            </div>
+            ${filterTabs}
+            <div id="recycleTableDiv">${_renderRecycleTable(filtered)}</div>
+        </div></div>`;
+}
+function _renderRecycleTable(items) {
+    if (!items.length) return '<div class="empty-state"><div class="empty-icon">♻️</div><h3>סל המחזור ריק</h3><p style="color:var(--gray-500);">אין פריטים שנמחקו</p></div>';
+    return `<div class="table-wrapper" style="box-shadow:none;"><table class="data-table"><thead><tr><th>סוג</th><th>שם</th><th>מחק ע"י</th><th>תאריך מחיקה</th><th>פעולות</th></tr></thead><tbody>${items.map(r => {
+        const d = r.data || {}; const meta = _ENTITY_META[r.originalStoreKey] || { nameField: 'name' }; const itemName = d[meta.nameField] || '—';
+        const subInfo = r.originalStoreKey === 'solutions' && d.solutionNumber ? '<br><small style="color:var(--gray-400);">מספר: ' + escAttr(d.solutionNumber) + '</small>' : r.originalStoreKey === 'lookup_schools' && d.code ? '<br><small style="color:var(--gray-400);">סמל: ' + escAttr(d.code) + '</small>' : r.originalStoreKey === 'registrations' && d.phone ? '<br><small style="color:var(--gray-400);">' + escAttr(d.phone) + '</small>' : '';
+        return `<tr>
+            <td><span style="background:var(--primary-bg);color:var(--primary-dark);padding:2px 8px;border-radius:12px;font-size:12px;white-space:nowrap;">${escAttr(r.originalEntityType || '—')}</span></td>
+            <td><strong>${escAttr(itemName)}</strong>${subInfo}</td>
+            <td>${escAttr(r.deletedByName || '—')}</td>
+            <td style="font-size:12px;">${formatDate(r.deletedAt)}</td>
+            <td><div style="display:flex;gap:4px;">
+                <button class="btn btn-success btn-sm" onclick="App.restoreFromRecycleBin('${r.id}')" title="שחזר">♻️ שחזר</button>
+                <button class="btn btn-danger btn-sm" onclick="App.permanentDeleteFromRecycleBin('${r.id}')" title="מחיקה לצמיתות">🗑️ לצמיתות</button>
+            </div></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+function restoreFromRecycleBin(recycleId) {
+    const item = DataStore.getById(DataStore.KEYS.RECYCLE_BIN, recycleId); if (!item || !item.data) return;
+    const storeKey = item.originalStoreKey; const meta = _ENTITY_META[storeKey] || { nameField: 'name' }; const itemName = (item.data[meta.nameField] || '').substring(0, 40);
+    confirmDialog('לשחזר פריט זה (' + (meta.label || '') + ') למערכת?', function() {
+        const restoreData = { ...item.data }; delete restoreData.id;
+        DataStore.create(storeKey, restoreData); logActivity('restore_item', 'שחזור ' + (meta.label || '') + ': ' + itemName, storeKey, recycleId);
+        DataStore.remove(DataStore.KEYS.RECYCLE_BIN, recycleId); showToast('הפריט שוחזר בהצלחה', 'success'); renderRecycleBin(); _refreshSectionAfterRestore(storeKey);
+    });
+}
+function _refreshSectionAfterRestore(storeKey) {
+    if (storeKey === DataStore.KEYS.SOLUTIONS) { renderSolutions(); updateSolutionsCount(); }
+    else if (storeKey === DataStore.KEYS.MENTORS) renderMentors();
+    else if (storeKey === DataStore.KEYS.GUIDES_REPO) renderGuidesRepo();
+    else if (storeKey === DataStore.KEYS.BUDGETS) renderBudgets();
+    else if (storeKey === DataStore.KEYS.PERIODS) renderPeriods();
+    else if (storeKey === DataStore.KEYS.REGISTRATIONS) renderRegistrations();
+    else if (storeKey === DataStore.KEYS.FAQ_DATA) renderFAQ();
+    else if (storeKey === DataStore.KEYS.INSPECTORS || storeKey === DataStore.KEYS.PEDAGOGICAL_EXECUTORS || storeKey === DataStore.KEYS.LOOKUP_SCHOOLS) renderLookupTables();
+}
+function permanentDeleteFromRecycleBin(recycleId) {
+    confirmDialog('⚠️ מחיקה לצמיתות! פעולה זו בלתי הפיכה.', function() { DataStore.remove(DataStore.KEYS.RECYCLE_BIN, recycleId); showToast('נמחק לצמיתות', 'success'); renderRecycleBin(); });
+}
+function emptyRecycleBin() {
+    const items = DataStore.getAll(DataStore.KEYS.RECYCLE_BIN) || [];
+    if (!items.length) { showToast('הסל כבר ריק', 'info'); return; }
+    confirmDialog('⚠️ למחוק לצמיתות את כל ' + items.length + ' הפריטים בסל המחזור? פעולה זו בלתי הפיכה!', function() {
+        DataStore.saveAll(DataStore.KEYS.RECYCLE_BIN, []); logActivity('empty_recycle_bin', 'ריקון סל מחזור (' + items.length + ' פריטים)', 'recycle_bin', '');
+        showToast('סל המחזור רוקן', 'success'); renderRecycleBin();
+    });
+}
+
+// ================================================================
+//  FAQ
+// ================================================================
+let _faqQuillAr = null, _faqQuillHe = null; let _faqDragId = null;
+function renderFAQ() {
+    const items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const container = document.getElementById('section-faq'); const hasItems = items.length > 0;
+    container.innerHTML = `
+        ${_lookupTableHeader('שאלות נפוצות ותשובות', items.length, '❓')}
+        <div style="font-size:14px;color:var(--gray-500);margin-bottom:12px;">כאן תוכלו למצוא שאלות נפוצות הנוגעות לתחום הפיתוח המקצועי למורים, לצד תשובות והדרכה מותאמות בנושא.</div>
+        ${_buildActionBar('faq', 'App.openFAQModal()', 'App.deleteAllFAQ()', items.length)}
+        <div class="toolbar">${_colVisBtnHtml('faq')}</div>
+        ${hasItems ? `<div id="faqBulkBar" style="display:none;margin-bottom:10px;padding:8px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:var(--border-radius);align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:600;color:#856404;" id="faqSelectedCount">0 נבחרו</span>
+            <button class="btn btn-danger btn-sm" onclick="App.deleteSelectedFAQs()">🗑️ מחק נבחרים</button>
+            <button class="btn btn-outline btn-sm" onclick="App.toggleFaqSelectAll(false)">בטל בחירה</button>
+        </div>` : ''}
+        <div class="card"><div class="card-body" style="padding:0;overflow-x:auto;">
+            <table class="data-table" style="min-width:700px;">
+                <thead><tr>
+                    ${hasItems ? '<th style="width:36px;"><input type="checkbox" id="faqSelectAll" onchange="App.toggleFaqSelectAll(this.checked)" style="cursor:pointer;"></th>' : ''}
+                    <th style="width:40px;">סדר</th><th>כותרת (ערבית)</th><th>כותרת (עברית)</th><th style="width:160px;">פעולות</th>
+                </tr></thead>
+                <tbody id="faqTableBody">${!hasItems ? '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400);">אין שאלות עדיין. לחצו על "הוספת שאלה" להתחלה.</td></tr>' :
+                    items.map(item => `<tr draggable="true" ondragstart="App._faqDragStart(event,'${escAttr(item.id)}')" ondragover="App._faqDragOver(event)" ondrop="App._faqDrop(event,'${escAttr(item.id)}')" ondragend="App._faqDragEnd(event)" style="cursor:grab;">
+                        <td style="text-align:center;"><input type="checkbox" class="faq-check" data-id="${escAttr(item.id)}" style="cursor:pointer;"></td>
+                        <td style="text-align:center;">${item.order || 0}</td>
+                        <td dir="rtl">${escAttr(item.titleAr || '—')}</td>
+                        <td>${escAttr(item.titleHe || '—')}</td>
+                        <td><div style="display:flex;gap:4px;justify-content:center;align-items:center;">
+                            <button class="btn btn-outline btn-sm" onclick="App.openFAQModal('${escAttr(item.id)}')" title="עריכה" style="padding:4px 8px;">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="App.deleteFAQ('${escAttr(item.id)}')" title="מחיקה" style="padding:4px 8px;">🗑️</button>
+                            <button class="btn btn-outline btn-sm" onclick="App.moveFAQ('${escAttr(item.id)}','up')" title="למעלה" style="padding:4px 8px;">▲</button>
+                            <button class="btn btn-outline btn-sm" onclick="App.moveFAQ('${escAttr(item.id)}','down')" title="למטה" style="padding:4px 8px;">▼</button>
+                        </div></td>
+                    </tr>`).join('')
+                }</tbody>
+            </table>
+        </div></div>`;
+    if (hasItems) container.querySelectorAll('.faq-check').forEach(function(cb) { cb.addEventListener('change', _updateFaqBulkBar); });
+    _applyTableFeatures('faq');
+}
+function _updateFaqBulkBar() {
+    var checked = document.querySelectorAll('.faq-check:checked'); var bar = document.getElementById('faqBulkBar'); var countEl = document.getElementById('faqSelectedCount'); var selectAll = document.getElementById('faqSelectAll');
+    if (!bar) return;
+    if (checked.length > 0) { bar.style.display = 'flex'; countEl.textContent = checked.length + ' נבחרו'; } else { bar.style.display = 'none'; }
+    if (selectAll) { var total = document.querySelectorAll('.faq-check').length; selectAll.checked = total > 0 && checked.length === total; }
+}
+function toggleFaqSelectAll(state) { var checkboxes = document.querySelectorAll('.faq-check'); checkboxes.forEach(function(cb) { cb.checked = state; }); _updateFaqBulkBar(); }
+function deleteSelectedFAQs() {
+    var checked = document.querySelectorAll('.faq-check:checked');
+    if (!checked.length) { showToast('לא נבחרו שאלות', 'warning'); return; }
+    confirmDialog('למחוק ' + checked.length + ' שאלות נבחרות?', function() {
+        checked.forEach(function(cb) { _moveToRecycleBin(DataStore.KEYS.FAQ_DATA, cb.dataset.id); });
+        logActivity('delete_faq_bulk', 'מחיקת ' + checked.length + ' שאלות', 'faq'); renderFAQ(); showToast(checked.length + ' שאלות נמחקו', 'success');
+    });
+}
+function deleteAllFAQ() {
+    var items = DataStore.getAll(DataStore.KEYS.FAQ_DATA) || [];
+    if (!items.length) { showToast('אין רשומות למחיקה', 'warning'); return; }
+    confirmDialog('למחוק את כל ' + items.length + ' השאלות? פעולה זו בלתי הפיכה!', function() {
+        _moveAllToRecycleBin(DataStore.KEYS.FAQ_DATA); logActivity('delete_faq_all', 'מחיקת כל השאלות (' + items.length + ')', 'faq'); renderFAQ(); showToast('כל השאלות נמחקו', 'success');
+    });
+}
+function moveFAQ(id, direction) {
+    var items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    var idx = items.findIndex(i => i.id === id); if (idx < 0) return;
+    var targetIdx;
+    if (direction === 'up' && idx > 0) targetIdx = idx - 1;
+    else if (direction === 'down' && idx < items.length - 1) targetIdx = idx + 1;
+    else return;
+    var itemA = items[idx]; var itemB = items[targetIdx]; var tempOrder = itemA.order;
+    DataStore.update(DataStore.KEYS.FAQ_DATA, itemA.id, { order: itemB.order });
+    DataStore.update(DataStore.KEYS.FAQ_DATA, itemB.id, { order: tempOrder });
+    renderFAQ();
+}
+function _faqDragStart(e, id) { _faqDragId = id; e.dataTransfer.effectAllowed = 'move'; e.target.style.opacity = '0.4'; }
+function _faqDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function _faqDrop(e, targetId) {
+    e.preventDefault(); if (!_faqDragId || _faqDragId === targetId) return;
+    var items = (DataStore.getAll(DataStore.KEYS.FAQ_DATA) || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    var fromIdx = items.findIndex(i => i.id === _faqDragId); var toIdx = items.findIndex(i => i.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    var moved = items.splice(fromIdx, 1)[0]; items.splice(toIdx, 0, moved);
+    items.forEach(function(item, i) { DataStore.update(DataStore.KEYS.FAQ_DATA, item.id, { order: i + 1 }); });
+    renderFAQ();
+}
+function _faqDragEnd(e) { _faqDragId = null; e.target.style.opacity = '1'; }
+function openFAQModal(editId) {
+    const item = editId ? DataStore.getById(DataStore.KEYS.FAQ_DATA, editId) : null;
+    const title = item ? 'עריכת שאלה' : 'הוספת שאלה חדשה';
+    const items = DataStore.getAll(DataStore.KEYS.FAQ_DATA) || [];
+    const maxOrder = items.reduce((max, i) => Math.max(max, i.order || 0), 0);
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-group"><label>כותרת בערבית</label><input type="text" id="fFaqTitleAr" class="form-input" value="${escAttr(item ? item.titleAr || '' : '')}" dir="rtl"></div>
+        <div class="form-group"><label>כותרת בעברית</label><input type="text" id="fFaqTitleHe" class="form-input" value="${escAttr(item ? item.titleHe || '' : '')}"></div>
+        <div class="form-group"><label>תשובה בערבית</label><div id="fFaqAnswerAr" style="min-height:200px;border:1px solid var(--gray-200);border-radius:var(--border-radius);"></div></div>
+        <div class="form-group"><label>תשובה בעברית</label><div id="fFaqAnswerHe" style="min-height:200px;border:1px solid var(--gray-200);border-radius:var(--border-radius);"></div></div>
+        <div class="form-group"><label>סדר תצוגה</label><input type="number" id="fFaqOrder" class="form-input" value="${item ? (item.order || 0) : maxOrder + 1}" style="max-width:120px;"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+            <button class="btn btn-primary" onclick="App.saveFAQ('${editId || ''}')">💾 שמור</button>
+            <button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>
+        </div>`;
+    document.getElementById('modalTitle').textContent = title; document.getElementById('modalFooter').innerHTML = '';
+    document.getElementById('modalOverlay').classList.add('active');
+    setTimeout(() => {
+        if (_faqQuillAr) { _faqQuillAr = null; } if (_faqQuillHe) { _faqQuillHe = null; }
+        const arEl = document.getElementById('fFaqAnswerAr'); const heEl = document.getElementById('fFaqAnswerHe');
+        if (arEl) { _faqQuillAr = new Quill(arEl, { theme: 'snow', direction: 'rtl', placeholder: 'أدخل الإجابة بالعربية...', modules: { toolbar: [['bold','italic','underline','strike'], [{'list':'ordered'},{'list':'bullet'}], ['link'], ['clean']] } }); if (item && item.answerAr) _faqQuillAr.root.innerHTML = item.answerAr; }
+        if (heEl) { _faqQuillHe = new Quill(heEl, { theme: 'snow', direction: 'rtl', placeholder: 'הזן את התשובה בעברית...', modules: { toolbar: [['bold','italic','underline','strike'], [{'list':'ordered'},{'list':'bullet'}], ['link'], ['clean']] } }); if (item && item.answerHe) _faqQuillHe.root.innerHTML = item.answerHe; }
+    }, 100);
+}
+function saveFAQ(editId) {
+    const titleAr = document.getElementById('fFaqTitleAr').value.trim(); const titleHe = document.getElementById('fFaqTitleHe').value.trim();
+    const answerAr = _faqQuillAr ? _faqQuillAr.root.innerHTML : ''; const answerHe = _faqQuillHe ? _faqQuillHe.root.innerHTML : '';
+    const order = parseInt(document.getElementById('fFaqOrder').value) || 0;
+    if (!titleAr && !titleHe) { showToast('יש להזין לפחות כותרת אחת', 'error'); return; }
+    const data = { titleAr, titleHe, answerAr, answerHe, order };
+    if (editId) { DataStore.update(DataStore.KEYS.FAQ_DATA, editId, data); logActivity('edit_faq', 'עריכת שאלה: ' + (titleHe || titleAr), 'faq', editId); }
+    else { DataStore.create(DataStore.KEYS.FAQ_DATA, data); logActivity('add_faq', 'הוספת שאלה: ' + (titleHe || titleAr), 'faq'); }
+    closeModal(); renderFAQ(); showToast(editId ? 'השאלה עודכנה' : 'השאלה נוספה', 'success');
+}
+function deleteFAQ(id) {
+    confirmDialog('⚠️ למחוק שאלה זו?', function() { _moveToRecycleBin(DataStore.KEYS.FAQ_DATA, id); logActivity('delete_faq', 'מחיקת שאלה', 'faq', id); renderFAQ(); showToast('השאלה נמחקה', 'success'); });
+}
+
+// ================================================================
+//  SETTINGS & BACKUP
+// ================================================================
+var _waEditIdx = -1;
+function _openWaEditModal(idx) {
+    var templates = _getWaTemplates(); if (idx < 0 || idx >= templates.length) return; _waEditIdx = idx; var t = templates[idx];
+    var langLabel = t.lang === 'ar' ? '🇸🇦 ערבית' : '🇮🇱 עברית'; var periodLabels = { morning: 'בוקר', afternoon: 'צהריים', evening: 'ערב', night: 'לילה' }; var pLabel = periodLabels[t.period] || t.period;
+    showModal('עריכת תבנית — ' + langLabel + ' · ' + pLabel, '<div class="form-group"><label>נוסח הפנייה</label><p style="font-size:12px;color:var(--gray-400);margin-bottom:6px;">השתמשו ב-<strong>[שם]</strong> או <strong>[اسم]</strong> כ-placeholder לשם המשתלם.</p><textarea id="fWaEditText" class="form-input" rows="4" style="resize:vertical;">' + escAttr(t.text) + '</textarea></div>', '<button class="btn btn-primary" onclick="App._saveWaEditModal()">💾 שמור</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>');
+}
+function _saveWaEditModal() {
+    if (_waEditIdx < 0) return; var textEl = document.getElementById('fWaEditText'); if (!textEl) return;
+    var templates = _getWaTemplates(); if (_waEditIdx < templates.length) { templates[_waEditIdx].text = textEl.value.trim() || templates[_waEditIdx].text; DataStore.updateSettings({ waTemplates: templates }); showToast('התבנית נשמרה', 'success'); var editor = document.getElementById('waTemplateEditor'); if (editor) editor.innerHTML = _renderWaTemplateEditor(); }
+    closeModal(); _waEditIdx = -1;
+}
+function _resetSingleWaTemplate(idx) {
+    var templates = _getWaTemplates(); if (idx < 0 || idx >= templates.length) return;
+    confirmDialog('לאפס תבנית זו לברירת מחדל?', function() {
+        var def = _WA_DEFAULT_TEMPLATES.find(function(d) { return d.id === templates[idx].id; });
+        if (def) { templates[idx].text = def.text; DataStore.updateSettings({ waTemplates: templates }); showToast('התבנית אופסה', 'success'); var editor = document.getElementById('waTemplateEditor'); if (editor) editor.innerHTML = _renderWaTemplateEditor(); }
+        else { showToast('תבנית מותאמת אישית — לא ניתן לאפס אוטומטית', 'warning'); }
+    });
+}
+function _renderWaTemplateEditor() {
+    var templates = _getWaTemplates(); var periodLabels = { morning: 'בוקר', afternoon: 'צהריים', evening: 'ערב', night: 'לילה' }; var periodIcons = { morning: '🌅', afternoon: '☀️', evening: '🌆', night: '🌙' };
+    var html = '<p style="color:var(--gray-500);font-size:13px;margin-bottom:14px;">ניתן לערוך כל תבנית בנפרד. השתמשו ב-<strong>[שם]</strong> או <strong>[اسم]</strong> כ-placeholder.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">';
+    templates.forEach(function(t, i) {
+        var langLabel = t.lang === 'ar' ? '🇸🇦 ערבית' : '🇮🇱 עברית'; var pLabel = periodLabels[t.period] || t.period; var pIcon = periodIcons[t.period] || '📝'; var preview = (t.text || '').substring(0, 55); if ((t.text || '').length > 55) preview += '...';
+        html += '<div style="border:1px solid var(--gray-200);border-radius:8px;padding:14px;background:white;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--gray-700);"><span>' + pIcon + '</span><span>' + langLabel + ' · ' + escAttr(pLabel) + '</span></div><div style="display:flex;gap:2px;"><button onclick="App._openWaEditModal(' + i + ')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:4px;border-radius:4px;" title="ערוך">✏️</button><button onclick="App._resetSingleWaTemplate(' + i + ')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:4px;border-radius:4px;" title="אפס לברירת מחדל">🔄</button></div></div><div style="font-size:12px;color:var(--gray-500);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escAttr(preview) + '</div></div>';
+    });
+    html += '</div><div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="App._addWaTemplate()">➕ הוסף תבנית</button><button class="btn btn-outline btn-sm" onclick="App._resetWaTemplates()">↩️ אפס הכל לברירת מחדל</button></div>';
+    return html;
+}
+function _saveWaTemplates() { DataStore.updateSettings({ waTemplates: _getWaTemplates() }); showToast('התבניות נשמרו בהצלחה', 'success'); }
+function _resetWaTemplates() { confirmDialog('לשחזר את תבניות ברירת המחדל?', function() { DataStore.updateSettings({ waTemplates: [] }); showToast('התבניות שוחזרו לברירת מחדל', 'success'); var editor = document.getElementById('waTemplateEditor'); if (editor) editor.innerHTML = _renderWaTemplateEditor(); }); }
+function _addWaTemplate() { var templates = _getWaTemplates(); templates.push({ id: 'custom_' + Date.now(), lang: 'he', period: 'morning', hourFrom: 6, hourTo: 11, text: 'חג שמח [שם],' }); DataStore.updateSettings({ waTemplates: templates }); var editor = document.getElementById('waTemplateEditor'); if (editor) editor.innerHTML = _renderWaTemplateEditor(); showToast('תבנית חדשה נוספה — ערכו את התוכן ושמרו', 'info'); }
+
+function _getBackupStatus(tableKey) {
+    var settings = DataStore.getSettings(); var ts = settings.backupTimestamps || {}; var dateStr = ts[tableKey];
+    if (!dateStr) return { status: 'none', label: 'ללא גיבוי', date: '', color: 'var(--gray-300)' };
+    var diff = Date.now() - new Date(dateStr).getTime(); var days = diff / (1000 * 60 * 60 * 24); var d = new Date(dateStr); var dateLabel = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+    if (days <= 7) return { status: 'fresh', label: 'עדכני', date: dateLabel, color: '#22c55e' };
+    if (days <= 30) return { status: 'old', label: 'ישן', date: dateLabel, color: '#eab308' };
+    return { status: 'stale', label: 'מאוד ישן', date: dateLabel, color: 'var(--gray-400)' };
+}
+function _backupTableCard(tableKey) { var sel = document.getElementById('fBackupTable'); if (sel) sel.value = tableKey; backupTable(tableKey); }
+function _backupFullCard() { backupFull(); }
+function _updateBackupStatusUI() {
+    var tableKeys = Object.keys(BACKUP_TABLE_META); var freshCount = 0, oldCount = 0, staleCount = 0, noneCount = 0;
+    tableKeys.forEach(function(k) {
+        var st = _getBackupStatus(k); var dot = document.getElementById('backup-dot-' + k); var dateEl = document.getElementById('backup-date-' + k);
+        if (dot) { dot.style.background = st.color; dot.title = st.label; } if (dateEl) dateEl.textContent = st.date || '—';
+        if (st.status === 'fresh') freshCount++; else if (st.status === 'old') oldCount++; else if (st.status === 'stale') staleCount++; else noneCount++;
+    });
+    var badge = document.getElementById('backupSummaryBadge'); var summaryText = document.getElementById('backupSummaryText');
+    if (badge && summaryText) {
+        if (noneCount > 0) { badge.style.background = '#fee2e2'; badge.style.color = '#991b1b'; badge.textContent = 'דרוש גיבוי'; summaryText.textContent = noneCount + ' טבלאות ללא גיבוי'; }
+        else if (staleCount > 0) { badge.style.background = '#fef3c7'; badge.style.color = '#92400e'; badge.textContent = 'גיבוי ישן'; summaryText.textContent = staleCount + ' טבלאות עם גיבוי ישן (>30 יום)'; }
+        else if (oldCount > 0) { badge.style.background = '#fef3c7'; badge.style.color = '#92400e'; badge.textContent = 'שים לב'; summaryText.textContent = oldCount + ' טבלאות עם גיבוי עד 30 יום'; }
+        else { badge.style.background = '#dcfce7'; badge.style.color = '#166534'; badge.textContent = 'תקין'; summaryText.textContent = 'כל הטבלאות מעודכנות (עד 7 ימים)'; }
+    }
+}
+function _triggerFullRestore() { var input = document.getElementById('fRestoreFullFile'); if (input) { input.value = ''; input.click(); } }
+function _triggerTableRestore(tableKey) { var sel = document.getElementById('fRestoreTable'); if (sel) sel.value = tableKey; var input = document.getElementById('fRestoreTableFile'); if (input) { input.value = ''; input.click(); } }
+function _triggerDataImport() { var input = document.getElementById('fSettingsImportFile'); if (input) { input.value = ''; input.click(); } }
+function _checkDataIntegrity() {
+    var keys = Object.keys(BACKUP_TABLE_META); var issues = [];
+    keys.forEach(function(k) { var data = DataStore.getAll(k); if (!data || (Array.isArray(data) && data.length === 0)) issues.push(BACKUP_TABLE_META[k] + ': ריקה'); });
+    if (issues.length === 0) showToast('כל ' + keys.length + ' הטבלאות תקינות ✓', 'success');
+    else { var listHtml = issues.map(function(i) { return '<li style="margin-bottom:3px;font-size:13px;">' + i + '</li>'; }).join(''); showModal('בדיקת תקינות', '<p style="margin-bottom:10px;color:var(--gray-600);">נמצאו <strong>' + issues.length + '</strong> טבלאות ריקות:</p><ul style="max-height:250px;overflow-y:auto;direction:rtl;text-align:right;padding-right:16px;color:var(--gray-700);">' + listHtml + '</ul>', '<button class="btn btn-primary" onclick="App.closeModal()">סגור</button>'); }
+}
+function renderSettings() {
+    const settings = DataStore.getSettings(); var tableKeys = Object.keys(BACKUP_TABLE_META); var tableCardsHtml = '';
+    tableKeys.forEach(function(k) {
+        var st = _getBackupStatus(k); var label = BACKUP_TABLE_META[k]; var data = DataStore.getAll(k);
+        var recordCount = Array.isArray(data) ? data.length : (typeof data === 'object' && data !== null ? Object.keys(data).length : 0);
+        var statusTooltip = st.status === 'none' ? 'לא בוצע גיבוי' : 'גיבוי אחרון: ' + st.date + ' (' + st.label + ')';
+        tableCardsHtml += '<div style="border:1px solid var(--gray-200);border-radius:10px;padding:12px 14px;background:white;display:flex;flex-direction:column;gap:8px;transition:box-shadow 0.15s;" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.06)\'" onmouseout="this.style.boxShadow=\'none\'" title="' + escAttr(statusTooltip) + '">';
+        tableCardsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:13px;font-weight:600;color:var(--gray-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escAttr(label) + '">' + escAttr(label) + '</span><span id="backup-dot-' + k + '" style="width:10px;height:10px;border-radius:50%;background:' + st.color + ';flex-shrink:0;" title="' + escAttr(st.label) + '"></span></div>';
+        tableCardsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;"><span id="backup-date-' + k + '" style="font-size:11px;color:var(--gray-400);">' + (st.date || '—') + '</span><span style="font-size:11px;color:var(--gray-400);background:var(--gray-100);padding:1px 7px;border-radius:8px;">' + recordCount + ' רשומות</span></div>';
+        tableCardsHtml += '<div style="display:flex;gap:6px;"><button class="btn btn-outline btn-sm" style="flex:1;font-size:12px;padding:6px 8px;" onclick="App._backupTableCard(\'' + k + '\')" title="הורד גיבוי של ' + escAttr(label) + '">💾 גיבוי</button><button class="btn btn-outline btn-sm" style="flex:1;font-size:12px;padding:6px 8px;" onclick="App._triggerTableRestore(\'' + k + '\')" title="טען גיבוי ל- ' + escAttr(label) + '">🔄 שחזור</button></div></div>';
+    });
+    document.getElementById('section-settings').innerHTML =
+        '<select id="fBackupTable" style="display:none;"><option value="">--</option></select><select id="fRestoreTable" style="display:none;"><option value="">--</option></select>' +
+        '<input type="file" id="fRestoreFullFile" accept=".json" style="display:none;" onchange="App.restoreFull()"><input type="file" id="fRestoreTableFile" accept=".json" style="display:none;" onchange="App.restoreTable()">' +
+        '<input type="file" id="fSettingsImportFile" accept=".json" style="display:none;" onchange="App.importJSON(this)">' +
+        '<div class="card" style="border-top:4px solid #0ca7aa;margin-bottom:24px;"><div class="card-header"><span class="card-title">🌐 כותרת אתר וזכויות יוצרים</span></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+            '<div class="form-group"><label>שם האתר – עברית</label><input type="text" id="fSiteNameHe" class="form-input" value="' + escAttr(settings.siteNameHe || '') + '" dir="rtl"></div>' +
+            '<div class="form-group"><label>اسم الموقع – بالعربية</label><input type="text" id="fSiteNameAr" class="form-input" value="' + escAttr(settings.siteNameAr || '') + '" dir="rtl"></div>' +
+            '<div class="form-group"><label>טקסט זכויות יוצרים – עברית</label><input type="text" id="fCopyrightHe" class="form-input" value="' + escAttr(settings.copyrightHe || '') + '" dir="rtl"></div>' +
+            '<div class="form-group"><label>نص حقوق النشر – بالعربية</label><input type="text" id="fCopyrightAr" class="form-input" value="' + escAttr(settings.copyrightAr || '') + '" dir="rtl"></div>' +
+        '</div><div class="form-group"><label>לוגו האתר</label><div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><input type="file" id="fLogoFile" accept="image/*" style="font-size:13px;"><div id="fLogoPreview" style="width:40px;height:40px;border-radius:8px;border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;flex-shrink:0;background:var(--gray-50);">' + (settings.logoUrl ? '<img src="'+settings.logoUrl+'" style="width:100%;height:100%;object-fit:cover;">' : '🧭') + '</div></div></div>' +
+        '<div style="display:flex;justify-content:flex-start;margin-top:8px;"><button class="btn btn-primary" onclick="App.saveSiteSettings()">💾 שמור שינויים</button></div></div></div>' +
+        '<div class="card" style="border-top:4px solid #25D366;margin-bottom:24px;"><div class="card-header"><span class="card-title">💬 תבניות הפנייה אישית – WhatsApp</span></div><div class="card-body"><div id="waTemplateEditor">' + _renderWaTemplateEditor() + '</div></div></div>' +
+        '<div class="card" style="border-top:4px solid #6b7280;margin-bottom:24px;"><div class="card-header"><span class="card-title">💾 ניהול נתונים, גיבוי ושחזור</span></div><div class="card-body">' +
+            '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:20px;direction:rtl;text-align:right;"><p style="margin:0 0 6px 0;font-size:13px;color:var(--gray-600);line-height:1.6;">💾 <strong>גיבוי מלא</strong> — יוצר עותק מלא של כל ' + tableKeys.length + ' הטבלאות במערכת ומוריד למחשב כקובץ JSON.</p><p style="margin:0;font-size:13px;color:var(--gray-600);line-height:1.6;">🔄 <strong>שחזור מלא</strong> — טוען קובץ גיבוי ומשחזר את כל הטבלאות שנכללו בו. <span style="color:#991b1b;font-weight:500;">⚠️ הנתונים הקיימים יוחלפו לחלוטין.</span></p></div>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--gray-200);">' +
+                '<button class="btn btn-primary" id="btnBackupFull" onclick="App._backupFullCard()" style="font-size:14px;padding:10px 20px;" title="יצירת גיבוי מלא של כל הטבלאות והורדה למחשב">💾 גיבוי מלא – כל הנתונים</button>' +
+                '<button class="btn btn-outline" onclick="App._triggerFullRestore()" style="font-size:14px;padding:10px 20px;" title="טעינת קובץ גיבוי ושחזור מלא של כל הטבלאות">🔄 שחזור מלא מקובץ גיבוי</button>' +
+                '<button class="btn btn-outline" onclick="App.exportJSON()" style="font-size:13px;">📤 ייצוא נתונים</button>' +
+                '<button class="btn btn-outline" onclick="App._triggerDataImport()" style="font-size:13px;">📥 ייבוא נתונים</button>' +
+                '<button class="btn btn-outline" onclick="App._checkDataIntegrity()" style="font-size:13px;">✅ בדיקת תקינות</button>' +
+                '<button class="btn btn-danger" onclick="App.clearData()" style="font-size:13px;">🗑️ נקה הכל</button>' +
+            '</div>' +
+            '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:16px;direction:rtl;text-align:right;"><p style="margin:0;font-size:12px;color:#0369a1;line-height:1.6;">📤 <strong>ייצוא נתונים</strong> — מייצא את כל הנתונים לקובץ CSV/Excel לצורך ניתוח או דיווח חיצוני. לא מתאים לשחזור!<br>📥 <strong>ייבוא נתונים</strong> — מיזוג נתונים מקובץ חיצוני לתוך הטבלאות הקיימות. לא מחליף נתונים קיימים!</p></div>' +
+            '<div style="background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;margin-bottom:16px;"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:13px;font-weight:600;color:var(--gray-600);">📊 מצב גיבוי כללי:</span><span id="backupSummaryBadge" style="font-size:12px;padding:4px 10px;border-radius:12px;background:#dcfce7;color:#166534;font-weight:600;">תקין</span></div><div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--gray-500);"><span id="backupSummaryText">כל הטבלאות מעודכנות</span></div></div></div>' +
+            '<p style="font-size:12px;color:var(--gray-400);margin-bottom:10px;">מצב גיבוי לכל טבלה (לחצו על "גיבוי" להורדה או "שחזור" לטעינה):</p>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;max-height:360px;overflow-y:auto;padding:2px;">' + tableCardsHtml + '</div>' +
+        '</div></div>' +
+        '<div class="card" style="border-top:4px solid #475569;"><div class="card-header"><span class="card-title">🩺 אבחון תקינות שרת</span></div><div class="card-body">' +
+            '<div id="healthCheckSummary" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:600;"></div>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">' +
+                '<button class="btn btn-primary" id="btnRunHealthCheck" onclick="App._runHealthCheck()" style="font-size:13px;">🩺 בצע אבחון שרת</button>' +
+                '<button class="btn btn-outline" onclick="App._showErrorLog()" style="font-size:13px;">📋 הצג שגיאות אחרונות</button>' +
+                '<button class="btn btn-outline" id="btnAutoFix" onclick="App._attemptAutoFix()" style="font-size:13px;display:none;">🔧 תיקון אוטומטי של הרשאות</button>' +
+            '</div>' +
+            '<div id="healthCheckResults" class="health-check-results" style="display:none;"></div>' +
+            '<div id="hcCpanelConfig" style="margin-top:16px;padding:12px 16px;border-radius:8px;background:#f0f4f8;border:1px solid #cbd5e1;direction:rtl;text-align:right;">' +
+                '<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">ℹ️ הגדרות cPanel (אופציונלי)</div>' +
+                '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+                    '<input type="text" id="hcCpanelUrl" placeholder="כתובת cPanel, דוגמה: https://cpanel.example.com:2083" style="flex:1;min-width:200px;padding:7px 12px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;direction:ltr;text-align:left;font-family:monospace;" onchange="localStorage.setItem(\'hc_cpanel_url\',this.value)" />' +
+                    '<button class="btn btn-outline" style="font-size:11px;white-space:nowrap;" onclick="App._openCpanelLink(\'errors\')">📋 דף שגיאות cPanel</button>' +
+                    '<button class="btn btn-outline" style="font-size:11px;white-space:nowrap;" onclick="App._openCpanelLink(\'filemanager\')">📁 מנהל קבצים</button>' +
+                '</div>' +
+                '<p style="font-size:11px;color:#64748b;margin:6px 0 0 0;">הכנסו את כתובת cPanel שלכם (כולל הפורט ו-:2083) כדי לקבל גישה ישירה לדפי השגיאות ומנהל הקבצים של cPanel.</p>' +
+            '</div>' +
+            '<p style="font-size:12px;color:var(--gray-400);margin-bottom:0;">בדיקה אוטומטית של הרשאות כתיבה, נתיבים, זיכרון, בעלות (Ownership) וקבצי נתונים. מותאם לשרתי cPanel/suPHP – יאבחן בעיות בעלות ויציג הנחיות לתיקון.</p>' +
+        '</div></div>';
+    _populateBackupTableSelects(); _restoreCpanelUrl();
+}
+function _switchSettingsSub(subSection) {
+    App._settingsSubSection = subSection;
+    document.querySelectorAll('.settings-sub-section').forEach(function(el) { el.style.display = 'none'; });
+    var activeEl = document.getElementById('settings-sub-' + subSection); if (activeEl) activeEl.style.display = 'block';
+    var buttons = document.querySelectorAll('#section-settings .btn');
+    buttons.forEach(function(btn) {
+        var isTarget = btn.textContent.includes(_getSubSectionLabel(subSection));
+        if (isTarget) { btn.classList.remove('btn-ghost'); btn.classList.add('btn-primary'); }
+        else { if (btn.onclick && btn.onclick.toString().includes('_switchSettingsSub')) { btn.classList.remove('btn-primary'); btn.classList.add('btn-ghost'); } }
+    });
+    document.querySelector('.main-content').scrollTop = 0;
+}
+function _getSubSectionLabel(sub) { var labels = { 'general': 'הגדרות כלליות', 'whatsapp': 'תבניות WhatsApp', 'backup': 'גיבוי ושחזור', 'health': 'אבחון שרת' }; return labels[sub] || ''; }
+
+var _lastHealthData = null;
+function _runHealthCheck() {
+    var btn = document.getElementById('btnRunHealthCheck'); var resultsEl = document.getElementById('healthCheckResults'); var summaryEl = document.getElementById('healthCheckSummary');
+    if (!btn || !resultsEl || !summaryEl) return;
+    btn.disabled = true; btn.textContent = '🔄 מאבחן...'; summaryEl.style.display = 'none'; resultsEl.style.display = 'none'; document.getElementById('btnAutoFix').style.display = 'none';
+    fetch('/api/health-check?XTransformPort=3001', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false; btn.textContent = '🩺 בצע אבחון שרת'; _lastHealthData = data; _renderHealthResults(data);
+    }).catch(function(err) {
+        btn.disabled = false; btn.textContent = '🩺 בצע אבחון שרת'; summaryEl.style.display = 'block'; summaryEl.style.background = '#fef2f2'; summaryEl.style.color = '#991b1b'; summaryEl.style.border = '1px solid #fecaca';
+        summaryEl.innerHTML = '❌ שגיאה בחיבור השרת: ' + escAttr(err.message) + '. ייתכן שהשרת אינו פעיל בסביבה הנוכחית.';
+    });
+}
+function _renderHealthResults(data) {
+    var summaryEl = document.getElementById('healthCheckSummary'); var resultsEl = document.getElementById('healthCheckResults'); var autoFixBtn = document.getElementById('btnAutoFix');
+    var hasFail = data.results.some(function(r) { return r.status === 'fail'; }); var hasWarn = data.results.some(function(r) { return r.status === 'warn'; });
+    summaryEl.style.display = 'block';
+    if (data.allPassed && !hasWarn) { summaryEl.style.background = '#f0fdf4'; summaryEl.style.color = '#166534'; summaryEl.style.border = '1px solid #bbf7d0'; summaryEl.innerHTML = '✅ המערכת תקינה – כל הבדיקות עברו בהצלחה. <span style="font-weight:400;font-size:12px;opacity:0.7;">(' + new Date(data.timestamp).toLocaleString('he-IL') + ')</span>'; }
+    else if (!hasFail && hasWarn) { summaryEl.style.background = '#fffbeb'; summaryEl.style.color = '#92400e'; summaryEl.style.border = '1px solid #fde68a'; summaryEl.innerHTML = '⚠️ המערכת פעילה עם אזהרות – יש לבדוק את הפרטים.'; }
+    else { summaryEl.style.background = '#fef2f2'; summaryEl.style.color = '#991b1b'; summaryEl.style.border = '1px solid #fecaca'; summaryEl.innerHTML = '❌ נמצאו בעיות – יש לפעול בהתאם להוראות.'; if (autoFixBtn) autoFixBtn.style.display = ''; }
+    var html = '';
+    data.results.forEach(function(r) {
+        var icon, bgColor, borderColor, textColor;
+        if (r.status === 'ok') { icon = '✅'; bgColor = '#f0fdf4'; borderColor = '#bbf7d0'; textColor = '#166534'; }
+        else if (r.status === 'warn') { icon = '⚠️'; bgColor = '#fffbeb'; borderColor = '#fde68a'; textColor = '#92400e'; }
+        else if (r.status === 'fail') { icon = '❌'; bgColor = '#fef2f2'; borderColor = '#fecaca'; textColor = '#991b1b'; }
+        else { icon = 'ℹ️'; bgColor = '#f8fafc'; borderColor = '#e2e8f0'; textColor = '#475569'; }
+        html += '<div class="hc-result-item" data-check-id="' + escAttr(r.id) + '" data-status="' + r.status + '" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;margin-bottom:8px;border-radius:8px;background:' + bgColor + ';border:1px solid ' + borderColor + ';direction:rtl;text-align:right;">';
+        html += '<span style="font-size:18px;flex-shrink:0;margin-top:1px;">' + icon + '</span><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:' + textColor + ';margin-bottom:4px;">' + escAttr(r.label) + '</div>';
+        if (r.status === 'info') { html += '<div style="font-size:12px;color:var(--gray-600);direction:ltr;text-align:left;font-family:monospace;background:white;padding:6px 10px;border-radius:4px;word-break:break-all;">' + escAttr(r.detail) + '</div>'; }
+        else { html += '<div style="font-size:12px;color:' + textColor + ';opacity:0.85;line-height:1.6;">' + escAttr(r.detail) + '</div>'; }
+        if (r.id === 'cpanel_owner' && r.status === 'fail') {
+            html += '<div class="hc-cpanel-guidance"><strong>🔧 פעולות מומלצות לתיקון הבעיה:</strong><ol style="margin:6px 0 0 0;padding-right:18px;line-height:2;"><li>התחברו ל-cPanel > מנהל הקבצים (File Manager)</li><li>בחרו בתיקיית data/ – בדקו את העמודה "בעלות" (Owner)</li><li>אם הבעלות מוגדרת ל-<strong>nobody</strong> – החליפו לשם המשתמש שלכם ב-cPanel</li><li>לאחר השינוי: תיקיות <strong>755</strong>, קבצים <strong>644</strong> או <strong>664</strong></li></ol></div>';
+        }
+        html += '</div></div>';
+    });
+    resultsEl.innerHTML = html; resultsEl.style.display = 'block';
+}
+function _showErrorLog() {
+    showModal('📋 יומן שגיאות אחרונות', '<div id="healthLogContent" style="direction:rtl;text-align:center;padding:20px 0;"><div style="font-size:24px;margin-bottom:12px;">🔄</div>טוען...</div>', '<button class="btn btn-outline" onclick="App.closeModal()">סגירה</button>');
+    fetch('/api/health-log?XTransformPort=3001', { method: 'GET' }).then(function(r) { return r.json(); }).then(function(data) {
+        var container = document.getElementById('healthLogContent'); if (!container) return;
+        if (!data.entries || data.entries.length === 0) { container.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--gray-400);">✅ אין שגיאות מתועדות.</div>'; return; }
+        var html = '<div style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">סה"כ כל השגיאות: ' + (data.total || 0) + '</div><div style="max-height:350px;overflow-y:auto;">';
+        data.entries.forEach(function(entry) { html += '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all;color:var(--gray-700);">' + escAttr(entry) + '</div>'; });
+        html += '</div><div style="margin-top:12px;display:flex;gap:8px;justify-content:center;"><button class="btn btn-outline btn-sm" onclick="App._copyErrorLog()" style="font-size:12px;">📋 העתק ללוח</button><button class="btn btn-outline btn-sm" onclick="App._clearErrorLog()" style="font-size:12px;color:var(--danger);">🗑️ נקה לוג</button></div>';
+        var cpanelUrl = (document.getElementById('hcCpanelUrl') && document.getElementById('hcCpanelUrl').value) || localStorage.getItem('hc_cpanel_url') || ''; cpanelUrl = cpanelUrl.trim().replace(/\/+$/, '');
+        html += '<div style="margin-top:16px;padding:12px 16px;border-radius:8px;background:#f0f4f8;border:1px solid #cbd5e1;direction:rtl;text-align:right;"><div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;">ℹ️ הפניה לשרתי cPanel</div><div style="font-size:12px;color:#475569;line-height:1.7;">בשרתי cPanel קיים מנגנון יומן שגיאות מובנה תחת <strong>Metrics > Errors</strong> בלוח הבקרה. ייתכן ששגיאות נוספות שאינן מופיעות כאן קשורות לבעלות ובעלויות (Ownership). מומלץ לבדוק גם את יומן השגיאות של Apache/PHP בתיקיית האתר.</div>';
+        if (cpanelUrl) { html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-start;"><a href="' + escAttr(cpanelUrl) + '/frontend/metrics/errors" target="_blank" class="btn btn-outline" style="font-size:11px;text-decoration:none;">📋 פתח דף שגיאות cPanel</a><a href="' + escAttr(cpanelUrl) + '/frontend/files" target="_blank" class="btn btn-outline" style="font-size:11px;text-decoration:none;">📁 מנהל קבצים</a></div>'; }
+        else { html += '<div style="margin-top:10px;font-size:11px;color:#64748b;">💡 לקבלת קישור ישיר לדף השגיאות, הגדירו את כתובת cPanel בכרטיס אבחון השרת.</div>'; }
+        html += '</div>'; container.innerHTML = html;
+    }).catch(function(err) { var container = document.getElementById('healthLogContent'); if (container) container.innerHTML = '<div style="color:var(--danger);text-align:center;">שגיאה בטעינת הלוג: ' + escAttr(err.message) + '</div>'; });
+}
+function _copyErrorLog() {
+    fetch('/api/health-log?XTransformPort=3001', { method: 'GET' }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.entries || data.entries.length === 0) { showToast('אין שגיאות להעתקה', 'info'); return; }
+        var text = data.entries.join('\n');
+        navigator.clipboard.writeText(text).then(function() { showToast('הלוג הועתק ללוח', 'success'); }).catch(function() { showToast('שגיאה בהעתקה', 'error'); });
+    });
+}
+function _clearErrorLog() {
+    confirmDialog('לנקות את יומן השגיאות?', function() {
+        fetch('/api/health-log?XTransformPort=3001', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear' }) }).then(function() {
+            showToast('יומן השגיאות נמחק', 'success'); App.closeModal();
+        }).catch(function() { showToast('שגיאה בניקוי', 'error'); });
+    });
+}
+function _attemptAutoFix() {
+    confirmDialog('תיקון אוטומטי של הרשאות', '<div style="padding:8px 0;"><p style="color:var(--gray-600);margin-bottom:12px;">המערכת תנסה להגדיר את ההרשאות:</p><ul style="text-align:right;color:var(--gray-700);font-size:13px;padding-right:20px;line-height:2;"><li>תיקיית data/ ל-755</li><li>קבצי JSON ל-664</li></ul><div style="margin-top:12px;padding:10px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;direction:rtl;text-align:right;"><div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:4px;">⚠️ הערת לשרתי cPanel – שימו לב:</div><ol style="text-align:right;color:#92400e;font-size:12px;padding-right:18px;line-height:2;margin:0;"><li>התחבר ל-cPanel > מנהל הקבצים (File Manager)</li><li>בדוק את בעלות (Owner) של תיקיית data/ – אם היא מוגדר ל-<strong>nobody</strong>, שנה לשם המשתמש שלך</li><li>הגדר הרשאות: תיקיות <strong>755</strong>, קבצים <strong>644</strong> או <strong>664</strong></li></ol><p style="color:#b45309;font-size:11px;margin:8px 0 0 0;">🚫 אין להשתמש ב-777 – ב-cPanel הדבר עלול לחסום את האתר בגלל מדינות האבטחה של suPHP/PHP-FPM.</p></div><p style="color:var(--gray-500);font-size:12px;margin-top:8px;">פעולה זו עלולה להשתנות באישור. האבחון יבדוק גם חוסר בעלות (Ownership).</p></div>', '<button class="btn btn-warning" onclick="App._doAutoFix()">🔧 בצע תיקון</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>');
+}
+function _doAutoFix() {
+    closeModal(); var btn = document.getElementById('btnAutoFix'); if (btn) { btn.disabled = true; btn.textContent = '🔧 מתקן...'; }
+    fetch('/api/health-log?XTransformPort=3001', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fix_perms' }) })
+    .then(function(r) { return r.json(); }).then(function(data) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔧 תיקון אוטומטי של הרשאות'; }
+        if (data.success) { showToast('🔧 התיקון הושלם! ' + (data.fixed ? data.fixed.length : 0) + ' קבצים תוקנו. מבצע אבחון חוזר...', 'success'); setTimeout(function() { _runHealthCheck(); }, 1500); }
+        else { var msg = 'חלק מהניסיונות נכשלו: '; if (data.failed && data.failed.length > 0) msg += data.failed.join(', '); if (data.ownershipWarning) { msg += ' | ' + data.ownershipWarning; setTimeout(function() { _runHealthCheck(); }, 3000); } showToast(msg, 'error'); }
+    }).catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = '🔧 תיקון אוטומטי של הרשאות'; } showToast('שגיאה בתיקון: ' + err.message, 'error'); });
+}
+function _openCpanelLink(type) {
+    var url = (document.getElementById('hcCpanelUrl') && document.getElementById('hcCpanelUrl').value) || localStorage.getItem('hc_cpanel_url') || ''; url = url.trim().replace(/\/+$/, '');
+    if (!url) { showToast('יש להכניס את כתובת cPanel בשדה הייעודית למעלה', 'info'); var inp = document.getElementById('hcCpanelUrl'); if (inp) inp.focus(); return; }
+    if (type === 'errors') window.open(url + '/frontend/metrics/errors', '_blank');
+    else if (type === 'filemanager') window.open(url + '/frontend/files', '_blank');
+}
+function _restoreCpanelUrl() { var saved = localStorage.getItem('hc_cpanel_url'); var inp = document.getElementById('hcCpanelUrl'); if (inp && saved) inp.value = saved; }
+
+function saveSiteSettings() {
+    const fileInput = document.getElementById('fLogoFile'); const currentSettings = DataStore.getSettings();
+    const saveData = { siteNameHe: document.getElementById('fSiteNameHe').value.trim(), siteNameAr: document.getElementById('fSiteNameAr').value.trim(), copyrightHe: document.getElementById('fCopyrightHe').value.trim(), copyrightAr: document.getElementById('fCopyrightAr').value.trim() };
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader(); reader.onload = function(e) { saveData.logoUrl = e.target.result; DataStore.updateSettings(saveData); showToast('ההגדרות נשמרו (כולל לוגו)', 'success'); renderSettings(); }; reader.readAsDataURL(fileInput.files[0]);
+    } else { saveData.logoUrl = currentSettings.logoUrl || ''; DataStore.updateSettings(saveData); showToast('ההגדרות נשמרו', 'success'); }
+}
+
+const BACKUP_TABLE_META = { users: 'משתמשים', categories: 'קטגוריות', solutions: 'פתרונות למידה', mentors: 'מנחים', guides_repo: 'מאגר מדריכים', budgets: 'תקצבים', lookup_schools: 'בתי ספר', periods: 'תקופות', solution_instructors: 'מדריכים-פתרונות', lookup_domains: 'תחומים', lookup_education_stages: 'שלבי חינוך', lookup_education_types: 'סוגי חינוך', lookup_budget_types: 'סוגי תקציב', lookup_allocation_status: 'סטטוס הקצאה', lookup_solution_status: 'סטטוס פתרון', lookup_performer_types: 'סוגי מבצע', lookup_lecturer_status: 'סטטוס מרצה', lookup_field_knowledge: 'תחומי ידע', lookup_role_holders: 'נושאי תפקיד', lookup_broad_topics: 'נושאים רחבים', lookup_designated_programs: 'תוכניות ייעוד', lookup_week_days: 'ימים בשבוע', lookup_meeting_types: 'סוגי מפגש', solution_comments: 'הערות פתרונות', catalog_entries: 'רשומות קטלוג', catalog_items: 'פריטי קטלוג', registrations: 'נרשמים לפתרונות למידה', settings: 'הגדרות אתר', recycle_bin: 'סל מחזור', inspectors: 'מפקחים', pedagogical_executors: 'מבצעים פדגוגיים', lookup_responsibility_types: 'סוגי אחריות', homepage: 'דף שער', faq_data: 'שאלות נפוצות','workshop-bookings': 'הזמנת סדנאות בפסגה', custom_pages: 'דפים מותאמים' };
+
+function _populateBackupTableSelects() { var sel1 = document.getElementById('fBackupTable'); var sel2 = document.getElementById('fRestoreTable'); if (sel1 && sel1.options.length <= 1) { Object.keys(BACKUP_TABLE_META).forEach(function(k) { var o1 = document.createElement('option'); o1.value = k; o1.textContent = BACKUP_TABLE_META[k]; sel1.appendChild(o1); var o2 = document.createElement('option'); o2.value = k; o2.textContent = BACKUP_TABLE_META[k]; sel2.appendChild(o2); }); } }
+function _collectBackupData(keys) { var data = {}; keys.forEach(function(k) { var val = DataStore.getAll(k); if (val !== undefined && val !== null) data[k] = val; }); return data; }
+function _downloadJSON(data, filename) { var jsonStr = JSON.stringify(data, null, 2); var url = URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' })); var a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return new Blob([jsonStr]).size; }
+function _readBackupFile(fileInput) { return new Promise(function(resolve, reject) { if (!fileInput || !fileInput.files || !fileInput.files[0]) { reject('לא נבחר קובץ'); return; } var reader = new FileReader(); reader.onload = function(e) { try { resolve(JSON.parse(e.target.result)); } catch (err) { reject('קובץ לא תקין: ' + err.message); } }; reader.onerror = function() { reject('שגיאה בקריאת הקובץ'); }; reader.readAsText(fileInput.files[0]); }); }
+function _applyBackupData(data, selectedKeys) { var keysToApply = selectedKeys || Object.keys(data).filter(function(k) { return k !== '__backup_meta'; }); var applied = 0; keysToApply.forEach(function(k) { if (k === '__backup_meta') return; if (data[k] === undefined) return; try { DataStore.saveAll(k, data[k]); applied++; } catch(e) { console.error('[Backup] Error restoring table', k, e); } }); return applied; }
+function _formatFileSize(bytes) { if (bytes < 1024) return bytes + ' B'; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'; return (bytes / (1024 * 1024)).toFixed(2) + ' MB'; }
+function _getBackupTimestamp() { var now = new Date(); var y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0'), d = String(now.getDate()).padStart(2,'0'); var h = String(now.getHours()).padStart(2,'0'), min = String(now.getMinutes()).padStart(2,'0'); return y + '-' + m + '-' + d + '_' + h + '-' + min; }
+function _countRecords(data) { var count = 0; Object.keys(data).forEach(function(k) { if (k === '__backup_meta') return; if (Array.isArray(data[k])) count += data[k].length; else if (typeof data[k] === 'object' && data[k] !== null) count += Object.keys(data[k]).length; else count++; }); return count; }
+function backupFull() {
+    var btn = document.getElementById('btnBackupFull'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-sm" style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;"></span> מכין גיבוי...'; }
+    setTimeout(function() {
         try {
-            fetch('/api/create-page-file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: filename + '.html', title: titleAr || titleHe, content: content })
-            }).then(function(r) {
-                if (!r.ok) {
-                    return r.text().then(function(txt) {
-                        showToast('⚠️ שגיאת שרת (' + r.status + '): ' + txt, 'error');
+            var keys = Object.keys(BACKUP_TABLE_META); var data = _collectBackupData(keys); data.__backup_meta = { type: 'full', timestamp: new Date().toISOString(), version: '2.0', tableCount: keys.length };
+            var totalRecords = _countRecords(data); var fileSize = _downloadJSON(data, 'matspanet_backup_' + _getBackupTimestamp() + '.json');
+            var settings = DataStore.getSettings(); var ts = settings.backupTimestamps || {}; var now = new Date().toISOString(); keys.forEach(function(k) { ts[k] = now; }); DataStore.updateSettings({ backupTimestamps: ts });
+            logActivity('backup_full', 'גיבוי מלא (' + keys.length + ' טבלאות, ' + totalRecords + ' רשומות, ' + _formatFileSize(fileSize) + ')', 'settings');
+            showToast('✅ גיבוי מלא הורד בהצלחה — ' + _formatFileSize(fileSize) + ', ' + totalRecords + ' רשומות', 'success'); _updateBackupStatusUI();
+        } catch(e) { showToast('שגיאה ביצירת גיבוי: ' + e.message, 'error'); }
+        if (btn) { btn.disabled = false; btn.innerHTML = '💾 גיבוי מלא – כל הנתונים'; }
+    }, 100);
+}
+function backupTable(tableKey) {
+    var key = tableKey || document.getElementById('fBackupTable').value; if (!key) { showToast('יש לבחר טבלה', 'error'); return; }
+    var data = _collectBackupData([key]); data.__backup_meta = { type: 'table', table: key, label: BACKUP_TABLE_META[key] || key, timestamp: new Date().toISOString(), version: '2.0' };
+    var count = _countRecords(data); var fileSize = _downloadJSON(data, 'matspanet_' + key + '_' + _getBackupTimestamp() + '.json');
+    var settings = DataStore.getSettings(); var ts = settings.backupTimestamps || {}; ts[key] = new Date().toISOString(); DataStore.updateSettings({ backupTimestamps: ts });
+    logActivity('backup_table', 'גיבוי טבלה: ' + (BACKUP_TABLE_META[key] || key) + ' (' + count + ' רשומות, ' + _formatFileSize(fileSize) + ')', 'settings');
+    showToast('✅ גיבוי טבלה ' + (BACKUP_TABLE_META[key] || key) + ' — ' + _formatFileSize(fileSize) + ', ' + count + ' רשומות', 'success'); _updateBackupStatusUI();
+}
+function _showSelectiveRestoreModal(data) {
+    var meta = data.__backup_meta || {}; var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; }); var tableCheckboxes = '';
+    tablesInFile.forEach(function(k) { var label = BACKUP_TABLE_META[k] || k; var count = Array.isArray(data[k]) ? data[k].length : (typeof data[k] === 'object' && data[k] !== null ? Object.keys(data[k]).length : 1); var isSettings = (k === 'settings'); tableCheckboxes += '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--gray-50)\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" class="restore-table-cb" value="' + escAttr(k) + '" checked style="width:16px;height:16px;accent-color:var(--primary-color);"' + (isSettings ? '' : '') + '><span style="flex:1;font-size:13px;font-weight:500;">' + escAttr(label) + '</span><span style="font-size:12px;color:var(--gray-400);background:var(--gray-100);padding:2px 8px;border-radius:10px;">' + count + ' רשומות</span></label>'; });
+    var tsFormatted = meta.timestamp ? new Date(meta.timestamp).toLocaleDateString('he-IL') + ' ' + new Date(meta.timestamp).toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit'}) : 'לא ידוע';
+    var modalHtml = '<div style="direction:rtl;text-align:right;"><div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div><strong style="font-size:13px;">📅 תאריך גיבוי:</strong> <span style="font-size:13px;">' + tsFormatted + '</span></div><div><strong style="font-size:13px;">📊 טבלאות:</strong> <span style="font-size:13px;">' + tablesInFile.length + '</span></div><div><strong style="font-size:13px;">📦 גרסה:</strong> <span style="font-size:13px;">' + (meta.version || '1.0') + '</span></div></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:14px;font-weight:600;">בחירת טבלאות לשחזור:</span><label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--gray-500);cursor:pointer;"><input type="checkbox" id="restoreSelectAll" checked onchange="document.querySelectorAll(\'.restore-table-cb\').forEach(function(cb){cb.checked=this.checked;});" style="accent-color:var(--primary-color);"> בחר הכל</label></div><div id="restoreTablesList" style="max-height:280px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:6px;margin-bottom:16px;">' + tableCheckboxes + '</div><div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;"><p style="margin:0;font-size:13px;color:#991b1b;font-weight:500;">⚠️ אזהרה: הנתונים הנבחרים יוחלפו לחלוטין בנתוני הגיבוי. פעולה זו אינה ניתנת לביטול.</p></div><div id="restoreProgressArea" style="display:none;margin-bottom:16px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span class="spinner-sm" style="display:inline-block;width:16px;height:16px;border:2px solid var(--primary-color);border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;flex-shrink:0;"></span><span id="restoreProgressText" style="font-size:13px;color:var(--gray-600);">משחזר נתונים...</span></div><div style="height:6px;background:var(--gray-200);border-radius:3px;overflow:hidden;"><div id="restoreProgressBar" style="height:100%;background:var(--primary-color);border-radius:3px;width:0%;transition:width 0.3s ease;"></div></div></div></div>';
+    showModal('🔄 שחזור מגיבוי', modalHtml, '<button class="btn btn-primary" id="btnDoRestore" onclick="App._executeSelectiveRestore()">🔄 בצע שחזור</button><button class="btn btn-outline" onclick="App.closeModal()" style="margin-right:8px;">ביטול</button>');
+    App._pendingRestoreData = data;
+}
+function _executeSelectiveRestore() {
+    var data = App._pendingRestoreData; if (!data) return;
+    var checkboxes = document.querySelectorAll('.restore-table-cb:checked'); var selectedKeys = []; checkboxes.forEach(function(cb) { selectedKeys.push(cb.value); });
+    if (selectedKeys.length === 0) { showToast('יש לבחר לפחות טבלה אחת', 'warning'); return; }
+    var btn = document.getElementById('btnDoRestore'); if (btn) { btn.disabled = true; btn.textContent = 'משחזר...'; }
+    var progressArea = document.getElementById('restoreProgressArea'); var progressBar = document.getElementById('restoreProgressBar'); var progressText = document.getElementById('restoreProgressText');
+    if (progressArea) progressArea.style.display = 'block';
+    var applied = 0; var total = selectedKeys.length;
+    function processNext() {
+        if (applied >= total) {
+            if (progressBar) progressBar.style.width = '100%'; if (progressText) progressText.textContent = 'הושלם! ' + total + ' טבלאות שוחזרו בהצלחה.';
+            logActivity('restore_full', 'שחזור סלקטיבי (' + total + ' טבלאות)', 'settings'); showToast('✅ שחזור הושלם — ' + total + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success'); setTimeout(function() { window.location.reload(); }, 2000); return;
+        }
+        var key = selectedKeys[applied]; if (progressText) progressText.textContent = 'משחזר: ' + (BACKUP_TABLE_META[key] || key) + ' (' + (applied + 1) + '/' + total + ')';
+        if (progressBar) progressBar.style.width = Math.round(((applied + 1) / total) * 100) + '%';
+        try { DataStore.saveAll(key, data[key]); } catch(e) { console.error('[Restore] Error restoring', key, e); }
+        applied++; setTimeout(processNext, 80);
+    }
+    setTimeout(processNext, 100);
+}
+async function restoreFull() {
+    var fileInput = document.getElementById('fRestoreFullFile');
+    try {
+        var data = await _readBackupFile(fileInput); if (!data.__backup_meta) { showToast('❌ קובץ הגיבוי אינו תקין – חסר metadata', 'error'); return; }
+        var tablesInFile = Object.keys(data).filter(function(k) { return k !== '__backup_meta'; });
+        confirmDialog('⚠️ שחזור מלא של ' + tablesInFile.length + ' טבלאות\nהנתונים הקיימים יוחלפו לחלוטין. להמשיך?', function() {
+            var applied = 0; tablesInFile.forEach(function(k) { try { DataStore.saveAll(k, data[k]); applied++; } catch(e) { console.error('[Restore] Error restoring', k, e); } });
+            logActivity('restore_full', 'שחזור מלא (' + applied + ' טבלאות)', 'settings'); showToast('✅ שחזור מלא הושלם — ' + applied + ' טבלאות שוחזרו בהצלחה. מרענן...', 'success'); 
+			// 🔑 שמירת הטאב הפעיל לפני רענון
+			try {
+				sessionStorage.setItem('matspanet_last_section', currentSection);
+				if (typeof window._activeLookupTabIndex !== 'undefined') {
+					sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+				} else if (typeof _activeLookupTabIndex !== 'undefined') {
+					sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex);
+				}
+			} catch(e) {}
+			setTimeout(function() { window.location.reload(); }, 1500);
+        }); fileInput.value = '';
+    } catch (err) { showToast('❌ ' + err, 'error'); }
+}
+async function restoreTable() {
+    var fileInput = document.getElementById('fRestoreTableFile'); var tableKey = document.getElementById('fRestoreTable').value; if (!tableKey) { showToast('יש לבחר טבלה לשחזור', 'error'); return; }
+    try {
+        var data = await _readBackupFile(fileInput); if (!data[tableKey] && !data.__backup_meta) { showToast('❌ הטבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' לא נמצאה בקובץ הגיבוי', 'error'); return; }
+        var count = Array.isArray(data[tableKey]) ? data[tableKey].length : (typeof data[tableKey] === 'object' ? Object.keys(data[tableKey]).length : 1);
+        confirmDialog('⚠️ שחזור טבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' (' + count + ' רשומות)\nהנתונים הקיימים בטבלה זו יוחלפו. להמשיך?', function() {
+            if (data[tableKey] !== undefined) DataStore.saveAll(tableKey, data[tableKey]);
+            logActivity('restore_table', 'שחזור טבלה: ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' (' + count + ' רשומות)', 'settings'); showToast('✅ שחזור טבלה ' + (BACKUP_TABLE_META[tableKey] || tableKey) + ' בוצע בהצלחה. מרענן...', 'success'); fileInput.value = ''; 
+		// 🔑 שמירת הטאב הפעיל לפני רענון
+		try {
+			sessionStorage.setItem('matspanet_last_section', currentSection);
+			if (typeof window._activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+			} else if (typeof _activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex);
+			}
+		} catch(e) {}			
+			setTimeout(function() { window.location.reload(); }, 1500);
+        });
+    } catch (err) { showToast('❌ ' + err, 'error'); }
+}
+function clearData() {
+    const TABLES_TO_CLEAR = ['inspectors', 'pedagogical_executors', 'schools', 'lookup_solution_status', 'lookup_education_stages', 'lookup_education_types', 'lookup_week_days', 'lookup_meeting_types', 'lookup_budget_types', 'lookup_field_knowledge', 'lookup_allocation_status', 'lookup_performer_types', 'lookup_lecturer_status', 'lookup_certified_lecturer', 'lookup_expert_field', 'lookup_domains', 'lookup_role_holders', 'lookup_broad_topics', 'lookup_designated_programs', 'lookup_responsibility_types', 'solutions', 'solution_instructors', 'solution_comments', 'catalog_items', 'catalog_entries', 'mentors', 'guides_repo', 'faq_data', 'custom_pages', 'categories', 'budgets', 'periods', 'registrations', 'activity_log', 'recycle_bin', 'settings', 'homepage', 'institutions', 'institutions_east_jerusalem'];
+    showModal('⚠️ מחיקת כל הנתונים', '<div style="text-align:center;padding:12px 0;"><div style="font-size:48px;margin-bottom:12px;">⚠️</div><p style="color:var(--danger);font-weight:600;font-size:15px;margin-bottom:8px;">פעולה בלתי הפיכה!</p><p style="color:var(--gray-500);margin-bottom:16px;font-size:13px;">פעולה זו תמחק את כל הנתונים מהמערכת לצמיתות, כולל:</p><div style="text-align:right;background:var(--gray-50);padding:12px;border-radius:8px;font-size:12px;color:var(--gray-600);max-height:200px;overflow-y:auto;"><strong>📋 רשימת הטבלאות שימחקו (' + TABLES_TO_CLEAR.length + '):</strong><br>• טבלאות ערכים (מפקחים, מבצעים, בתי ספר, שלבים, סוגים, ימים, מפגשים, סוגי תקציב, תחומי דעת, תקצוב, סטטוסים, מרצים, מומחים, תחומי דעת, בעלי תפקידים, נושאי רוחב, תוכניות ייעודיות, סוגי אחריות)<br>• קטלוג פתרונות למידה (כולל מדריכים והערות)<br>• מאגר מרצים<br>• מאגר מדריכים<br>• שאלות נפוצות ותשובות<br>• דפים מותאמים אישית<br>• משתמשים רשומים<br>• תקציבים ותקופות<br>• נרשמים לפתרונות<br>• יומן פעילות והיסטוריה<br>• סל מחזור</div><div class="form-group" style="margin-top:16px;"><label>הזן סיסמת אישור</label><input type="password" id="fClearPass" class="form-input" placeholder="סיסמת אישור" style="text-align:center;font-size:16px;"></div></div>', '<button class="btn btn-danger" onclick="App._doClearAll()">🗑️ אישור מחיקה</button><button class="btn btn-outline" onclick="App.closeModal()">ביטול</button>');
+    setTimeout(function() { var el = document.getElementById('fClearPass'); if (el) el.focus(); }, 100);
+}
+function _doClearAll() {
+    var pass = document.getElementById('fClearPass').value; if (pass !== 'Adan.3011$') { showToast('סיסמת אישור שגויה!', 'error'); return; }
+    closeModal();
+    confirmDialog('⚠️ למחוק את כל הנתונים לצמיתות? פעולה זו בלתי הפיכה!', function() {
+        const TABLES_TO_CLEAR = ['inspectors', 'pedagogical_executors', 'schools', 'lookup_solution_status', 'lookup_education_stages', 'lookup_education_types', 'lookup_week_days', 'lookup_meeting_types', 'lookup_budget_types', 'lookup_field_knowledge', 'lookup_allocation_status', 'lookup_performer_types', 'lookup_lecturer_status', 'lookup_certified_lecturer', 'lookup_expert_field', 'lookup_domains', 'lookup_role_holders', 'lookup_broad_topics', 'lookup_designated_programs', 'lookup_responsibility_types', 'lookup_user_roles', 'lookup_schools', 'solutions', 'solution_instructors', 'solution_comments', 'catalog_items', 'catalog_entries', 'mentors', 'guides_repo', 'faq_data', 'custom_pages', 'categories', 'budgets', 'periods', 'registrations', 'activity_log', 'recycle_bin', 'settings', 'homepage', 'institutions', 'institutions_east_jerusalem'];
+        let totalDeleted = 0;
+        TABLES_TO_CLEAR.forEach(function(key) { var storeKey = 'matspanet_' + key; var data = localStorage.getItem(storeKey); if (data) { try { var parsed = JSON.parse(data); var count = Array.isArray(parsed) ? parsed.length : (typeof parsed === 'object' && parsed !== null ? Object.keys(parsed).length : 0); totalDeleted += count; } catch(e) { totalDeleted += 0; } localStorage.removeItem(storeKey); } });
+        TABLES_TO_CLEAR.forEach(function(key) { try { DataStore.saveAll(key, []); } catch(e) { } });
+        try {
+            var usersData = localStorage.getItem('matspanet_users');
+            if (usersData) {
+                try {
+                    var users = JSON.parse(usersData); var adminUser = users.find(function(u) { return u.username === 'admin'; });
+                    if (!adminUser) { adminUser = { id: 'usr_admin_001', username: 'admin', password: 'admin123', fullName: 'מנהל מערכת', email: 'admin@matspanet.co.il', role: 'system_admin', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; }
+                    DataStore.saveAll('users', [adminUser]); totalDeleted += (users.length - 1);
+                } catch(e) { DataStore.saveAll('users', [{ id: 'usr_admin_001', username: 'admin', password: 'admin123', fullName: 'מנהל מערכת', email: 'admin@matspanet.co.il', role: 'system_admin', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]); }
+            }
+        } catch(e) { }
+        logActivity('clear_all', 'נקה הכל - נמחקו ' + totalDeleted + ' רשומות מ-' + (TABLES_TO_CLEAR.length + 1) + ' טבלאות', 'settings');
+        showToast('הכל נמחק! ' + totalDeleted + ' רשומות נמחקו. משתמש admin נשמר. מרענן...', 'success'); 
+		// 🔑 שמירת הטאב הפעיל לפני רענון
+		try {
+			sessionStorage.setItem('matspanet_last_section', currentSection);
+			if (typeof window._activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+			} else if (typeof _activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex);
+			}
+		} catch(e) {}	
+		
+		setTimeout(function() { window.location.reload(); }, 1500);
+    });
+}
+function resetUserPassword(id) {
+    confirmDialog('לאפס את סיסמת המשתמש ל-1234?', function() {
+        const result = DataStore.update(DataStore.KEYS.USERS, id, { password: '1234' });
+        if (result) { showToast('הסיסמה אופסה בהצלחה ל-1234', 'success'); renderGuides(); } else { showToast('שגיאה: המשתמש לא נמצא', 'error'); }
+    });
+}
+
+// ================================================================
+//  CUSTOM PAGES
+// ================================================================
+var _cpEditorInit = false; var _cpCurrentEditId = null;
+function _cpEsc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function _cpLang() { return (DataStore.getSettings() || {}).language || document.documentElement.lang || 'ar'; }
+function _cpSanitizeHtml(html) { if (!html) return ''; html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''); html = html.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, ''); html = html.replace(/href\s*=\s*("')javascript:[^"']*\1/gi, 'href="#"'); return html; }
+function _cpGetPageUrl(filename) { return './pages/' + filename + '.html'; }
+function _cpUpdateHomepageMenu(pageData, oldMenuLocation) {
+    if (oldMenuLocation && oldMenuLocation !== 'none') { var hp = DataStore.getHomepage(); var key = oldMenuLocation === 'top' ? 'navItems' : 'sidebarItems'; var items = (hp[key] || []).filter(function(i) { return i._cpPageId !== pageData.id; }); var updates = {}; updates[key] = items; DataStore.updateHomepage(updates); }
+    if (pageData.menuLocation && pageData.menuLocation !== 'none') {
+        var hp = DataStore.getHomepage(); var key = pageData.menuLocation === 'top' ? 'navItems' : 'sidebarItems'; var items = (hp[key] || []).slice();
+        var exists = items.find(function(i) { return i._cpPageId === pageData.id; });
+        if (!exists) { var maxOrder = items.reduce(function(max, i) { return Math.max(max, i.order || 0); }, 0); items.push({ id: 'cpnav_' + pageData.id, _cpPageId: pageData.id, labelHe: pageData.menuLabelHe || pageData.titleHe || pageData.filename, labelAr: pageData.menuLabelAr || pageData.titleAr || pageData.filename, url: _cpGetPageUrl(pageData.filename), order: maxOrder + 1, isActive: true }); var updates = {}; updates[key] = items; DataStore.updateHomepage(updates); }
+    }
+}
+function _cpRemoveHomepageMenu(pageId) {
+    var hp = DataStore.getHomepage(); var navItems = (hp.navItems || []).filter(function(i) { return i._cpPageId !== pageId; }); var sideItems = (hp.sidebarItems || []).filter(function(i) { return i._cpPageId !== pageId; });
+    if (navItems.length !== (hp.navItems || []).length || sideItems.length !== (hp.sidebarItems || []).length) DataStore.updateHomepage({ navItems: navItems, sidebarItems: sideItems });
+}
+function renderCustomPages() {
+    var items = (DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []).slice().sort(function(a,b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
+    var btnNew = '➕ צור דף חדש'; var colName = 'שם הדף'; var colFilename = 'שם קובץ'; var colStatus = 'סטטוס'; var colMenu = 'תפריט'; var colDate = 'תאריך עדכון'; var colActions = 'פעולות';
+    var emptyTitle = 'אין דפים'; var emptySub = 'צור את הדף הראשון שלך'; var emptyBtn = '➕ צור דף חדש'; var headerLabel = 'יצירת דף חדש';
+    var html = _lookupTableHeader(headerLabel, items.length, '📄', '<button class="btn btn-sm" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;font-weight:700;" onclick="App.openCustomPageModal()">' + btnNew + '</button>');
+    if (!items.length) { html += '<div class="cp-empty"><div class="cp-empty-icon">📄</div><h3>' + emptyTitle + '</h3><p>' + emptySub + '</p><button class="btn btn-primary" style="margin-top:20px;" onclick="App.openCustomPageModal()">' + emptyBtn + '</button></div>'; }
+    else {
+        html += '<div class="table-wrapper"><table class="data-table"><thead><tr><th>' + colName + '</th><th>' + colFilename + '</th><th>' + colStatus + '</th><th>' + colMenu + '</th><th>' + colDate + '</th><th>' + colActions + '</th></tr></thead><tbody>';
+        items.forEach(function(p) {
+            var statusClass = p.status === 'published' ? 'cp-status-published' : 'cp-status-draft'; var statusText = p.status === 'published' ? 'מפורסם' : 'טיוטה';
+            var menuLoc = p.menuLocation || 'none'; var menuBadge = menuLoc === 'top' ? '<span class="cp-status-badge cp-status-published">עליון</span>' : menuLoc === 'sidebar' ? '<span class="cp-status-badge" style="background:#eff6ff;color:#2563eb;">צדדי</span>' : '<span class="cp-status-badge cp-status-draft">ללא</span>';
+            var dateStr = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('he-IL') : '-';
+            var editBtn = '✏️ עריכה'; var deleteBtn = '🗑️ מחיקה'; var previewBtn = '👁️ תצוגה'; var linkBtn = '🔗 קישור';
+            var displayTitle = p.titleHe || p.titleAr || ''; var secondaryTitle = p.titleAr && p.titleHe ? '<br><span style="color:var(--gray-400);font-size:13px;">' + _cpEsc(p.titleAr) + '</span>' : '';
+            html += '<tr><td><strong>' + _cpEsc(displayTitle) + '</strong>' + secondaryTitle + '</td><td style="direction:ltr;unicode-bidi:embed;font-family:monospace;font-size:13px;">' + _cpEsc(p.filename) + '</td><td><span class="cp-status-badge ' + statusClass + '">' + statusText + '</span></td><td>' + menuBadge + '</td><td style="font-size:13px;color:var(--gray-500);">' + dateStr + '</td><td><div class="cp-table-actions"><button class="btn btn-outline btn-sm" onclick="App.editCustomPage(\'' + p.id + '\')">' + editBtn + '</button><button class="btn btn-outline btn-sm" onclick="App.previewCustomPage(\'' + p.id + '\')">' + previewBtn + '</button><button class="btn btn-outline btn-sm" onclick="App._openPageLink(\'' + p.filename + '\')" title="פתח את הדף">' + linkBtn + '</button><button class="btn btn-outline btn-sm" onclick="App.deleteCustomPage(\'' + p.id + '\')" style="color:var(--danger, #e53e3e);">' + deleteBtn + '</button></div></td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+    document.getElementById('section-custom-pages').innerHTML = html;
+}
+function _cpInitEditor() {
+    if (typeof tinymce === 'undefined') return;
+    if (!_cpEditorInit) {
+        tinymce.init({ selector: '#cpEditor', readonly: false, statistics: false, height: 420, directionality: 'rtl', menubar: 'file edit view insert format table tools', plugins: 'advlist autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste wordcount help', toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | bullist numlist | outdent indent | table | link image | hr | removeformat | help', content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; }', branding: false, promotion: false, resize: true, statusbar: true, paste_data_images: true });
+        _cpEditorInit = true;
+    }
+}
+
+function openCustomPageModal(editId) {
+    _cpCurrentEditId = editId || null;
+    var title = editId ? 'עריכת דף' : 'יצירת דף חדש';
+    
+    var existing = editId ? (DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []).find(function(p) { return p.id === editId; }) : null;
+    var valFilename = existing ? _cpEsc(existing.filename) : '';
+    var valTitleHe = existing ? _cpEsc(existing.titleHe || '') : '';
+    var valTitleAr = existing ? _cpEsc(existing.titleAr || '') : '';
+    var valStatus = existing ? existing.status : 'draft';
+    var valMenuLoc = existing ? (existing.menuLocation || 'none') : 'none';
+    var valMenuLabelHe = existing ? _cpEsc(existing.menuLabelHe || '') : '';
+    var valMenuLabelAr = existing ? _cpEsc(existing.menuLabelAr || '') : '';
+    var disabledAttr = existing ? 'disabled style="opacity:0.6;cursor:not-allowed;"' : '';
+    
+    var statusOpts = (valStatus === 'published' ? '<option value="published" selected>מפורסם</option><option value="draft">טיוטה</option>' : '<option value="draft" selected>טיוטה</option><option value="published">מפורסם</option>');
+    var menuLocOpts = '<option value="none"' + (valMenuLoc === 'none' ? ' selected' : '') + '>ללא קישור</option><option value="top"' + (valMenuLoc === 'top' ? ' selected' : '') + '>תפריט עליון</option><option value="sidebar"' + (valMenuLoc === 'sidebar' ? ' selected' : '') + '>תפריט צדדי</option>';
+    var menuLabelsStyle = valMenuLoc !== 'none' ? 'display:flex;' : 'display:none;';
+    
+    var bodyHtml = '<div class="cp-editor-wrap">' +
+        '<div class="cp-field-row"><div class="cp-field-group"><label>שם קובץ (באנגלית) *</label><input type="text" id="cpFilename" placeholder="about-us" value="' + valFilename + '" ' + disabledAttr + ' pattern="^[a-z0-9][a-z0-9-]*$"></div>' +
+        '<div class="cp-field-group" style="max-width:180px;"><label>סטטוס</label><select id="cpStatus">' + statusOpts + '</select></div></div>' +
+        '<div class="cp-field-row"><div class="cp-field-group"><label>כותרת הדף (בעברית) *</label><input type="text" id="cpTitleHe" placeholder="כותרת בעברית" value="' + valTitleHe + '"></div>' +
+        '<div class="cp-field-group"><label>כותרת הדף (בערבית) *</label><input type="text" id="cpTitleAr" placeholder="عنوان بالعربية" value="' + valTitleAr + '" dir="rtl"></div></div>' +
+        '<div class="cp-field-row"><div class="cp-field-group" style="max-width:260px;"><label>מיקום קישור בתפריט</label><select id="cpMenuLocation" onchange="App._cpOnMenuLocChange()">' + menuLocOpts + '</select></div></div>' +
+        '<div class="cp-field-row" id="cpMenuLabelsRow" style="' + menuLabelsStyle + '"><div class="cp-field-group"><label>טקסט תפריט (בעברית)</label><input type="text" id="cpMenuLabelHe" placeholder="הטקסט בעברית" value="' + valMenuLabelHe + '"></div>' +
+        '<div class="cp-field-group"><label>טקסט תפריט (בערבית)</label><input type="text" id="cpMenuLabelAr" placeholder="הטקסט בערבית" value="' + valMenuLabelAr + '" dir="rtl"></div></div>' +
+        '<div class="cp-field-group" style="margin-bottom:10px;flex:none;"><label>תוכן הדף</label></div>' +
+        '<div class="cp-editor-container"><textarea id="cpEditor">' + (existing ? existing.content : '') + '</textarea></div>' +
+        '<div class="cp-editor-actions"><button class="btn btn-outline btn-sm" onclick="App.previewCustomPage()" type="button">👁️ תצוגה מקדימה</button></div>' +
+        '</div>';
+        
+    var footerHtml = '<button class="btn btn-ghost" onclick="App.closeModal()" type="button">❌ ביטול</button><button class="btn btn-primary" onclick="App.saveCustomPage()" type="button">💾 שמור</button>';
+    
+    showModal(title, bodyHtml, footerHtml);
+    var modalEl = document.querySelector('#modalOverlay .modal');
+    if (modalEl) modalEl.style.maxWidth = '960px';
+    
+    // 🔑 אתחול TinyMCE בצורה חסינה ואמינה
+    setTimeout(function() { 
+        if (typeof tinymce !== 'undefined') {
+            tinymce.remove('#cpEditor');
+            tinymce.baseURL = "./tinymce"; // הנתיב המקומי
+            
+            tinymce.init({
+                selector: '#cpEditor',
+                language: 'he',
+                height: 450,
+                menubar: 'file edit view insert format tools table help',
+                plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste code help wordcount directionality',
+                toolbar: 'undo redo | formatselect | bold italic underline strikethrough | forecolor backcolor | alignright aligncenter alignleft | bullist numlist outdent indent | link image media table | removeformat code',
+                content_style: 'body { font-family: \'Noto Sans Arabic\', \'Tajawal\', Arial, sans-serif; font-size: 16px; direction: rtl; text-align: right; line-height: 1.8; color: #333; }',
+                setup: function (editor) {
+                    editor.on('change', function () {
+                        editor.save(); // שמירה אוטומטית ל-textarea
                     });
                 }
-                return r.json();
-            }).then(function(data) {
-                if (data && !data.success) { console.error('Failed to create page file:', data.error); showToast('⚠️ שגיאה ביצירת קובץ HTML: ' + data.error, 'warning'); }
-            }).catch(function(e) { console.error('Error creating page file:', e); showToast('⚠️ כשל בתקשורת עם השרת: ' + e.message, 'error'); });
-        } catch(e) { console.error('Error creating page file:', e); }
-        if (typeof tinymce !== 'undefined') { var editor = tinymce.get('cpEditor'); if (editor) { editor.destroy(); _cpEditorInit = false; } }
-        var modalEl = document.querySelector('#modalOverlay .modal');
-        if (modalEl) modalEl.style.maxWidth = '';
-        closeModal();
-        renderCustomPages();
-    }
-    function deleteCustomPage(id) {
-        var msg = 'האם למחוק דף זה?';
-        confirmDialog('⚠️ ' + msg, function() {
-            // Get page filename for HTML file deletion
-            var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || [];
-            var page = pages.find(function(p) { return p.id === id; });
-            // Remove from DataStore (use remove, not delete)
-            DataStore.remove(DataStore.KEYS.CUSTOM_PAGES, id);
-            // Remove from homepage menu
-            _cpRemoveHomepageMenu(id);
-            // Delete HTML file from server
-            if (page && page.filename) {
-                try {
-                    fetch('/api/create-page-file', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ filename: page.filename, action: 'delete' })
-                    }).catch(function() { /* silent */ });
-                } catch(e) { /* silent */ }
-            }
-            showToast('הדף נמחק', 'success');
-            renderCustomPages();
-        });
-    }
-    function previewCustomPage(id, fromModal) {
-        var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || [];
-        var page = id ? pages.find(function(p) { return p.id === id; }) : null;
-        var previewData = null;
-        if (fromModal && !page) {
-            if (typeof tinymce !== 'undefined') { var editor = tinymce.get('cpEditor'); if (editor) editor.save(); }
-            previewData = {
-                filename: (document.getElementById('cpFilename').value || '').trim() || 'preview',
-                titleHe: (document.getElementById('cpTitleHe').value || '').trim(),
-                titleAr: (document.getElementById('cpTitleAr').value || '').trim(),
-                content: _cpSanitizeHtml(document.getElementById('cpEditor').value)
-            };
-        }
-        var data = page || previewData;
-        if (!data) return;
-        var title = _cpLang() === 'ar' ? 'معاينة' : 'תצוגה מקדימה';
-        var closeBtn = _cpLang() === 'ar' ? '❌ إغلاق' : '❌ סגור';
-        // Display title based on current language - Arabic is default/primary
-        var displayTitle = (_cpLang() === 'ar' && data.titleAr) ? data.titleAr : (data.titleHe || data.titleAr || '');
-        var bodyHtml = '<div style="direction:rtl;text-align:right;">' +
-            '<h2 style="font-size:22px;font-weight:800;margin-bottom:8px;">' + _cpEsc(displayTitle) + '</h2>' +
-            '<div style="border-top:2px solid var(--gray-200);padding-top:16px;line-height:1.9;">' + data.content + '</div></div>';
-        showModal(title, bodyHtml, '<button class="btn btn-ghost" onclick="App.closeModal()" type="button">' + closeBtn + '</button>');
-    }
-    function _openPageLink(filename) {
-        var url = _cpGetPageUrl(filename);
-        window.open(url, '_blank');
-    }
-    function _copyPageLink(filename) {
-        var link = _cpGetPageUrl(filename);
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(link).then(function() {
-                showToast(_cpLang() === 'ar' ? 'تم نسخ الرابط' : 'הקישור הועתק', 'success');
-            }).catch(function() {
-                _cpFallbackCopy(link);
             });
         } else {
-            _cpFallbackCopy(link);
+            console.error('❌ TinyMCE לא נטען! ודא שהסקריפט כלול ב-dashboard.html');
+        }
+    }, 400);
+}
+
+function _cpOnMenuLocChange() { var sel = document.getElementById('cpMenuLocation'); var row = document.getElementById('cpMenuLabelsRow'); if (sel && row) { row.style.display = sel.value !== 'none' ? 'flex' : 'none'; } }
+function editCustomPage(id) { openCustomPageModal(id); }
+
+function saveCustomPage() {
+    // 1. שמירת תוכן העורך לפני השליפה
+    if (typeof tinymce !== 'undefined') { 
+        var editor = tinymce.get('cpEditor'); 
+        if (editor) editor.save(); 
+    }
+    
+    // 2. איסוף נתונים
+    var filename = document.getElementById('cpFilename').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    var titleHe = document.getElementById('cpTitleHe').value.trim(); 
+    var titleAr = document.getElementById('cpTitleAr').value.trim();	
+    var status = document.getElementById('cpStatus').value; 
+    var menuLocation = document.getElementById('cpMenuLocation').value;
+    var menuLabelHe = document.getElementById('cpMenuLabelHe').value.trim(); 
+    var menuLabelAr = document.getElementById('cpMenuLabelAr').value.trim();
+    var content = document.getElementById('cpEditor').value; // לוקח את התוכן מעורך ה-TinyMCE
+    
+    // 3. בדיקות תקינות
+    if (!filename) { showToast('חובה להזין שם קובץ', 'error'); return; }
+    if (!titleHe && !titleAr) { showToast('חובה להזין כותרת', 'error'); return; }
+    
+    var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []; 
+    var dup = pages.find(function(p) { return p.filename === filename && p.id !== _cpCurrentEditId; });
+    if (dup) { showToast('שם קובץ כבר קיים', 'error'); return; }
+    
+    content = _cpSanitizeHtml(content); 
+    var now = new Date().toISOString();
+    
+    var pageData = { 
+        filename: filename, titleHe: titleHe, titleAr: titleAr, status: status, 
+        content: content, menuLocation: menuLocation, menuLabelHe: menuLabelHe, 
+        menuLabelAr: menuLabelAr, updatedAt: now 
+    };
+    
+    var oldMenuLocation = null; 
+    var savedPageId = _cpCurrentEditId;
+    
+    // 4. שמירה ל-DataStore
+    if (_cpCurrentEditId) { 
+        var oldPage = pages.find(function(p) { return p.id === _cpCurrentEditId; }); 
+        oldMenuLocation = oldPage ? (oldPage.menuLocation || 'none') : null; 
+        DataStore.update(DataStore.KEYS.CUSTOM_PAGES, _cpCurrentEditId, pageData); 
+        showToast('הדף עודכן בהצלחה', 'success'); 
+    } else { 
+        var newItem = DataStore.create(DataStore.KEYS.CUSTOM_PAGES, pageData); 
+        savedPageId = newItem.id; 
+        showToast('הדף נוצר בהצלחה', 'success'); 
+    }
+    
+    _cpUpdateHomepageMenu({ id: savedPageId, filename: filename, titleHe: titleHe, titleAr: titleAr, menuLocation: menuLocation, menuLabelHe: menuLabelHe, menuLabelAr: menuLabelAr }, oldMenuLocation);
+    
+    // 5. שליחה לשרת ליצירת הקובץ העצמאי
+    try { 
+        fetch('./api/create-page-file.php', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                filename: filename + '.html', 
+                title: titleAr || titleHe, 
+                content: content 
+            }) 
+        }).then(function(r) { 
+            if (!r.ok) {
+                return r.text().then(function(txt) { showToast('⚠️ שגיאת שרת (' + r.status + '): ' + txt, 'error'); }); 
+            }
+            return r.json(); 
+        }).then(function(data) { 
+            if (data && !data.success) { 
+                console.error('Failed to create page file:', data.error); 
+                showToast('⚠️ שגיאה ביצירת קובץ HTML: ' + data.error, 'warning'); 
+            } else {
+                console.log('✅ קובץ HTML עצמאי נוצר בהצלחה:', filename + '.html');
+            }
+        }).catch(function(e) { 
+            console.error('Error creating page file:', e); 
+            showToast('⚠️ כשל בתקשורת עם השרת: ' + e.message, 'error'); 
+        }); 
+    } catch(e) { 
+        console.error('Error creating page file:', e); 
+    }
+    
+    // 6. ניקוי וסגירה
+    if (typeof tinymce !== 'undefined') { 
+        var editor = tinymce.get('cpEditor'); 
+        if (editor) { editor.destroy(); } 
+    }
+    var modalEl = document.querySelector('#modalOverlay .modal'); 
+    if (modalEl) modalEl.style.maxWidth = '';
+    
+    closeModal(); 
+    renderCustomPages();
+}
+
+function deleteCustomPage(id) {
+    confirmDialog('⚠️ האם למחוק דף זה?', function() {
+        var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []; var page = pages.find(function(p) { return p.id === id; });
+        DataStore.remove(DataStore.KEYS.CUSTOM_PAGES, id); _cpRemoveHomepageMenu(id);
+        if (page && page.filename) { try { fetch('./api/create-page-file.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: page.filename, action: 'delete' }) }).catch(function() { }); } catch(e) { } }
+        showToast('הדף נמחק', 'success'); renderCustomPages();
+    });
+}
+function previewCustomPage(id, fromModal) {
+    var pages = DataStore.getAll(DataStore.KEYS.CUSTOM_PAGES) || []; var page = id ? pages.find(function(p) { return p.id === id; }) : null; var previewData = null;
+    if (fromModal && !page) { if (typeof tinymce !== 'undefined') { var editor = tinymce.get('cpEditor'); if (editor) editor.save(); } previewData = { filename: (document.getElementById('cpFilename').value || '').trim() || 'preview', titleHe: (document.getElementById('cpTitleHe').value || '').trim(), titleAr: (document.getElementById('cpTitleAr').value || '').trim(), content: _cpSanitizeHtml(document.getElementById('cpEditor').value) }; }
+    var data = page || previewData; if (!data) return;
+    var title = _cpLang() === 'ar' ? 'معاينة' : 'תצוגה מקדימה'; var closeBtn = _cpLang() === 'ar' ? '❌ إغلاق' : '❌ סגור';
+    var displayTitle = (_cpLang() === 'ar' && data.titleAr) ? data.titleAr : (data.titleHe || data.titleAr || '');
+    var bodyHtml = '<div style="direction:rtl;text-align:right;"><h2 style="font-size:22px;font-weight:800;margin-bottom:8px;">' + _cpEsc(displayTitle) + '</h2><div style="border-top:2px solid var(--gray-200);padding-top:16px;line-height:1.9;">' + data.content + '</div></div>';
+    showModal(title, bodyHtml, '<button class="btn btn-ghost" onclick="App.closeModal()" type="button">' + closeBtn + '</button>');
+}
+function _openPageLink(filename) { var url = _cpGetPageUrl(filename); window.open(url, '_blank'); }
+function _copyPageLink(filename) {
+    var link = _cpGetPageUrl(filename);
+    if (navigator.clipboard) { navigator.clipboard.writeText(link).then(function() { showToast(_cpLang() === 'ar' ? 'تم نسخ الرابط' : 'הקישור הועתק', 'success'); }).catch(function() { _cpFallbackCopy(link); }); }
+    else { _cpFallbackCopy(link); }
+}
+function _cpFallbackCopy(text) {
+    var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast(_cpLang() === 'ar' ? 'تم نسخ الرابط' : 'הקישור הועתק', 'success'); } catch(e) { showToast(_cpLang() === 'ar' ? 'فشل نسخ الرابط' : 'העתקת הקישור נכשלה', 'error'); }
+    document.body.removeChild(ta);
+}
+
+function clearActivityLog() {
+    if (confirm('למחוק את כל יומן הפעילות?')) { DataStore.saveAll(DataStore.KEYS.ACTIVITY_LOG, []); renderActivityLog(); showToast('יומן הפעילות נמחק', 'success'); }
+}
+function resetLocalStorage() {
+    if (confirm('⚠️ פעולה זו תמחק את כל הנתונים מהדפדפן (localStorage).\nהנתונים שנשמרו בשרת יישארו.\nלהמשיך?')) {
+        Object.keys(localStorage).filter(function(k) { return k.startsWith('matspanet_'); }).forEach(function(k) { localStorage.removeItem(k); });
+        showToast('✅ localStorage נוקה, מרענן...', 'success'); 
+		// 🔑 שמירת הטאב הפעיל לפני רענון
+		try {
+			sessionStorage.setItem('matspanet_last_section', currentSection);
+			if (typeof window._activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', window._activeLookupTabIndex);
+			} else if (typeof _activeLookupTabIndex !== 'undefined') {
+				sessionStorage.setItem('matspanet_last_lookup_tab', _activeLookupTabIndex);
+			}
+		} catch(e) {}
+		setTimeout(function() { location.reload(); }, 1000);
+    }
+}
+
+
+    // ==========================================
+    // ניהול הזמנת סדנאות בפסגה - ממשק הגדרות למנהל
+    // ==========================================
+	async function renderWorkshopBookings() {
+		const container = document.getElementById('section-workshop-bookings');
+		if (!container) return;
+		const activeTab = window._workshopActiveTab || 'settings';
+		
+		// הצגת חיווי טעינה
+		container.innerHTML = `
+			<div class="card">
+				<div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+					<h3 class="card-title">🏔️ ניהול הזמנת סדנאות בפסגה</h3>
+					<div style="display:flex; gap:8px;">
+						<button class="btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchWorkshopTab('settings')">⚙️ הגדרות ותפעול</button>
+						<button class="btn ${activeTab === 'bookings' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchWorkshopTab('bookings')">📋 הזמנות שהתקבלו</button>
+					</div>
+				</div>
+				<div class="card-body">
+					<div id="workshopTabContent">
+						<div style="text-align:center; padding:40px; color:var(--gray-500);">
+							<div style="font-size:32px; margin-bottom:10px;">⏳</div>
+							<p>טוען נתונים מהשרת...</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		`;
+
+		if (activeTab === 'settings') {
+			_renderWorkshopSettingsTab();
+		} else {
+			// 🔑 קריטי: משיכת הנתונים הטריים מהשרת לפני הצגת הטבלה
+			try {
+				const response = await fetch('./data/workshop_bookings.json?t=' + Date.now());
+				if (response.ok) {
+					const bookings = await response.json();
+					if (Array.isArray(bookings)) {
+						// עדכון ה-DataStore עם הנתונים מהשרת (עוקף את ה-localStorage הישן)
+						DataStore.saveAll(DataStore.KEYS.WORKSHOP_BOOKINGS, bookings);
+						console.log('✅ נטענו ' + bookings.length + ' הזמנות מהשרת לטאב הזמנות בפסגה');
+					}
+				}
+			} catch (e) {
+				console.warn('⚠️ לא ניתן לטעון הזמנות מהשרת:', e);
+			}
+			_renderWorkshopBookingsTab();
+		}
+	}
+
+	function _switchWorkshopTab(tab) {
+		window._workshopActiveTab = tab;
+		renderWorkshopBookings();
+	}
+
+	function _renderWorkshopSettingsTab() {
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		const labels = settings.labels || {};
+		const workshops = settings.workshops || [];
+		const allowedDays = settings.allowedDays || [];
+		const responsible = settings.responsible || {};
+		const introText = settings.introText || '';
+
+		// 1. שליפת נתונים מ- guides_repo (מאגר מדריכים)
+		const guides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
+		
+		// 2. שליפת נתונים מ- lookup_week_days (ימי שבוע)
+		const weekDays = DataStore.getAll(DataStore.KEYS.LOOKUP_WEEK_DAYS) || [];
+
+		const getLabel = (key, defHe, defAr) => ({ he: labels[key]?.he || defHe, ar: labels[key]?.ar || defAr });
+		const lblInst = getLabel('institutionCode', 'קוד מוסד', 'رمز المؤسسة');
+		const lblContact = getLabel('contactPerson', 'שם איש קשר', 'اسم شخص الاتصال');
+		const lblMobile = getLabel('mobile', 'מספר נייד', 'رقم الهاتف المحمول');
+		const lblEmail = getLabel('email', 'דוא"ל', 'البريد الإلكتروني');
+		const lblDate = getLabel('meetingDate', 'תאריך המפגש', 'تاريخ اللقاء');
+		const lblTime = getLabel('meetingTime', 'שעת המפגש', 'وقت اللقاء');
+		const lblWorkshop = getLabel('workshopName', 'שם הסדנה', 'اسم الورشة');
+		const lblNotes = getLabel('notes', 'הערות', 'ملاحظات');
+		const lblParticipants = getLabel('participants', 'מספר משתתפים', 'عدد المشاركين');
+
+		// בניית אופציות למדריכים (מיפוי מדויק: fullNameAr, phone, email)
+		// בניית אופציות למדריכים (מיפוי מדויק: העדפה ל-fullName בעברית)
+		const guidesOptions = guides.map(g => {
+			const name = g.fullName || g.fullNameAr || 'ללא שם'; // 🔑 שינוי סדר העדיפות: fullName (עברית) קודם
+			const isSelected = responsible.id === g.id ? 'selected' : '';
+			return `<option value="${g.id}" data-phone="${g.phone || ''}" data-email="${g.email || ''}" ${isSelected}>${name}</option>`;
+		}).join('');
+
+	// 🔑 בניית צ'קבוקסים לימי שבוע - תיקון קריטי: שימוש ב-day.value במקום day.id
+	const weekDaysHtml = weekDays.map(day => {
+		const dayValue = day.value || day.id; // 🔑 תאימות לאחור
+		const isChecked = allowedDays.includes(dayValue) ? 'checked' : '';
+		const dayLabel = day.label || day.labelAr || day.value || 'יום';
+		return `<label style="display:inline-flex; align-items:center; gap:6px; margin-left:16px; cursor:pointer; padding:6px 10px; border-radius:6px; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
+			<input type="checkbox" class="ws-day-checkbox" value="${escAttr(dayValue)}" ${isChecked} style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);"> 
+			<span style="font-size:14px;">${escAttr(dayLabel)}</span>
+		</label>`;
+	}).join('');
+
+		// בניית טבלת סדנאות
+		const workshopsTableRows = workshops.map((w, index) => `
+			<tr>
+				<td style="text-align:center;">${index + 1}</td>
+				<td>${escAttr(w.name)}</td>
+				<td style="text-align:center; white-space:nowrap;">
+					<button class="btn btn-sm btn-outline" onclick="App.editWorkshop(${index})" title="עריכה">✏️</button>
+					<button class="btn btn-sm btn-danger" onclick="App.deleteWorkshop(${index})" title="מחיקה">🗑️</button>
+				</td>
+			</tr>
+		`).join('') || '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-secondary);">אין סדנאות מוגדרות</td></tr>';
+
+		document.getElementById('workshopTabContent').innerHTML = `
+			<!-- חלק 0: הקדמה לטופס הזמנה (TinyMCE) -->
+			<div class="card" style="margin-bottom:24px; border:1px solid var(--primary);">
+				<div class="card-header"><span class="card-title">📝 הקדמה לטופס הזמנה (מוצג בראש הדף הציבורי)</span></div>
+				<div class="card-body">
+					<div class="hp-editor-wrapper" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+						<textarea id="ws_intro_text">${escHtml(introText)}</textarea>
+					</div>
+					<div style="margin-top:12px;">
+						<button class="btn btn-outline btn-sm" onclick="App._initWorkshopIntroTinyMCE()">🔄 אתחל עורך</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- חלק 1: מנהל אחראי -->
+			<div class="card" style="margin-bottom:24px; border:1px solid var(--primary);">
+				<div class="card-header"><span class="card-title">👤 מנהל/ת אחראי/ת לתפעול והתראות (ממאגר מדריכים)</span></div>
+				<div class="card-body">
+					<div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr; gap:16px;">
+						<div class="form-group">
+							<label>שם האחראי/ת *</label>
+							<select id="ws_resp_id" class="form-input" onchange="App.autoFillResponsibleData()">
+								<option value="">-- בחר מדריך/מנהל --</option>
+								${guidesOptions}
+							</select>
+						</div>
+						<div class="form-group">
+							<label>מספר נייד</label>
+							<input type="text" id="ws_resp_phone" class="form-input" value="${responsible.phone || ''}" readonly style="background:#f8f9fa;">
+						</div>
+						<div class="form-group">
+							<label>כתובת דוא"ל</label>
+							<input type="email" id="ws_resp_email" class="form-input" value="${responsible.email || ''}" readonly style="background:#f8f9fa;">
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- חלק 2: ימי פעילות -->
+			<div class="card" style="margin-bottom:24px;">
+				<div class="card-header"><span class="card-title">📅 ימי פעילות להזמנת סדנאות (מטבלת ימי שבוע)</span></div>
+				<div class="card-body">
+					<p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">סמן את הימים שבהם יהיה ניתן להגיש הזמנות סדנאות:</p>
+					<div style="display:flex; flex-wrap:wrap; gap:12px;">
+						${weekDaysHtml}
+					</div>
+				</div>
+			</div>
+
+			<!-- חלק 3: ניהול סדנאות -->
+			<div class="card" style="margin-bottom:24px;">
+				<div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+					<span class="card-title">📚 רשימת הסדנאות הזמינות</span>
+					<div style="display:flex; gap:8px;">
+						<button class="btn btn-sm btn-danger" onclick="App.deleteAllWorkshops()" ${workshops.length === 0 ? 'disabled' : ''}>🗑️ מחק הכל</button>
+						<button class="btn btn-sm btn-primary" onclick="App.openWorkshopModal()">➕ הוסף סדנה</button>
+					</div>
+				</div>
+				<div class="card-body" style="padding:0; overflow-x:auto;">
+					<table class="data-table">
+						<thead><tr><th style="width:50px;">#</th><th>שם הסדנה</th><th style="width:120px; text-align:center;">פעולות</th></tr></thead>
+						<tbody>${workshopsTableRows}</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- חלק 4: תוויות שדות (דו-לשוני) -->
+			<div class="card">
+				<div class="card-header"><span class="card-title">🌐 תוויות שדות בטופס (עברית / ערבית)</span></div>
+				<div class="card-body">
+					<div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+						<div style="font-weight:600; padding:8px;">שדה</div>
+						<div style="font-weight:600; padding:8px;">עברית</div>
+						<div style="font-weight:600; padding:8px;">ערבית</div>
+						
+						<div>קוד מוסד</div>
+						<input type="text" class="form-input" id="ws_lbl_inst_he" value="${lblInst.he}">
+						<input type="text" class="form-input" id="ws_lbl_inst_ar" value="${lblInst.ar}" dir="rtl">
+
+						<div>איש קשר</div>
+						<input type="text" class="form-input" id="ws_lbl_contact_he" value="${lblContact.he}">
+						<input type="text" class="form-input" id="ws_lbl_contact_ar" value="${lblContact.ar}" dir="rtl">
+
+						<div>מספר נייד</div>
+						<input type="text" class="form-input" id="ws_lbl_mobile_he" value="${lblMobile.he}">
+						<input type="text" class="form-input" id="ws_lbl_mobile_ar" value="${lblMobile.ar}" dir="rtl">
+						
+						<div>דוא"ל</div>
+						<input type="text" class="form-input" id="ws_lbl_email_he" value="${lblEmail.he}">
+						<input type="text" class="form-input" id="ws_lbl_email_ar" value="${lblEmail.ar}" dir="rtl">
+
+						<div>תאריך המפגש</div>
+						<input type="text" class="form-input" id="ws_lbl_date_he" value="${lblDate.he}">
+						<input type="text" class="form-input" id="ws_lbl_date_ar" value="${lblDate.ar}" dir="rtl">
+
+						<div>שעת המפגש</div>
+						<input type="text" class="form-input" id="ws_lbl_time_he" value="${lblTime.he}">
+						<input type="text" class="form-input" id="ws_lbl_time_ar" value="${lblTime.ar}" dir="rtl">
+
+						<div>שם הסדנה</div>
+						<input type="text" class="form-input" id="ws_lbl_workshop_he" value="${lblWorkshop.he}">
+						<input type="text" class="form-input" id="ws_lbl_workshop_ar" value="${lblWorkshop.ar}" dir="rtl">
+						
+						<div>מספר משתתפים</div>
+						<input type="text" class="form-input" id="ws_lbl_participants_he" value="${lblParticipants.he}">
+						<input type="text" class="form-input" id="ws_lbl_participants_ar" value="${lblParticipants.ar}" dir="rtl">
+
+						<div>הערות</div>
+						<input type="text" class="form-input" id="ws_lbl_notes_he" value="${lblNotes.he}">
+						<input type="text" class="form-input" id="ws_lbl_notes_ar" value="${lblNotes.ar}" dir="rtl">
+					</div>
+					<div style="text-align:left; margin-top:16px;">
+						<button class="btn btn-primary" onclick="App.saveWorkshopSettings()">💾 שמור את כל ההגדרות</button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		// אתחול TinyMCE להקדמה
+		setTimeout(() => App._initWorkshopIntroTinyMCE(), 100);
+	}
+
+	// פונקציית אוטו-מילוי נתוני אחראי (מעודכנת לשדות phone ו-email)
+	function autoFillResponsibleData() {
+		const select = document.getElementById('ws_resp_id');
+		const selectedOption = select.options[select.selectedIndex];
+		
+		document.getElementById('ws_resp_phone').value = selectedOption.getAttribute('data-phone') || '';
+		document.getElementById('ws_resp_email').value = selectedOption.getAttribute('data-email') || '';
+	}
+
+	// שמירת כל ההגדרות
+	function saveWorkshopSettings() {
+		// שמירת תוכן TinyMCE לפני השמירה
+		if (typeof tinymce !== 'undefined') {
+			var editor = tinymce.get('ws_intro_text');
+			if (editor) editor.save();
+		}
+		
+		// 🔑 בדיקה שנבחר לפחות יום אחד לפעילות
+		const checkedDays = document.querySelectorAll('.ws-day-checkbox:checked');
+		if (checkedDays.length === 0) {
+			showToast('⚠️ יש לבחור לפחות יום אחד לפעילות הזמנת סדנאות', 'warning');
+			return;
+		}
+		
+		const respSelect = document.getElementById('ws_resp_id');
+		const respOption = respSelect.options[respSelect.selectedIndex];
+		
+		const labels = {
+			institutionCode: { he: document.getElementById('ws_lbl_inst_he').value, ar: document.getElementById('ws_lbl_inst_ar').value },
+			contactPerson: { he: document.getElementById('ws_lbl_contact_he').value, ar: document.getElementById('ws_lbl_contact_ar').value },
+			mobile: { he: document.getElementById('ws_lbl_mobile_he').value, ar: document.getElementById('ws_lbl_mobile_ar').value },
+			email: { he: document.getElementById('ws_lbl_email_he').value, ar: document.getElementById('ws_lbl_email_ar').value }, // 🔑 שדה חדש
+			meetingDate: { he: document.getElementById('ws_lbl_date_he').value, ar: document.getElementById('ws_lbl_date_ar').value },
+			meetingTime: { he: document.getElementById('ws_lbl_time_he').value, ar: document.getElementById('ws_lbl_time_ar').value },
+			workshopName: { he: document.getElementById('ws_lbl_workshop_he').value, ar: document.getElementById('ws_lbl_workshop_ar').value },
+			notes: { he: document.getElementById('ws_lbl_notes_he').value, ar: document.getElementById('ws_lbl_notes_ar').value }
+		};
+
+		const allowedDays = [];
+		document.querySelectorAll('.ws-sim-day-checkbox:checked').forEach(cb => allowedDays.push(cb.value));
+
+		const introText = document.getElementById('ws_intro_text')?.value || '';
+
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		const newData = {
+			id: 'workshop_settings_main',
+			labels: labels,
+			allowedDays: allowedDays,
+			workshops: settings.workshops || [],
+			responsible: {
+				id: respSelect.value,
+				name: respOption.text,
+				phone: document.getElementById('ws_resp_phone').value,
+				email: document.getElementById('ws_resp_email').value
+			},
+			introText: introText,
+			updatedAt: new Date().toISOString()
+		};
+
+		const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+		if (existing) {
+			DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, newData);
+		} else {
+			DataStore.create(DataStore.KEYS.WORKSHOP_SETTINGS, newData);
+		}
+		showToast('הגדרות הדף נשמרו בהצלחה!', 'success');
+	}
+
+	// ================================================================
+	// 🔑 פונקציה גלובלית: קבלת הימים המותרים להזמנת סדנאות
+	// ================================================================
+	/**
+	 * מחזירה מערך של ימי השבוע המותרים להזמנת סדנאות
+	 * @returns {Array} מערך של אובייקטים: [{value: 'sunday', label: 'יום ראשון'}, ...]
+	 */
+	function getAllowedWorkshopDays() {
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		const allowedDayValues = settings.allowedDays || [];
+		
+		if (allowedDayValues.length === 0) return [];
+		
+		const weekDays = DataStore.getAll(DataStore.KEYS.LOOKUP_WEEK_DAYS) || [];
+		
+		return weekDays.filter(day => {
+			const dayValue = day.value || day.id;
+			return allowedDayValues.includes(dayValue);
+		}).map(day => ({
+			value: day.value || day.id,
+			label: day.label || day.labelAr || day.value,
+			labelAr: day.labelAr || day.label || ''
+		}));
+	}
+
+	/**
+	 * בודק אם תאריך נתון חל באחד הימים המותרים להזמנת סדנאות
+	 * @param {string|Date} dateStr - תאריך בפורמט YYYY-MM-DD או אובייקט Date
+	 * @returns {Object} {allowed: boolean, dayName: string, allowedDays: Array}
+	 */
+	function checkWorkshopDateAllowed(dateStr) {
+		const allowedDays = getAllowedWorkshopDays();
+		
+		if (allowedDays.length === 0) {
+			return { allowed: false, dayName: '', allowedDays: [], error: 'לא הוגדרו ימי פעילות' };
+		}
+		
+		// המרת התאריך ל-Date
+		const date = (dateStr instanceof Date) ? dateStr : new Date(dateStr);
+		if (isNaN(date.getTime())) {
+			return { allowed: false, dayName: '', allowedDays: allowedDays, error: 'תאריך לא תקין' };
+		}
+		
+		// קבלת היום בשבוע (0 = ראשון, 1 = שני, ..., 6 = שבת)
+		const jsDay = date.getDay();
+		
+		// מיפוי מ-JavaScript day ל-value של lookup_week_days
+		// בדרך כלל: sunday=0, monday=1, ..., saturday=6
+		const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+		const selectedDayValue = dayMap[jsDay];
+		
+		// בדיקה אם היום נמצא ברשימת הימים המותרים
+		const isAllowed = allowedDays.some(d => d.value === selectedDayValue);
+		
+		// מציאת שם היום שנבחר
+		const selectedDayInfo = allowedDays.find(d => d.value === selectedDayValue);
+		const dayName = selectedDayInfo ? selectedDayInfo.label : '';
+		
+		return {
+			allowed: isAllowed,
+			dayName: dayName,
+			dayValue: selectedDayValue,
+			allowedDays: allowedDays,
+			error: isAllowed ? '' : `היום "${dayName || selectedDayValue}" אינו יום פעילות להזמנת סדנאות`
+		};
+	}
+
+	/**
+	 * מחזירה מחרוזת תיאור של הימים המותרים (לתצוגה בטופס)
+	 * @returns {string} מחרוזת כמו "ימים מותרים: יום ראשון, יום שלישי"
+	 */
+	function getAllowedDaysDescription() {
+		const allowedDays = getAllowedWorkshopDays();
+		if (allowedDays.length === 0) return 'לא הוגדרו ימי פעילות';
+		
+		const lang = (typeof getUiLang === 'function') ? getUiLang() : 'he';
+		const dayNames = allowedDays.map(d => lang === 'ar' ? d.labelAr : d.label);
+		
+		return (lang === 'ar' ? 'الأيام المسموحة: ' : 'ימים מותרים: ') + dayNames.join(', ');
+	}
+
+	// --- ניהול סדנאות (CRUD) ---
+	function openWorkshopModal(index) {
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		const workshops = settings.workshops || [];
+		
+		let currentName = '';
+		let isEdit = false;
+		
+		if (index !== null && index !== undefined && index !== 'null') {
+			const idx = parseInt(index);
+			if (!isNaN(idx) && workshops[idx]) {
+				currentName = workshops[idx].name || '';
+				isEdit = true;
+			}
+		}
+
+		const title = isEdit ? 'עריכת סדנה' : 'הוספת סדנה חדשה';
+		const btnText = isEdit ? '💾 שמור שינויים' : '➕ הוסף סדנה';
+		const indexParam = isEdit ? index : 'null';
+
+		// יצירת מודאל ידני (בלי תלות ב-showModal)
+		let overlay = document.getElementById('ws_modal_overlay');
+		if (overlay) overlay.remove();
+
+		overlay = document.createElement('div');
+		overlay.id = 'ws_modal_overlay';
+		overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+		
+		overlay.innerHTML = `
+			<div style="background:#fff;border-radius:12px;padding:32px;min-width:400px;max-width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+				<h3 style="margin:0 0 20px 0;color:var(--primary);">${title}</h3>
+				<div class="form-group">
+					<label style="font-weight:600;margin-bottom:6px;display:block;">שם הסדנה *</label>
+					<input type="text" id="ws_workshop_name_input" class="form-input" value="${currentName}" placeholder="הזן שם סדנה">
+				</div>
+				<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">
+					<button class="btn btn-primary" id="ws_modal_save_btn">${btnText}</button>
+					<button class="btn btn-outline" id="ws_modal_cancel_btn">ביטול</button>
+				</div>
+			</div>
+		`;
+		
+		document.body.appendChild(overlay);
+
+		// חיבור אירועים
+		document.getElementById('ws_modal_save_btn').addEventListener('click', function() {
+			App.saveWorkshopItem(indexParam);
+		});
+		
+		document.getElementById('ws_modal_cancel_btn').addEventListener('click', function() {
+			overlay.remove();
+		});
+		
+		// סגירה בלחיצה על הרקע
+		overlay.addEventListener('click', function(e) {
+			if (e.target === overlay) overlay.remove();
+		});
+
+		// פוקוס אוטומטי על השדה
+		setTimeout(function() {
+			var input = document.getElementById('ws_workshop_name_input');
+			if (input) input.focus();
+		}, 100);
+	}
+
+	function saveWorkshopItem(index) {
+		const nameInput = document.getElementById('ws_workshop_name_input');
+		const name = nameInput ? nameInput.value.trim() : '';
+		
+		if (!name) { 
+			showToast('יש להזין שם סדנה', 'error'); 
+			return; // לא סוגרים אם יש שגיאת ולידציה
+		}
+
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		let workshops = settings.workshops || [];
+
+		// 🔧 בדיקה מלאה גם ל-undefined (תיקון מהקטע הראשון)
+		const idx = (index === null || index === undefined || index === 'null') ? null : parseInt(index);
+
+		if (idx !== null && !isNaN(idx)) {
+			if (workshops[idx]) {
+				workshops[idx] = { name: name };
+				showToast('הסדנה עודכנה בהצלחה', 'success');
+			}
+		} else {
+			workshops.push({ name: name });
+			showToast('הסדנה נוספה בהצלחה', 'success');
+		}
+
+		settings.workshops = workshops;
+		
+		const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+		if (existing) {
+			DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, settings);
+		} else {
+			settings.id = 'workshop_settings_main';
+			DataStore.create(DataStore.KEYS.WORKSHOP_SETTINGS, settings);
+		}
+		
+		// 🔥 סגירת חלון מודאלי - ניקוי בטוח (סדר מתוקן!)
+		// 1. קודם מנסים את הפונקציה הרשמית שדואגת לניקוי מאזיני אירועים ואנימציות
+		if (typeof App !== 'undefined' && typeof App.closeModal === 'function') {
+			App.closeModal();
+		}
+		// 2. גיבוי כבד: הסרה פיזית של האוברליי מה-DOM, למקרה שהפונקציה הקודמת לא עבדה
+		const overlay = document.getElementById('ws_modal_overlay');
+		if (overlay) {
+			overlay.remove();
+		}
+		
+		_renderWorkshopSettingsTab();
+	}
+
+	// פונקציה לעריכת סדנה (מפעילה את המודאל עם האינדקס)
+	function editWorkshop(index) {
+		App.openWorkshopModal(index);
+	}
+
+	// פונקציה למחיקת סדנה בודדת
+	function deleteWorkshop(index) {
+		if (!confirm('האם אתה בטוח שברצונך למחוק סדנה זו?')) return;
+		
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		let workshops = settings.workshops || [];
+		
+		// בדיקת תקינות לפני מחיקה
+		if (index >= 0 && index < workshops.length) {
+			workshops.splice(index, 1); // מחיקת הפריט מהמערך
+			settings.workshops = workshops;
+			
+			const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+			if (existing) {
+				DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, settings);
+			}
+			
+			showToast('הסדנה נמחקה בהצלחה', 'success');
+			_renderWorkshopSettingsTab(); // רענון התצוגה
+		}
+	}
+
+
+	// פונקציה למחיקת כל הסדנאות
+	function deleteAllWorkshops() {
+		if (!confirm('⚠️ האם אתה בטוח שברצונך למחוק את כל רשימת הסדנאות? פעולה זו בלתי הפיכה.')) return;
+		
+		const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+		settings.workshops = [];
+		
+		const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+		if (existing) {
+			DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, settings);
+		}
+		
+		showToast('כל הסדנאות נמחקו', 'success');
+		_renderWorkshopSettingsTab();
+	}
+
+
+		 function _renderWorkshopBookingsTab() {
+			// 🔑 תיקון קריטי: שימוש במפתח גמיש למקרה ש-DataStore.KEYS.WORKSHOP_BOOKINGS לא מוגדר
+			const storeKey = (typeof DataStore !== 'undefined' && DataStore.KEYS && DataStore.KEYS.WORKSHOP_BOOKINGS) ? DataStore.KEYS.WORKSHOP_BOOKINGS : 'workshop_bookings';
+			
+			const bookings = (DataStore.getAll(storeKey) || []).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+			
+			// 🔑 לוג אבחון: ידפיס בדיוק מה המערכת רואה
+			console.log('📋 [Workshop Bookings Debug] מפתח בשימוש:', storeKey);
+			console.log('📋 [Workshop Bookings Debug] מספר הזמנות שנמצאו:', bookings.length);
+			if (bookings.length > 0) {
+				console.log('📋 [Workshop Bookings Debug] דוגמה להזמנה ראשונה:', bookings[0]);
+			}
+
+			if (bookings.length === 0) {
+				document.getElementById('workshopTabContent').innerHTML = `
+					<div style="text-align:center; padding:60px 20px; color:var(--text-secondary);">
+						<div style="font-size:64px; margin-bottom:16px;">📭</div>
+						<h3>אין הזמנות עדיין</h3>
+						<p>הזמנות יופיעו כאן לאחר שמשתמשים ימלאו את הטופס באתר הציבורי.</p>
+						<p style="font-size:12px; color:#999; margin-top:8px;">(אם ביצעת הזמנה, לחץ Ctrl+F5 לרענון עמוק)</p>
+					</div>`;
+				return;
+			}
+		const statusColors = { 'pending': '#ffc107', 'approved': '#28a745', 'rejected': '#dc3545', 'completed': '#17a2b8', 'cancelled': '#6c757d' };
+		const statusLabels = { 'pending': 'ממתין', 'approved': 'אושרה', 'rejected': 'נדחתה', 'completed': 'הושלמה', 'cancelled': 'בוטלה' };
+		const rowsHtml = bookings.map(b => `
+			<tr>
+				<td style="text-align:center;">${new Date(b.createdAt).toLocaleDateString('he-IL')}</td>
+				<td>${escAttr(b.schoolName || '-')}</td>
+				<td>${escAttr(b.contactPerson || '-')}</td>
+				<td dir="ltr">${escAttr(b.mobile || '-')}</td>
+				<td>${escAttr(b.workshopName || '-')}</td>
+				<td>${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'}</td>
+				<td style="text-align:center;">
+					<select class="form-select" style="padding:4px 8px; font-size:12px; font-weight:600; color:#fff; background:${statusColors[b.status] || '#6c757d'}; border:none; border-radius:12px; cursor:pointer;" 
+							onchange="App.updateBookingStatus('${b.id}', this.value)">
+						<option value="pending" ${b.status === 'pending' ? 'selected' : ''}>⏳ ממתין</option>
+						<option value="approved" ${b.status === 'approved' ? 'selected' : ''}>✅ אושרה</option>
+						<option value="rejected" ${b.status === 'rejected' ? 'selected' : ''}>❌ נדחתה</option>
+						<option value="completed" ${b.status === 'completed' ? 'selected' : ''}>🏁 הושלמה</option>
+						<option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>🚫 בוטלה</option>
+					</select>
+				</td>
+				<td style="text-align:center; white-space:nowrap;">
+					<button class="btn btn-sm btn-outline" onclick="App.viewBookingDetails('${b.id}')" title="צפייה בפרטים">👁️</button>
+					<button class="btn btn-sm btn-outline" onclick="App.printBooking('${b.id}')" title="הדפסה">🖨️</button>
+					<button class="btn btn-sm btn-success" onclick="App.replyWhatsappBooking('${b.id}')" title="מענה בוואטסאפ">💬</button>
+					<button class="btn btn-sm btn-danger" onclick="App.deleteBooking('${b.id}')" title="מחיקה">🗑️</button>
+				</td>
+			</tr>
+		`).join('');
+		document.getElementById('workshopTabContent').innerHTML = `
+			<div style="overflow-x:auto;">
+				<table class="data-table">
+					<thead>
+						<tr>
+							<th>תאריך הזמנה</th><th>בית ספר</th><th>איש קשר</th><th>טלפון</th><th>סדנה</th><th>תאריך מפגש</th><th>סטטוס</th><th>פעולות</th>
+						</tr>
+					</thead>
+					<tbody>${rowsHtml}</tbody>
+				</table>
+			</div>
+		`;
+	 }
+
+	// 🔑 פונקציה חדשה: עדכון סטטוס הזמנה (כולל שחרור תאריך במקרה של דחייה/ביטול)
+	function updateBookingStatus(id, newStatus) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const bookingIndex = bookings.findIndex(b => b.id === id);
+		
+		if (bookingIndex === -1) return;
+		
+		const oldStatus = bookings[bookingIndex].status;
+		bookings[bookingIndex].status = newStatus;
+		bookings[bookingIndex].updatedAt = new Date().toISOString();
+		
+		DataStore.saveAll(DataStore.KEYS.WORKSHOP_BOOKINGS, bookings);
+		
+		// הודעה למשתמש על שינוי הסטטוס והשלכותיו
+		let msg = 'סטטוס ההזמנה עודכן ל: ';
+		if (newStatus === 'approved') msg += '✅ אושרה';
+		else if (newStatus === 'rejected') msg += '❌ נדחתה (התאריך שוחרר וזמין להזמנה חדשה)';
+		else if (newStatus === 'completed') msg += '🏁 הושלמה';
+		else if (newStatus === 'cancelled') msg += '🚫 בוטלה (התאריך שוחרר)';
+		else msg += '⏳ ממתין';
+		
+		showToast(msg, 'success');
+		_renderWorkshopBookingsTab(); // רענון הטבלה
+	}
+
+	// --- פעולות על הזמנות ---
+	function viewBookingDetails(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const b = bookings.find(x => x.id === id);
+		if (!b) return;
+
+		const statusLabels = { 'pending': 'ממתין לאישור', 'approved': 'אושר', 'completed': 'הושלם', 'cancelled': 'בוטל' };
+		const body = `
+			<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:14px; line-height:1.6;">
+				<div><strong>📅 תאריך הזמנה:</strong><br>${new Date(b.createdAt).toLocaleString('he-IL')}</div>
+				<div><strong>📊 סטטוס:</strong><br><span style="color:var(--primary); font-weight:bold;">${statusLabels[b.status] || b.status}</span></div>
+				<div><strong>🏫 קוד מוסד:</strong><br>${escAttr(b.institutionCode || '-')}</div>
+				<div><strong>🏫 בית ספר:</strong><br>${escAttr(b.schoolName || '-')}</div>
+				<div><strong>👤 מנהל/ת בית הספר:</strong><br>${escAttr(b.principalName || '-')}</div>
+				<div><strong>📞 איש קשר:</strong><br>${escAttr(b.contactPerson || '-')}</div>
+				<div><strong>📱 טלפון:</strong><br><span dir="ltr">${escAttr(b.mobile || '-')}</span></div>
+				<div><strong>📚 שם הסדנה:</strong><br>${escAttr(b.workshopName || '-')}</div>
+				<div><strong>🗓️ תאריך מפגש:</strong><br>${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'}</div>
+				<div><strong>⏰ שעה:</strong><br>${escAttr(b.startTime || '-')} עד ${escAttr(b.endTime || '-')}</div>
+				<div style="grid-column:1/-1; background:#f8f9fa; padding:12px; border-radius:8px;">
+					<strong>📝 הערות:</strong><br>${escAttr(b.notes || 'אין הערות')}
+				</div>
+			</div>
+		`;
+		showModal('פרטי הזמנה מלאים', body, '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>');
+	}
+
+	function printBooking(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const b = bookings.find(x => x.id === id);
+		if (!b) return;
+
+		const printWindow = window.open('', '_blank');
+		printWindow.document.write(`
+			<html dir="rtl"><head><title>הדפסת הזמנה - ${b.schoolName}</title>
+			<style>body{font-family:Arial,sans-serif; padding:40px; line-height:1.6;} h2{color:#0ca7aa; border-bottom:2px solid #0ca7aa; padding-bottom:10px;} .row{display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px dashed #ccc; padding-bottom:8px;} .label{font-weight:bold; color:#555;} .value{color:#000;} @media print{body{padding:0;}}</style>
+			</head><body>
+			<h2>🏔️ פרטי הזמנת סדנה בפסגה</h2>
+			<div class="row"><span class="label">תאריך הפקת המסמך:</span><span class="value">${new Date().toLocaleDateString('he-IL')}</span></div>
+			<div class="row"><span class="label">בית ספר:</span><span class="value">${b.schoolName} (קוד: ${b.institutionCode})</span></div>
+			<div class="row"><span class="label">מנהל/ת בית הספר:</span><span class="value">${b.principalName}</span></div>
+			<div class="row"><span class="label">איש קשר:</span><span class="value">${b.contactPerson} | ${b.mobile}</span></div>
+			<div class="row"><span class="label">סדנה מבוקשת:</span><span class="value">${b.workshopName}</span></div>
+			<div class="row"><span class="label">תאריך ושעת המפגש:</span><span class="value">${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'} | ${b.startTime} - ${b.endTime}</span></div>
+			<div class="row"><span class="label">הערות:</span><span class="value">${b.notes || 'אין'}</span></div>
+			<br><br>
+			<p style="text-align:center; color:#888; font-size:12px;">מסמך זה הופק אוטומטית ממערכת מצפן נט.</p>
+			</body></html>
+		`);
+		printWindow.document.close();
+		setTimeout(() => { printWindow.print(); }, 500);
+	}
+
+	function replyEmailBooking(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const b = bookings.find(x => x.id === id);
+		if (!b || !b.mobile) { showToast('לא נמצא מספר טלפון להזמנה זו', 'warning'); return; }
+		
+		// הערה: מכיוון שאין שדה אימייל בטופס הציבורי, נשתמש ב-mailto עם הטלפון כנושא, או שנבקש מהמשתמש להזין ידנית.
+		// אם תרצה להוסיף שדה אימייל לטופס הציבורי, עדכן את ה-fetch שם. כרגע נפתח חלון אימייל ריק עם פרטי ההזמנה בגוף ההודעה.
+		const subject = encodeURIComponent(`מענה להזמנת סדנה - ${b.schoolName}`);
+		const body = encodeURIComponent(`שלום רב ${b.contactPerson},\n\nתודה על פנייתך להזמנת הסדנה "${b.workshopName}".\nאנו בודקים את הזמינות לתאריך ${b.meetingDate} ונחזור אליך בהקדם.\n\nבברכה,\nצוות מצפן נט`);
+		
+		window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+	}
+
+	function replyWhatsappBooking(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const b = bookings.find(x => x.id === id);
+		if (!b || !b.mobile) { showToast('לא נמצא מספר טלפון להזמנה זו', 'warning'); return; }
+
+		const cleanPhone = b.mobile.replace(/[^0-9]/g, '');
+		const message = encodeURIComponent(`שלום רב ${b.contactName || b.contactPerson || ''},\nתודה על הזמנת הסדנה "${b.workshopName}" עבור ${b.schoolName}.\nאנו נחזור אליך בהקדם לאישור סופי.\nבברכה, צוות מצפן נט 🧭`);
+		
+		window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+	}
+
+	function deleteBooking(id) {
+		if (!confirm('האם אתה בטוח שברצונך למחוק הזמנה זו לצמיתות?')) return;
+		DataStore.remove(DataStore.KEYS.WORKSHOP_BOOKINGS, id);
+		showToast('ההזמנה נמחקה בהצלחה', 'success');
+		_renderWorkshopBookingsTab();
+	}
+
+    function addWorkshop() {
+        const input = document.getElementById('wsNewWorkshop');
+        const newName = input.value.trim();
+        if (!newName) return;
+
+        const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+        const workshops = settings.workshops || [];
+        
+        if (workshops.includes(newName)) {
+            showToast('סדנה זו כבר קיימת ברשימה', 'warning');
+            return;
+        }
+
+        workshops.push(newName);
+        
+        // עדכון ישיר ב-DataStore
+        const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+        if (existing) {
+            existing.workshops = workshops;
+            DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, existing);
+        } else {
+            DataStore.create(DataStore.KEYS.WORKSHOP_SETTINGS, { id: 'workshop_settings_main', workshops: workshops });
+        }
+
+        input.value = '';
+        showToast('הסדנה נוספה בהצלחה', 'success');
+        renderWorkshopBookings(); // רענון הרשימה
+    }
+
+    function removeWorkshop(index) {
+        if (!confirm('האם אתה בטוח שברצונך למחוק סדנה זו מהרשימה?')) return;
+
+        const settings = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || [])[0] || {};
+        const workshops = settings.workshops || [];
+        
+        workshops.splice(index, 1);
+        
+        const existing = (DataStore.getAll(DataStore.KEYS.WORKSHOP_SETTINGS) || []).find(item => item.id === 'workshop_settings_main');
+        if (existing) {
+            existing.workshops = workshops;
+            DataStore.update(DataStore.KEYS.WORKSHOP_SETTINGS, existing.id, existing);
+        }
+
+        showToast('הסדנה הוסרה', 'success');
+        renderWorkshopBookings(); // רענון הרשימה
+    }
+
+	function viewWorkshopBooking(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const booking = bookings.find(b => b.id === id);
+		
+		if (!booking) {
+			showToast('ההזמנה לא נמצאה', 'error');
+			return;
+		}
+
+		const statusLabels = {
+			'pending': 'ממתין לאישור',
+			'approved': 'אושר',
+			'completed': 'הושלם',
+			'cancelled': 'בוטל'
+		};
+
+		const body = `
+			<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:14px;">
+				<div><strong>תאריך הזמנה:</strong><br>${new Date(booking.createdAt).toLocaleString('he-IL')}</div>
+				<div><strong>סטטוס:</strong><br>${statusLabels[booking.status] || booking.status}</div>
+				
+				<div><strong>קוד מוסד:</strong><br>${booking.institutionCode || '-'}</div>
+				<div><strong>בית ספר:</strong><br>${booking.schoolName || '-'}</div>
+				
+				<div><strong>שם המנהל/ת:</strong><br>${booking.principalName || '-'}</div>
+				<div><strong>איש קשר:</strong><br>${booking.contactPerson || '-'}</div>
+				
+				<div><strong>טלפון:</strong><br><span dir="ltr">${booking.mobile || '-'}</span></div>
+				<div><strong>שם הסדנה:</strong><br>${booking.workshopName || '-'}</div>
+				
+				<div><strong>תאריך מפגש:</strong><br>${booking.meetingDate ? new Date(booking.meetingDate).toLocaleDateString('he-IL') : '-'}</div>
+				<div><strong>שעה:</strong><br>${booking.startTime || '-'} - ${booking.endTime || '-'}</div>
+				
+				<div style="grid-column:1/-1;"><strong>הערות:</strong><br>${booking.notes || 'אין הערות'}</div>
+			</div>
+		`;
+
+		showModal('פרטי הזמנה', body, '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>');
+	}
+
+	function changeWorkshopStatus(id) {
+		const bookings = DataStore.getAll(DataStore.KEYS.WORKSHOP_BOOKINGS) || [];
+		const booking = bookings.find(b => b.id === id);
+		
+		if (!booking) return;
+
+		const statuses = ['pending', 'approved', 'completed', 'cancelled'];
+		const statusLabels = {
+			'pending': 'ממתין',
+			'approved': 'אושר',
+			'completed': 'הושלם',
+			'cancelled': 'בוטל'
+		};
+
+		const currentIndex = statuses.indexOf(booking.status);
+		const nextIndex = (currentIndex + 1) % statuses.length;
+		const newStatus = statuses[nextIndex];
+
+		if (confirm(`לשנות סטטוס מ-"${statusLabels[booking.status]}" ל-"${statusLabels[newStatus]}"?`)) {
+			booking.status = newStatus;
+			DataStore.update(DataStore.KEYS.WORKSHOP_BOOKINGS, id, booking);
+			showToast('הסטטוס עודכן', 'success');
+			_renderWorkshopBookingsTab();
+		}
+	}
+
+	function sendWhatsApp(mobile, contactName) {
+		if (!mobile) {
+			showToast('אין מספר טלפון להזמנה זו', 'warning');
+			return;
+		}
+
+		const message = encodeURIComponent(`שלום ${contactName || ''},\nתודה על הזמנת הסדנה. ניצור איתך קשר בהקדם.\nבברכה,\nמרכז פיתוח סגלי הוראה`);
+		const whatsappUrl = `https://wa.me/${mobile.replace(/[^0-9]/g, '')}?text=${message}`;
+		
+		window.open(whatsappUrl, '_blank');
+	}
+
+	function deleteWorkshopBooking(id) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק הזמנה זו?')) return;
+    
+    DataStore.remove(DataStore.KEYS.WORKSHOP_BOOKINGS, id);
+    showToast('ההזמנה נמחקה', 'success');
+    _renderWorkshopBookingsTab();
+}
+
+// ================================================================
+//  ניהול הזמנת סדנאות סימולציה (מערכת מקבילה ועצמאית)
+// ================================================================
+const SIM_SETTINGS_KEY = 'workshop_sim_settings';
+const SIM_BOOKINGS_KEY = 'workshop_sim_bookings';
+
+async function renderWorkshopSimBookings() {
+    const container = document.getElementById('section-workshop-sim-bookings');
+    if (!container) return;
+    const activeTab = window._workshopSimActiveTab || 'settings';
+    
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 class="card-title">🎭 ניהול הזמנת סדנאות סימולציה</h3>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchWorkshopSimTab('settings')">⚙️ הגדרות ותפעול</button>
+                    <button class="btn ${activeTab === 'bookings' ? 'btn-primary' : 'btn-outline'}" onclick="App._switchWorkshopSimTab('bookings')">📋 הזמנות שהתקבלו</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="workshopSimTabContent">
+					<div style="text-align:center; padding:40px; color:var(--gray-500);">
+						<div style="font-size:32px; margin-bottom:10px;">⏳</div>
+						<p>טוען נתונים מהשרת...</p>
+					</div>
+				</div>
+            </div>
+        </div>
+    `;
+    if (activeTab === 'settings') {
+        _renderWorkshopSimSettingsTab();
+    } else {
+        // 🔑 קריטי: משיכת הנתונים הטריים מהשרת לפני הצגת הטבלה
+        try {
+            const response = await fetch('./data/workshop_sim_bookings.json?t=' + Date.now());
+            if (response.ok) {
+                const bookings = await response.json();
+                if (Array.isArray(bookings)) {
+                    DataStore.saveAll(DataStore.KEYS.WORKSHOP_SIM_BOOKINGS, bookings);
+                    console.log('✅ נטענו ' + bookings.length + ' הזמנות סימולציה מהשרת');
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ לא ניתן לטעון הזמנות סימולציה מהשרת:', e);
+        }
+        _renderWorkshopSimBookingsTab();
+    }
+}
+
+function _switchWorkshopSimTab(tab) {
+    window._workshopSimActiveTab = tab;
+    renderWorkshopSimBookings();
+}
+
+function _renderWorkshopSimSettingsTab() {
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    const labels = settings.labels || {};
+    const workshops = settings.workshops || [];
+    const allowedDays = settings.allowedDays || [];
+    const responsible = settings.responsible || {};
+    const introText = settings.introText || '';
+    
+    const guides = DataStore.getAll(DataStore.KEYS.GUIDES_REPO) || [];
+    const weekDays = DataStore.getAll(DataStore.KEYS.LOOKUP_WEEK_DAYS) || [];
+    const getLabel = (key, defHe, defAr) => ({ he: labels[key]?.he || defHe, ar: labels[key]?.ar || defAr });
+    
+    const lblInst = getLabel('institutionCode', 'קוד מוסד', 'رمز المؤسسة');
+    const lblContact = getLabel('contactPerson', 'שם איש קשר', 'اسم شخص الاتصال');
+    const lblMobile = getLabel('mobile', 'מספר נייד', 'رقم الهاتف المحمول');
+    const lblEmail = getLabel('email', 'דוא"ל', 'البريد الإلكتروني');
+    const lblDate = getLabel('meetingDate', 'תאריך המפגש', 'تاريخ اللقاء');
+    const lblTime = getLabel('meetingTime', 'שעת המפגש', 'وقت اللقاء');
+    const lblWorkshop = getLabel('workshopName', 'שם הסדנה', 'اسم الورشة');
+    const lblParticipants = getLabel('participants', 'מספר משתתפים', 'عدد المشاركين');
+    const lblNotes = getLabel('notes', 'הערות', 'ملاحظات');
+
+    const guidesOptions = guides.map(g => {
+        const name = g.fullName || g.fullNameAr || 'ללא שם';
+        const isSelected = responsible.id === g.id ? 'selected' : '';
+        return `<option value="${g.id}" data-phone="${g.phone || ''}" data-email="${g.email || ''}" ${isSelected}>${name}</option>`;
+    }).join('');
+
+    const weekDaysHtml = weekDays.map(day => {
+        const dayValue = day.value || day.id;
+        const isChecked = allowedDays.includes(dayValue) ? 'checked' : '';
+        const dayLabel = day.label || day.labelAr || dayValue;
+        return `<label style="display:inline-flex; align-items:center; gap:6px; margin-left:16px; cursor:pointer; padding:6px 10px; border-radius:6px; transition:background 0.15s;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
+            <input type="checkbox" class="ws-sim-day-checkbox" value="${escAttr(dayValue)}" ${isChecked} style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);"> 
+            <span style="font-size:14px;">${escAttr(dayLabel)}</span>
+        </label>`;
+    }).join('');
+
+    const workshopsTableRows = workshops.map((w, index) => `
+        <tr>
+            <td style="text-align:center;">${index + 1}</td>
+            <td>${escAttr(w.name)}</td>
+            <td style="text-align:center; white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" onclick="App.editWorkshopSim(${index})" title="עריכה">✏️</button>
+                <button class="btn btn-sm btn-danger" onclick="App.deleteWorkshopSim(${index})" title="מחיקה">🗑️</button>
+            </td>
+        </tr>
+    `).join('') || '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-secondary);">אין סדנאות מוגדרות</td></tr>';
+
+    document.getElementById('workshopSimTabContent').innerHTML = `
+        <div class="card" style="margin-bottom:24px; border:1px solid var(--primary);">
+            <div class="card-header"><span class="card-title">📝 הקדמה לטופס הזמנה (סימולציה)</span></div>
+            <div class="card-body">
+                <div class="hp-editor-wrapper" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+                    <textarea id="ws_sim_intro_text">${escHtml(introText)}</textarea>
+                </div>
+                <div style="margin-top:12px;"><button class="btn btn-outline btn-sm" onclick="App._initWorkshopSimIntroTinyMCE()">🔄 אתחל עורך</button></div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:24px; border:1px solid var(--primary);">
+            <div class="card-header"><span class="card-title">👤 מנהל/ת אחראי/ת לתפעול והתראות (סימולציה)</span></div>
+            <div class="card-body">
+                <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr; gap:16px;">
+                    <div class="form-group"><label>שם האחראי/ת *</label>
+                        <select id="ws_sim_resp_id" class="form-input" onchange="App.autoFillSimResponsibleData()">
+                            <option value="">-- בחר מדריך/מנהל --</option>${guidesOptions}
+                        </select>
+                    </div>
+                    <div class="form-group"><label>מספר נייד</label><input type="text" id="ws_sim_resp_phone" class="form-input" value="${responsible.phone || ''}" readonly style="background:#f8f9fa;"></div>
+                    <div class="form-group"><label>כתובת דוא"ל</label><input type="email" id="ws_sim_resp_email" class="form-input" value="${responsible.email || ''}" readonly style="background:#f8f9fa;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:24px;">
+            <div class="card-header"><span class="card-title">📅 ימי פעילות להזמנת סדנאות סימולציה</span></div>
+            <div class="card-body">
+                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">סמן את הימים שבהם יהיה ניתן להגיש הזמנות:</p>
+                <div style="display:flex; flex-wrap:wrap; gap:12px;">${weekDaysHtml}</div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:24px;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="card-title">📚 רשימת הסדנאות הזמינות (סימולציה)</span>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-sm btn-danger" onclick="App.deleteAllWorkshopsSim()" ${workshops.length === 0 ? 'disabled' : ''}>🗑️ מחק הכל</button>
+                    <button class="btn btn-sm btn-primary" onclick="App.openWorkshopSimModal()">➕ הוסף סדנה</button>
+                </div>
+            </div>
+            <div class="card-body" style="padding:0; overflow-x:auto;">
+                <table class="data-table"><thead><tr><th style="width:50px;">#</th><th>שם הסדנה</th><th style="width:120px; text-align:center;">פעולות</th></tr></thead>
+                <tbody>${workshopsTableRows}</tbody></table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">🌐 תוויות שדות בטופס (עברית / ערבית)</span></div>
+            <div class="card-body">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+                    <div style="font-weight:600; padding:8px;">שדה</div><div style="font-weight:600; padding:8px;">עברית</div><div style="font-weight:600; padding:8px;">ערבית</div>
+                    <div>קוד מוסד</div><input type="text" class="form-input" id="ws_sim_lbl_inst_he" value="${lblInst.he}"><input type="text" class="form-input" id="ws_sim_lbl_inst_ar" value="${lblInst.ar}" dir="rtl">
+                    <div>איש קשר</div><input type="text" class="form-input" id="ws_sim_lbl_contact_he" value="${lblContact.he}"><input type="text" class="form-input" id="ws_sim_lbl_contact_ar" value="${lblContact.ar}" dir="rtl">
+                    <div>מספר נייד</div><input type="text" class="form-input" id="ws_sim_lbl_mobile_he" value="${lblMobile.he}"><input type="text" class="form-input" id="ws_sim_lbl_mobile_ar" value="${lblMobile.ar}" dir="rtl">
+                    <div>דוא"ל</div><input type="text" class="form-input" id="ws_sim_lbl_email_he" value="${lblEmail.he}"><input type="text" class="form-input" id="ws_sim_lbl_email_ar" value="${lblEmail.ar}" dir="rtl">
+                    <div>תאריך המפגש</div><input type="text" class="form-input" id="ws_sim_lbl_date_he" value="${lblDate.he}"><input type="text" class="form-input" id="ws_sim_lbl_date_ar" value="${lblDate.ar}" dir="rtl">
+                    <div>שעת המפגש</div><input type="text" class="form-input" id="ws_sim_lbl_time_he" value="${lblTime.he}"><input type="text" class="form-input" id="ws_sim_lbl_time_ar" value="${lblTime.ar}" dir="rtl">
+                    <div>שם הסדנה</div><input type="text" class="form-input" id="ws_sim_lbl_workshop_he" value="${lblWorkshop.he}"><input type="text" class="form-input" id="ws_sim_lbl_workshop_ar" value="${lblWorkshop.ar}" dir="rtl">
+                    <div>מספר משתתפים</div><input type="text" class="form-input" id="ws_sim_lbl_participants_he" value="${lblParticipants.he}"><input type="text" class="form-input" id="ws_sim_lbl_participants_ar" value="${lblParticipants.ar}" dir="rtl">
+                    <div>הערות</div><input type="text" class="form-input" id="ws_sim_lbl_notes_he" value="${lblNotes.he}"><input type="text" class="form-input" id="ws_sim_lbl_notes_ar" value="${lblNotes.ar}" dir="rtl">
+                </div>
+                <div style="text-align:left; margin-top:16px;"><button class="btn btn-primary" onclick="App.saveWorkshopSimSettings()">💾 שמור את כל ההגדרות</button></div>
+            </div>
+        </div>
+    `;
+    setTimeout(() => App._initWorkshopSimIntroTinyMCE(), 100);
+}
+
+function autoFillSimResponsibleData() {
+    const select = document.getElementById('ws_sim_resp_id');
+    const selectedOption = select.options[select.selectedIndex];
+    document.getElementById('ws_sim_resp_phone').value = selectedOption.getAttribute('data-phone') || '';
+    document.getElementById('ws_sim_resp_email').value = selectedOption.getAttribute('data-email') || '';
+}
+
+function saveWorkshopSimSettings() {
+    if (typeof tinymce !== 'undefined') {
+        var editor = tinymce.get('ws_sim_intro_text');
+        if (editor) editor.save();
+    }
+    const respSelect = document.getElementById('ws_sim_resp_id');
+    const respOption = respSelect.options[respSelect.selectedIndex];
+    const labels = {
+        institutionCode: { he: document.getElementById('ws_sim_lbl_inst_he').value, ar: document.getElementById('ws_sim_lbl_inst_ar').value },
+        contactPerson: { he: document.getElementById('ws_sim_lbl_contact_he').value, ar: document.getElementById('ws_sim_lbl_contact_ar').value },
+        mobile: { he: document.getElementById('ws_sim_lbl_mobile_he').value, ar: document.getElementById('ws_sim_lbl_mobile_ar').value },
+        email: { he: document.getElementById('ws_sim_lbl_email_he').value, ar: document.getElementById('ws_sim_lbl_email_ar').value },
+        meetingDate: { he: document.getElementById('ws_sim_lbl_date_he').value, ar: document.getElementById('ws_sim_lbl_date_ar').value },
+        meetingTime: { he: document.getElementById('ws_sim_lbl_time_he').value, ar: document.getElementById('ws_sim_lbl_time_ar').value },
+        workshopName: { he: document.getElementById('ws_sim_lbl_workshop_he').value, ar: document.getElementById('ws_sim_lbl_workshop_ar').value },
+        participants: { he: document.getElementById('ws_sim_lbl_participants_he').value, ar: document.getElementById('ws_sim_lbl_participants_ar').value },
+        notes: { he: document.getElementById('ws_sim_lbl_notes_he').value, ar: document.getElementById('ws_sim_lbl_notes_ar').value }
+    };
+    const allowedDays = [];
+    document.querySelectorAll('.ws-sim-day-checkbox:checked').forEach(cb => allowedDays.push(cb.value));
+    const introText = document.getElementById('ws_sim_intro_text')?.value || '';
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    const newData = {
+        id: 'workshop_sim_settings_main',
+        labels: labels, 
+        allowedDays: allowedDays, 
+        workshops: settings.workshops || [],
+        responsible: { 
+            id: respSelect.value, 
+            name: respOption.text, 
+            phone: document.getElementById('ws_sim_resp_phone').value, 
+            email: document.getElementById('ws_sim_resp_email').value 
+        },
+        introText: introText, 
+        updatedAt: new Date().toISOString()
+    };
+    
+    console.log('💾 [Sim Settings] שומר הגדרות:', newData);
+    
+    const existing = (DataStore.getAll(SIM_SETTINGS_KEY) || []).find(item => item.id === 'workshop_sim_settings_main');
+    if (existing) {
+        DataStore.update(SIM_SETTINGS_KEY, existing.id, newData);
+        console.log('✅ [Sim Settings] עודכן בהצלחה');
+    } else {
+        DataStore.create(SIM_SETTINGS_KEY, newData);
+        console.log('✅ [Sim Settings] נוצר בהצלחה');
+    }
+    showToast('הגדרות הסדנאות (סימולציה) נשמרו בהצלחה!', 'success');
+}
+
+function openWorkshopSimModal(index) {
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    const workshops = settings.workshops || [];
+    let currentName = '', isEdit = false;
+    if (index !== null && index !== undefined && index !== 'null') {
+        const idx = parseInt(index);
+        if (!isNaN(idx) && workshops[idx]) { currentName = workshops[idx].name || ''; isEdit = true; }
+    }
+    const title = isEdit ? 'עריכת סדנה (סימולציה)' : 'הוספת סדנה חדשה (סימולציה)';
+    const btnText = isEdit ? '💾 שמור שינויים' : '➕ הוסף סדנה';
+    const indexParam = isEdit ? index : 'null';
+    
+    let overlay = document.getElementById('ws_sim_modal_overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'ws_sim_modal_overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:32px;min-width:400px;max-width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <h3 style="margin:0 0 20px 0;color:var(--primary);">${title}</h3>
+            <div class="form-group"><label style="font-weight:600;margin-bottom:6px;display:block;">שם הסדנה *</label>
+            <input type="text" id="ws_sim_workshop_name_input" class="form-input" value="${currentName}" placeholder="הזן שם סדנה"></div>
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">
+                <button class="btn btn-primary" id="ws_sim_modal_save_btn">${btnText}</button>
+                <button class="btn btn-outline" id="ws_sim_modal_cancel_btn">ביטול</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('ws_sim_modal_save_btn').addEventListener('click', function() { App.saveWorkshopSimItem(indexParam); });
+    document.getElementById('ws_sim_modal_cancel_btn').addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    setTimeout(function() { var input = document.getElementById('ws_sim_workshop_name_input'); if (input) input.focus(); }, 100);
+}
+
+function saveWorkshopSimItem(index) {
+    const nameInput = document.getElementById('ws_sim_workshop_name_input');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name) { showToast('יש להזין שם סדנה', 'error'); return; }
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    let workshops = settings.workshops || [];
+    const idx = (index === null || index === undefined || index === 'null') ? null : parseInt(index);
+    if (idx !== null && !isNaN(idx)) { 
+        if (workshops[idx]) { workshops[idx] = { name: name }; showToast('הסדנה עודכנה בהצלחה', 'success'); } 
+    } else { 
+        workshops.push({ name: name }); showToast('הסדנה נוספה בהצלחה', 'success'); 
+    }
+    settings.workshops = workshops;
+    const existing = (DataStore.getAll(SIM_SETTINGS_KEY) || []).find(item => item.id === 'workshop_sim_settings_main');
+    if (existing) DataStore.update(SIM_SETTINGS_KEY, existing.id, settings);
+    else { settings.id = 'workshop_sim_settings_main'; DataStore.create(SIM_SETTINGS_KEY, settings); }
+    const overlay = document.getElementById('ws_sim_modal_overlay'); if (overlay) overlay.remove();
+    if (typeof App !== 'undefined' && typeof App.closeModal === 'function') App.closeModal();
+    _renderWorkshopSimSettingsTab();
+}
+
+function editWorkshopSim(index) { App.openWorkshopSimModal(index); }
+function deleteWorkshopSim(index) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק סדנה זו?')) return;
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    let workshops = settings.workshops || [];
+    if (index >= 0 && index < workshops.length) {
+        workshops.splice(index, 1); settings.workshops = workshops;
+        const existing = (DataStore.getAll(SIM_SETTINGS_KEY) || []).find(item => item.id === 'workshop_sim_settings_main');
+        if (existing) DataStore.update(SIM_SETTINGS_KEY, existing.id, settings);
+        showToast('הסדנה נמחקה בהצלחה', 'success'); _renderWorkshopSimSettingsTab();
+    }
+}
+function deleteAllWorkshopsSim() {
+    if (!confirm('⚠️ האם אתה בטוח שברצונך למחוק את כל רשימת הסדנאות? פעולה זו בלתי הפיכה.')) return;
+    const settings = (DataStore.getAll(SIM_SETTINGS_KEY) || [])[0] || {};
+    settings.workshops = [];
+    const existing = (DataStore.getAll(SIM_SETTINGS_KEY) || []).find(item => item.id === 'workshop_sim_settings_main');
+    if (existing) DataStore.update(SIM_SETTINGS_KEY, existing.id, settings);
+    showToast('כל הסדנאות נמחקו', 'success'); _renderWorkshopSimSettingsTab();
+}
+
+function _renderWorkshopSimBookingsTab() {
+    const bookings = (DataStore.getAll(SIM_BOOKINGS_KEY) || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    console.log('📋 [Sim Bookings] מספר הזמנות:', bookings.length);
+    if (bookings.length === 0) {
+        document.getElementById('workshopSimTabContent').innerHTML = `<div style="text-align:center; padding:60px 20px; color:var(--text-secondary);"><div style="font-size:64px; margin-bottom:16px;">📭</div><h3>אין הזמנות עדיין</h3><p>הזמנות יופיעו כאן לאחר שמשתמשים ימלאו את הטופס הציבורי.</p></div>`;
+        return;
+    }
+    const statusColors = { 'pending': '#ffc107', 'approved': '#28a745', 'rejected': '#dc3545', 'completed': '#17a2b8', 'cancelled': '#6c757d' };
+    const rowsHtml = bookings.map(b => `
+        <tr>
+            <td style="text-align:center;">${new Date(b.createdAt).toLocaleDateString('he-IL')}</td>
+            <td>${escAttr(b.schoolName || '-')}</td>
+            <td>${escAttr(b.contactPerson || '-')}</td>
+            <td dir="ltr">${escAttr(b.mobile || '-')}</td>
+            <td>${escAttr(b.workshopName || '-')}</td>
+            <td>${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'}</td>
+            <td style="text-align:center;">
+                <select class="form-select" style="padding:4px 8px; font-size:12px; font-weight:600; color:#fff; background:${statusColors[b.status] || '#6c757d'}; border:none; border-radius:12px; cursor:pointer;" onchange="App.updateWorkshopSimStatus('${b.id}', this.value)">
+                    <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>⏳ ממתין</option>
+                    <option value="approved" ${b.status === 'approved' ? 'selected' : ''}>✅ אושרה</option>
+                    <option value="rejected" ${b.status === 'rejected' ? 'selected' : ''}>❌ נדחתה</option>
+                    <option value="completed" ${b.status === 'completed' ? 'selected' : ''}>🏁 הושלמה</option>
+                    <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>🚫 בוטלה</option>
+                </select>
+            </td>
+            <td style="text-align:center; white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" onclick="App.viewWorkshopSimBookingDetails('${b.id}')" title="צפייה בפרטים">👁️</button>
+                <button class="btn btn-sm btn-outline" onclick="App.printWorkshopSimBooking('${b.id}')" title="הדפסה">🖨️</button>
+                <button class="btn btn-sm btn-success" onclick="App.replyWhatsappWorkshopSimBooking('${b.id}')" title="מענה בוואטסאפ">💬</button>
+                <button class="btn btn-sm btn-danger" onclick="App.deleteWorkshopSimBooking('${b.id}')" title="מחיקה">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+    document.getElementById('workshopSimTabContent').innerHTML = `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>תאריך הזמנה</th><th>בית ספר</th><th>איש קשר</th><th>טלפון</th><th>סדנה</th><th>תאריך מפגש</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+}
+
+function updateWorkshopSimStatus(id, newStatus) {
+    const bookings = DataStore.getAll(SIM_BOOKINGS_KEY) || [];
+    const bookingIndex = bookings.findIndex(b => b.id === id);
+    if (bookingIndex === -1) return;
+    bookings[bookingIndex].status = newStatus;
+    bookings[bookingIndex].updatedAt = new Date().toISOString();
+    DataStore.saveAll(SIM_BOOKINGS_KEY, bookings);
+    let msg = 'סטטוס ההזמנה עודכן ל: ';
+    if (newStatus === 'approved') msg += '✅ אושרה';
+    else if (newStatus === 'rejected') msg += '❌ נדחתה (התאריך שוחרר)';
+    else if (newStatus === 'completed') msg += '🏁 הושלמה';
+    else if (newStatus === 'cancelled') msg += '🚫 בוטלה (התאריך שוחרר)';
+    else msg += '⏳ ממתין';
+    showToast(msg, 'success');
+    _renderWorkshopSimBookingsTab();
+}
+
+function viewWorkshopSimBookingDetails(id) {
+    const bookings = DataStore.getAll(SIM_BOOKINGS_KEY) || [];
+    const b = bookings.find(x => x.id === id); if (!b) return;
+    const statusLabels = { 'pending': 'ממתין לאישור', 'approved': 'אושרה', 'rejected': 'נדחתה', 'completed': 'הושלמה', 'cancelled': 'בוטלה' };
+    const body = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:14px; line-height:1.6;">
+        <div><strong>📅 תאריך הזמנה:</strong><br>${new Date(b.createdAt).toLocaleString('he-IL')}</div>
+        <div><strong>📊 סטטוס:</strong><br><span style="color:var(--primary); font-weight:bold;">${statusLabels[b.status] || b.status}</span></div>
+        <div><strong>🏫 קוד מוסד:</strong><br>${escAttr(b.institutionCode || '-')}</div>
+        <div><strong>🏫 בית ספר:</strong><br>${escAttr(b.schoolName || '-')}</div>
+        <div><strong>👤 מנהל/ת בית הספר:</strong><br>${escAttr(b.principalName || '-')}</div>
+        <div><strong>📞 איש קשר:</strong><br>${escAttr(b.contactPerson || '-')}</div>
+        <div><strong>📱 טלפון:</strong><br><span dir="ltr">${escAttr(b.mobile || '-')}</span></div>
+        <div><strong>📧 דוא"ל:</strong><br><span dir="ltr">${escAttr(b.contactEmail || '-')}</span></div>
+        <div><strong>📚 שם הסדנה:</strong><br>${escAttr(b.workshopName || '-')}</div>
+        <div><strong>👥 משתתפים:</strong><br>${escAttr(b.participantsCount || '-')}</div>
+        <div><strong>🗓️ תאריך מפגש:</strong><br>${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'}</div>
+        <div><strong>⏰ שעה:</strong><br>${escAttr(b.startTime || '-')} עד ${escAttr(b.endTime || '-')}</div>
+        <div style="grid-column:1/-1; background:#f8f9fa; padding:12px; border-radius:8px;"><strong>📝 הערות:</strong><br>${escAttr(b.notes || 'אין הערות')}</div>
+    </div>`;
+    showModal('פרטי הזמנה מלאים (סימולציה)', body, '<button class="btn btn-outline" onclick="App.closeModal()">סגור</button>');
+}
+
+function printWorkshopSimBooking(id) {
+    const bookings = DataStore.getAll(SIM_BOOKINGS_KEY) || [];
+    const b = bookings.find(x => x.id === id); if (!b) return;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<html dir="rtl"><head><title>הדפסת הזמנה - ${b.schoolName}</title><style>body{font-family:Arial,sans-serif; padding:40px; line-height:1.6;} h2{color:#0ca7aa; border-bottom:2px solid #0ca7aa; padding-bottom:10px;} .row{display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px dashed #ccc; padding-bottom:8px;} .label{font-weight:bold; color:#555;} .value{color:#000;} @media print{body{padding:0;}}</style></head><body>
+    <h2>🎭 פרטי הזמנת סדנת סימולציה</h2>
+    <div class="row"><span class="label">תאריך הפקת המסמך:</span><span class="value">${new Date().toLocaleDateString('he-IL')}</span></div>
+    <div class="row"><span class="label">בית ספר:</span><span class="value">${b.schoolName} (קוד: ${b.institutionCode})</span></div>
+    <div class="row"><span class="label">מנהל/ת בית הספר:</span><span class="value">${b.principalName}</span></div>
+    <div class="row"><span class="label">איש קשר:</span><span class="value">${b.contactPerson} | ${b.mobile}</span></div>
+    <div class="row"><span class="label">סדנה מבוקשת:</span><span class="value">${b.workshopName}</span></div>
+    <div class="row"><span class="label">מספר משתתפים:</span><span class="value">${b.participantsCount || 'לא צוין'}</span></div>
+    <div class="row"><span class="label">תאריך ושעת המפגש:</span><span class="value">${b.meetingDate ? new Date(b.meetingDate).toLocaleDateString('he-IL') : '-'} | ${b.startTime} - ${b.endTime}</span></div>
+    <div class="row"><span class="label">הערות:</span><span class="value">${b.notes || 'אין'}</span></div>
+    <br><br><p style="text-align:center; color:#888; font-size:12px;">מסמך זה הופק אוטומטית ממערכת מצפן נט.</p></body></html>`);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); }, 500);
+}
+
+function replyWhatsappWorkshopSimBooking(id) {
+    const bookings = DataStore.getAll(SIM_BOOKINGS_KEY) || [];
+    const b = bookings.find(x => x.id === id);
+    if (!b || !b.mobile) { showToast('לא נמצא מספר טלפון להזמנה זו', 'warning'); return; }
+    const cleanPhone = b.mobile.replace(/[^0-9]/g, '');
+    const message = encodeURIComponent(`שלום רב ${b.contactPerson || ''},\nתודה על הזמנת סדנת הסימולציה "${b.workshopName}" עבור ${b.schoolName}.\nאנו נחזור אליך בהקדם לאישור סופי.\nבברכה, צוות מצפן נט 🧭`);
+    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+}
+
+function deleteWorkshopSimBooking(id) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק הזמנה זו לצמיתות? (התאריך ישוחרר)')) return;
+    DataStore.remove(SIM_BOOKINGS_KEY, id);
+    showToast('ההזמנה נמחקה בהצלחה', 'success');
+    _renderWorkshopSimBookingsTab();
+}
+
+var _wsSimIntroTinyMCEInit = false;
+function _initWorkshopSimIntroTinyMCE() {
+    if (typeof tinymce === 'undefined') {
+        console.warn('[Workshop Sim] TinyMCE not loaded yet');
+        return;
+    }
+    if (_wsSimIntroTinyMCEInit) {
+        try {
+            var existingEditor = tinymce.get('ws_sim_intro_text');
+            if (existingEditor) {
+                existingEditor.save();
+                existingEditor.destroy();
+            }
+        } catch(e) { console.error('[Workshop Sim] Error destroying editor:', e); }
+        _wsSimIntroTinyMCEInit = false;
+    }
+    try {
+        tinymce.init({
+            selector: '#ws_sim_intro_text',
+            base_url: './tinymce',
+            suffix: '.min',
+            readonly: false,
+            statistics: false,
+            height: 300,
+            directionality: 'rtl',
+            language: 'he_IL',
+            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table wordcount help directionality',
+            toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
+            content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; }',
+            branding: false,
+            promotion: false,
+            resize: true,
+            statusbar: true,
+            paste_data_images: true,
+            setup: function(editor) {
+                editor.on('init', function() {
+                    _wsSimIntroTinyMCEInit = true;
+                    console.log('[Workshop Sim] TinyMCE intro editor initialized');
+                });
+            }
+        });
+    } catch(e) {
+        console.error('[Workshop Sim] Error initializing TinyMCE:', e);
+    }
+}
+
+var _wsIntroTinyMCEInit = false;
+function _initWorkshopIntroTinyMCE() {
+    if (typeof tinymce === 'undefined') {
+        console.warn('[Workshop] TinyMCE not loaded yet');
+        return;
+    }
+    if (_wsIntroTinyMCEInit) {
+        try {
+            var existingEditor = tinymce.get('ws_intro_text');
+            if (existingEditor) {
+                existingEditor.save();
+                existingEditor.destroy();
+            }
+        } catch(e) { console.error('[Workshop] Error destroying editor:', e); }
+        _wsIntroTinyMCEInit = false;
+    }
+    try {
+        tinymce.init({
+            selector: '#ws_intro_text',
+            base_url: './tinymce',
+            suffix: '.min',
+            readonly: false,
+            statistics: false,
+            height: 300,
+            directionality: 'rtl',
+            language: 'en', // שים לב: 'en' מונע שגיאת 404 של he.js אם הקובץ חסר אצלך מקומית
+            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table wordcount help directionality',
+            toolbar: 'undo redo | bold italic underline strikethrough | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright justify | ltr rtl | bullist numlist | outdent indent | table | link image | hr | removeformat | code | help',
+            content_style: 'body { font-family: Noto Sans Hebrew, Tajawal, Arial, sans-serif; font-size: 15px; line-height: 1.8; padding: 16px; direction: rtl; } img { max-width: 100%; height: auto; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #ddd; padding: 8px; }',
+            branding: false,
+            promotion: false,
+            resize: true,
+            statusbar: true,
+            paste_data_images: true,
+            setup: function(editor) {
+                editor.on('init', function() {
+                    _wsIntroTinyMCEInit = true;
+                    console.log('[Workshop] TinyMCE intro editor initialized');
+                });
+            }
+        });
+    } catch(e) {
+        console.error('[Workshop] Error initializing TinyMCE:', e);
+    }
+}
+
+// ============================================================
+// MAIN EXPORT - APPLICATION MODULE - PUBLIC API
+// ============================================================
+
+/**
+ * Main application module export
+ * All public methods are exposed through this return statement
+ * Organized by functional domains for clarity and maintainability
+ */
+
+return {
+    // ============================================================
+    // CORE APPLICATION LIFECYCLE
+    // ============================================================
+    init,
+    showSection,
+    printSection,
+    logActivity,
+    clearActivityLog,
+    resetLocalStorage,
+    executeImport,
+    showToast,
+    showModal,
+    closeModal,
+
+    // ============================================================
+    // SIDEBAR & NAVIGATION
+    // ============================================================
+    renderSidebar,
+    toggleSidebarMobile,
+    closeSidebarMobile,
+
+    // ============================================================
+    // DASHBOARD
+    // ============================================================
+    renderDashboard,
+
+    // ============================================================
+    // HOME PAGE MANAGEMENT
+    // ============================================================
+    renderHomepage,
+    _saveHomepageHeader,
+    _saveHomepageContent,
+    _saveHomepageFooter,
+    _previewHomepageBanner,
+    openHomepageNavModal,
+    saveHomepageNavItem,
+    deleteHomepageNavItem,
+    moveHomepageNavItem,
+    openHomepageSidebarModal,
+    saveHomepageSidebarItem,
+    deleteHomepageSidebarItem,
+    moveHomepageSidebarItem,
+
+    // ============================================================
+    // MENTORS
+    // ============================================================
+    renderMentors,
+    openMentorModal,
+    saveMentor,
+    deleteMentor,
+    clearAllMentors,
+    filterMentors,
+    _mentorSetKpiFilter,
+
+    // ============================================================
+    // SOLUTIONS
+    // ============================================================
+    renderSolutions,
+    openSolutionModal,
+    saveSolution,
+    viewSolution,
+    deleteSolution,
+    deleteAllSolutions,
+    filterSolutions,
+    toggleSolColumn,
+    resetSolColumns,
+    toggleSolDropdown,
+    _onHebYearChange,
+    _onTopicTypeChange,
+    editSolutionPopulated,
+    _espOnTopicTypeChange,
+    _saveEditPopulated,
+    _essOnRespTypeChange,
+    _essSchoolInit,
+    _essOnInput,
+    _essOnKeyDown,
+    _essSelectSchool,
+    _essRemoveSchool,
+    _essHighlightItem,
+    _essCloseDropdown,
+    _essOnDocClick,
+    _guideDisplayName,
+    _msInit,
+    _msOnInput,
+    _msOnKeyDown,
+    _msSelectItem,
+    _msRemoveTag,
+    _msRemovePreSelectedName,
+    _msRenderTags,
+    _msCloseDropdown,
+    _msHighlightItem,
+    openCompleteDataModal,
+    _cdUpdateCardStyles,
+    _cdOnBudgetStatusChange,
+    _cdRenderFundedStage2,
+    _cdRenderNonFundedStage2,
+    _cdBuildMentorRow,
+    _cdOnTypeChange,
+    _cdRecalc,
+    _cdAddMentorInline,
+    _cdRemoveMentorRow,
+    _cdAddInternalForceRow,
+    _saveCompleteData,
+    _fmtDateRange,
+    _filterMentorSearch,
+    _selectMentorSearchItem,
+    _closeMentorSearch,
+    startNewSolutionFlow,
+    _selectResponsibilityType,
+    _backToResponsibilitySelection,
+    _ssSchoolInit,
+    _ssOnInput,
+    _ssOnKeyDown,
+    _ssSelectSchool,
+    _ssRemoveSchool,
+    _ssHighlightItem,
+    _ssCloseDropdown,
+    _nsfOnTopicTypeChange,
+    _initNsfTinyMCE,
+    _saveNewSolution,
+
+    // ============================================================
+    // SOLUTION INSTITUTIONS
+    // ============================================================
+    openSolInstModal,
+    saveSolInst,
+    editSolInst,
+    deleteSolInst,
+    _fillInstFromRepo,
+
+    // ============================================================
+    // HOURS DETAIL
+    // ============================================================
+    openHoursDetailModal,
+    saveHoursDetail,
+    _updateHoursDetailValidation,
+    _updateHoursValidation,
+
+    // ============================================================
+    // GUIDES
+    // ============================================================
+    renderGuides,
+
+    // ============================================================
+    // GUIDES REPOSITORY
+    // ============================================================
+    renderGuidesRepo,
+    openGuideRepoModal,
+    saveGuideRepo,
+    deleteGuideRepo,
+    clearAllGuidesRepo,
+    filterGuidesRepo,
+    _previewGuideImage,
+    moveGuideRepo,
+
+    // ============================================================
+    // BUDGETS
+    // ============================================================
+    renderBudgets,
+    openBudgetModal,
+    saveBudget,
+    deleteBudget,
+    deleteAllBudgets,
+    filterBudgets,
+    _onBHebYear,
+
+    // ============================================================
+    // PERIODS
+    // ============================================================
+    renderPeriods,
+    openPeriodModal,
+    savePeriod,
+    deletePeriod,
+    _onPHebYear,
+    _loadActivePeriod,
+    _getActivePeriodRange,
+    _renderActivePeriodBadge,
+    _switchActivePeriod,
+    _resolveDisplayPeriod,
+    _setDisplayPeriod,
+
+    // ============================================================
+    // LOOKUP TABLES
+    // ============================================================
+    renderLookupTables,
+    switchLookupTab,
+    openLookupModal,
+    saveLookupItem,
+    deleteLookupItem,
+    clearAllLookupItems,
+    moveLookupItem,
+
+    // ============================================================
+    // SCHOOLS & REGISTRATIONS
+    // ============================================================
+    renderRegistrations,
+    openSchoolModal,
+    saveSchool,
+    deleteSchool,
+    clearAllSchools,
+    filterSchools,
+    editRegistration,
+    saveEditRegistration,
+    deleteRegistration,
+    clearAllRegistrations,
+    filterRegistrations,
+    _sortRegistrations,
+    _toggleRegSortDir,
+    _exportRegistrationsExcel,
+
+    // ============================================================
+    // INSPECTORS
+    // ============================================================
+    openInspectorModal,
+    saveInspector,
+    deleteInspector,
+    clearAllInspectors,
+    filterInspectors,
+
+    // ============================================================
+    // PEDAGOGICAL EXECUTIVES
+    // ============================================================
+    openPedExecModal,
+    savePedExec,
+    deletePedExec,
+    clearAllPedExecs,
+    filterPedExec,
+
+    // ============================================================
+    // PERMISSIONS
+    // ============================================================
+    renderPermissions,
+    _permsOnUserChange,
+    _permTogglePart,
+    _permSetLevel,
+    _permsResetUser,
+    _permsSave,
+
+    // ============================================================
+    // ACTIVITY LOG
+    // ============================================================
+    renderActivityLog,
+    filterActivityLog,
+
+    // ============================================================
+    // RECYCLE BIN
+    // ============================================================
+    renderRecycleBin,
+    restoreFromRecycleBin,
+    permanentDeleteFromRecycleBin,
+    emptyRecycleBin,
+
+    // ============================================================
+    // FAQ
+    // ============================================================
+    renderFAQ,
+    openFAQModal,
+    saveFAQ,
+    deleteFAQ,
+    moveFAQ,
+    deleteAllFAQ,
+    toggleFaqSelectAll,
+    deleteSelectedFAQs,
+    _faqDragStart,
+    _faqDragOver,
+    _faqDrop,
+    _faqDragEnd,
+
+    // ============================================================
+    // CUSTOM PAGES
+    // ============================================================
+    renderCustomPages,
+    openCustomPageModal,
+    saveCustomPage,
+    editCustomPage,
+    deleteCustomPage,
+    previewCustomPage,
+    _openPageLink,
+    _copyPageLink,
+    _cpOnMenuLocChange,
+
+    // ============================================================
+    // SETTINGS
+    // ============================================================
+    renderSettings,
+    saveSiteSettings,
+    _switchSettingsSub,
+    _getSubSectionLabel,
+    _toggleLinkVis,
+    _addMentorFromForm,
+    _onPerformerTypeChange,
+    _openCpanelLink,
+    _restoreCpanelUrl,
+    _doConfirm,
+
+    // ============================================================
+    // DATA EXPORT & IMPORT
+    // ============================================================
+    exportCSV,
+    exportExcel,
+    exportExcelGuides,
+    exportJSON,
+    startImport,
+    importJSON,
+    downloadBudgetTemplate,
+    _executeMentorsBatchImport,
+    _cancelBatchImport,
+    _downloadImportErrors,
+    _downloadUpdateDetails,
+    _triggerDataImport,
+    _checkDataIntegrity,
+
+    // ============================================================
+    // DATA BACKUP & RESTORE
+    // ============================================================
+    backupFull,
+    backupTable,
+    restoreFull,
+    restoreTable,
+    _showSelectiveRestoreModal,
+    _executeSelectiveRestore,
+    clearData,
+    _doClearAll,
+    resetUserPassword,
+    _backupTableCard,
+    _backupFullCard,
+    _triggerFullRestore,
+    _triggerTableRestore,
+    _updateBackupStatusUI,
+
+    // ============================================================
+    // HEALTH CHECK & MAINTENANCE
+    // ============================================================
+    _runHealthCheck,
+    _showErrorLog,
+    _attemptAutoFix,
+    _doAutoFix,
+    _copyErrorLog,
+    _clearErrorLog,
+
+    // ============================================================
+    // COLUMN VISIBILITY
+    // ============================================================
+    _openColVisModal,
+    _toggleColVis,
+    _resetColVis,
+    _goToPage,
+
+    // ============================================================
+    // COMMENTS
+    // ============================================================
+    openCommentModal,
+    saveComment,
+    deleteComment,
+
+    // ============================================================
+    // WHATSAPP INTEGRATION
+    // ============================================================
+    _openWhatsAppModal,
+    _onWaSolutionChange,
+    _onWaGreetingChange,
+    _sendWhatsAppMessages,
+    _renderWaTemplateEditor,
+    _saveWaTemplates,
+    _resetWaTemplates,
+    _addWaTemplate,
+    _openWaEditModal,
+    _saveWaEditModal,
+    _resetSingleWaTemplate,
+
+    // ============================================================
+    // WORKSHOPS - PEAK (פסגה)
+    // ============================================================
+    addWorkshop,
+    removeWorkshop,
+    renderWorkshopBookings,
+    _switchWorkshopTab,
+    _renderWorkshopSettingsTab,
+    _renderWorkshopBookingsTab,
+    getAllowedWorkshopDays,
+    checkWorkshopDateAllowed,
+    getAllowedDaysDescription,
+    autoFillResponsibleData,
+    saveWorkshopSettings,
+    openWorkshopModal,
+    saveWorkshopItem,
+    editWorkshop,
+    deleteWorkshop,
+    deleteAllWorkshops,
+    viewBookingDetails,
+    printBooking,
+    replyEmailBooking,
+    replyWhatsappBooking,
+    deleteBooking,
+    _addRegistrationManual,
+    _initRegAutocomplete,
+    _saveManualRegistration,
+    _initWorkshopIntroTinyMCE,
+
+    // ============================================================
+    // WORKSHOPS - SIMULATION (סימולציה)
+    // ============================================================
+    // --- פונקציות סדנאות סימולציה ---
+    renderWorkshopSimBookings: renderWorkshopSimBookings,
+    _switchWorkshopSimTab: _switchWorkshopSimTab,
+    _renderWorkshopSimSettingsTab: _renderWorkshopSimSettingsTab,
+    _renderWorkshopSimBookingsTab: _renderWorkshopSimBookingsTab,
+    autoFillSimResponsibleData: autoFillSimResponsibleData,
+    saveWorkshopSimSettings: saveWorkshopSimSettings,
+    openWorkshopSimModal: openWorkshopSimModal,
+    saveWorkshopSimItem: saveWorkshopSimItem,
+    editWorkshopSim: editWorkshopSim,
+    deleteWorkshopSim: deleteWorkshopSim,
+    deleteAllWorkshopsSim: deleteAllWorkshopsSim,
+    updateWorkshopSimStatus: updateWorkshopSimStatus,
+    viewWorkshopSimBookingDetails: viewWorkshopSimBookingDetails,
+    printWorkshopSimBooking: printWorkshopSimBooking,
+    replyWhatsappWorkshopSimBooking: replyWhatsappWorkshopSimBooking,
+    deleteWorkshopSimBooking: deleteWorkshopSimBooking,
+    _initWorkshopSimIntroTinyMCE: _initWorkshopSimIntroTinyMCE,
+	_initHpTinyMCE: _initHpTinyMCE,
+	
+    // ============================================================
+    // Cluster (אשכולות)
+    // ============================================================	
+    renderClusters: renderClusters,
+    openClusterModal: openClusterModal,
+    updateClusterSolutionsList: updateClusterSolutionsList,
+    addClusterChoiceModule: addClusterChoiceModule,
+    saveCluster: saveCluster,
+    deleteCluster: deleteCluster,
+    saveClustersIntroText: saveClustersIntroText,
+    _initClustersIntroTinyMCE: _initClustersIntroTinyMCE,
+	_switchClustersTab: _switchClustersTab,
+    _renderClustersManagementTab: _renderClustersManagementTab,
+    _renderClustersRegistrationsTab: _renderClustersRegistrationsTab,
+    updateClusterRegistrationStatus: updateClusterRegistrationStatus,
+    viewClusterRegistration: viewClusterRegistration,
+    deleteClusterRegistration: deleteClusterRegistration,
+    deleteAllClusterRegistrations: deleteAllClusterRegistrations,
+    exportClusterRegistrationsExcel: exportClusterRegistrationsExcel,
+    exportClusterRegistrationsCSV: exportClusterRegistrationsCSV,
+    importClusterRegistrationsExcel: importClusterRegistrationsExcel,
+    printClusterRegistrations: printClusterRegistrations
+	
+};
+
+
+// 🔑 פונקציה לפתיחה/סגירה של תפריט בחירת עמודות
+function toggleSolDropdown(event) {
+    if (event) event.stopPropagation();
+    var dropdown = document.getElementById('solColVisDropdown');
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// 🔑 האזנה גלובלית לסגירת התפריט כשלוחצים מחוץ לו
+document.addEventListener('click', function(event) {
+    var dropdown = document.getElementById('solColVisDropdown');
+    if (dropdown && dropdown.style.display === 'block') {
+        if (!dropdown.contains(event.target)) {
+            dropdown.style.display = 'none';
         }
     }
-    function _cpFallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); showToast(_cpLang() === 'ar' ? 'تم نسخ الرابط' : 'הקישור הועתק', 'success'); }
-        catch(e) { showToast(_cpLang() === 'ar' ? 'فشل نسخ الرابط' : 'העתקת הקישור נכשלה', 'error'); }
-        document.body.removeChild(ta);
+});
+
+
+// 🔑 פונקציות לניהול תצוגת עמודות בקטלוג פתרונות למידה
+function toggleSolColumn(key, isVisible) {
+    let visibleKeys = JSON.parse(localStorage.getItem('matspanet_sol_cols') || 'null');
+    const defaultVisible = ['solName', 'schoolName', 'guide', 'domain', 'startDate', 'academicHours', 'instructors', 'actions'];
+    if (!visibleKeys || !Array.isArray(visibleKeys)) {
+        visibleKeys = [...defaultVisible];
+    }
+    
+    if (isVisible) {
+        if (!visibleKeys.includes(key)) visibleKeys.push(key);
+    } else {
+        visibleKeys = visibleKeys.filter(k => k !== key);
+    }
+    
+    localStorage.setItem('matspanet_sol_cols', JSON.stringify(visibleKeys));
+    renderSolutions(); // רענון מיידי של הטבלה
+}
+
+function resetSolColumns() {
+    localStorage.removeItem('matspanet_sol_cols');
+    // סגירת התפריט
+    var dropdown = document.getElementById('solColVisDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    // רענון הטבלה
+    renderSolutions();
+}
+
+
+
+
+// 🔍 כלי אבחון לשלמות נתונים
+window.checkTableData = async function(tableName, keyName) {
+    console.log(`\n=== בדיקת שלמות נתונים: ${tableName} ===`);
+    
+    // 1. בדיקה ישירה מול קובץ ה-JSON בשרת (עוקף את כל המערכת)
+    try {
+        const serverRes = await fetch(`./data/${tableName}.json?t=${Date.now()}`);
+        const serverData = await serverRes.json();
+        console.log(`1. 📁 בשרת (קובץ JSON): ${serverData.length} רשומות`);
+    } catch(e) {
+        console.error(`1. 📁 שגיאה בקריאה מהשרת:`, e);
     }
 
-    // ============ PUBLIC API ============
-    return {
-        init, showSection, closeModal, showToast, printSection,
-        // Solutions
-        openSolutionModal, saveSolution, viewSolution, deleteSolution, deleteAllSolutions, filterSolutions, _onHebYearChange, _onTopicTypeChange,
-        // Edit Populated & Complete Data
-        editSolutionPopulated, _espOnTopicTypeChange, _saveEditPopulated, _essOnRespTypeChange, _essSchoolInit, _essOnInput, _essOnKeyDown, _essSelectSchool, _essRemoveSchool, _essHighlightItem, _essCloseDropdown, _essOnDocClick,
-        _guideDisplayName,
-        // Multi-select autocomplete
-        _msInit, _msOnInput, _msOnKeyDown, _msSelectItem, _msRemoveTag, _msRemovePreSelectedName, _msRenderTags, _msCloseDropdown, _msHighlightItem,
-        openCompleteDataModal, _cdUpdateCardStyles, _cdOnBudgetStatusChange, _cdRenderFundedStage2, _cdRenderNonFundedStage2, _cdBuildMentorRow, _cdOnTypeChange, _cdRecalc, _cdAddMentorInline, _cdRemoveMentorRow, _cdAddInternalForceRow, _saveCompleteData, _fmtDateRange,
-        _filterMentorSearch, _selectMentorSearchItem, _closeMentorSearch,
-        // New Solution Flow
-        startNewSolutionFlow, _selectResponsibilityType, _backToResponsibilitySelection, _ssSchoolInit, _ssOnInput, _ssOnKeyDown, _ssSelectSchool, _ssRemoveSchool, _ssHighlightItem, _ssCloseDropdown, _nsfOnTopicTypeChange, _initNsfTinyMCE, _saveNewSolution,
-        // Site settings
-        saveSiteSettings,
-        // Year Context
-        _loadActivePeriod, _getActivePeriodRange, _renderActivePeriodBadge, _switchActivePeriod, _resolveDisplayPeriod, _setDisplayPeriod,
-        // Link visibility & mentor from form
-        _toggleLinkVis, _addMentorFromForm, _onPerformerTypeChange,
-        // Sub-records
-        openSolInstModal, saveSolInst, editSolInst, deleteSolInst, _fillInstFromRepo,
-        // Hours detail
-        openHoursDetailModal, saveHoursDetail, _updateHoursDetailValidation, _updateHoursValidation,
-        // Mentors
-        openMentorModal, saveMentor, deleteMentor, clearAllMentors, filterMentors, _mentorSetKpiFilter,
-        // Users
-        openUserModal, saveUser, deleteUser,
-        // Guides Repo
-        openGuideRepoModal, saveGuideRepo, deleteGuideRepo, clearAllGuidesRepo, filterGuidesRepo, _previewGuideImage, moveGuideRepo,
-        // Homepage
-        renderHomepage, _saveHomepageHeader, _saveHomepageContent, _saveHomepageFooter,
-        openHomepageNavModal, saveHomepageNavItem, deleteHomepageNavItem, moveHomepageNavItem,
-        openHomepageSidebarModal, saveHomepageSidebarItem, deleteHomepageSidebarItem, moveHomepageSidebarItem,
-        _previewHomepageLogo,
-        // Budgets
-        openBudgetModal, saveBudget, deleteBudget, deleteAllBudgets, filterBudgets, _onBHebYear,
-        // Periods
-        openPeriodModal, savePeriod, deletePeriod, _onPHebYear,
-        // Lookup Tables
-        switchLookupTab, openLookupModal, saveLookupItem, deleteLookupItem, clearAllLookupItems, moveLookupItem,
-        // Schools (LOOKUP_SCHOOLS)
-        openSchoolModal, saveSchool, deleteSchool, clearAllSchools, filterSchools,
-        // Inspectors
-        openInspectorModal, saveInspector, deleteInspector, clearAllInspectors, filterInspectors,
-        // Pedagogical Executors
-        openPedExecModal, savePedExec, deletePedExec, clearAllPedExecs, filterPedExec,
-        // FAQ
-        openFAQModal, saveFAQ, deleteFAQ, moveFAQ, deleteAllFAQ, toggleFaqSelectAll, deleteSelectedFAQs, _faqDragStart, _faqDragOver, _faqDrop, _faqDragEnd,
-        // Import/Export
-        exportCSV, exportExcel, exportExcelGuides, exportJSON, startImport, executeImport, importJSON, downloadBudgetTemplate,
-        _executeMentorsBatchImport, _cancelBatchImport, _downloadImportErrors, _downloadUpdateDetails,
-        // Table Features (Column Visibility & Pagination)
-        _openColVisModal, _toggleColVis, _resetColVis, _goToPage,
-        // Comments
-        openCommentModal, saveComment, deleteComment,
-        // Registrations (enhanced)
-        filterRegistrations, _sortRegistrations, _toggleRegSortDir, _exportRegistrationsExcel,
-        _addRegistrationManual, _saveManualRegistration, _updateRegAddSolName,
-        editRegistration, saveEditRegistration, deleteRegistration, clearAllRegistrations,
-        _openWhatsAppModal, _onWaSolutionChange, _onWaGreetingChange, _sendWhatsAppMessages,
-        _renderWaTemplateEditor, _saveWaTemplates, _resetWaTemplates, _addWaTemplate,
-        _openWaEditModal, _saveWaEditModal, _resetSingleWaTemplate,
-        // Permissions
-        _permsOnUserChange, _permTogglePart, _permSetLevel, _permsResetUser, _permsSave,
-        // Activity Log
-        filterActivityLog,
-        // Recycle Bin
-        restoreFromRecycleBin, permanentDeleteFromRecycleBin, emptyRecycleBin,
-        // Settings
-        backupFull, backupTable, restoreFull, restoreTable, _showSelectiveRestoreModal, _executeSelectiveRestore, resetData, clearData, _doClearAll, resetUserPassword,
-        _backupTableCard, _backupFullCard, _triggerFullRestore, _triggerTableRestore, _updateBackupStatusUI,
-        _triggerDataImport, _checkDataIntegrity,
-        // Health Check
-        _runHealthCheck, _showErrorLog, _attemptAutoFix, _doAutoFix, _copyErrorLog, _clearErrorLog,
-        _openCpanelLink, _restoreCpanelUrl,
-        // Custom Pages
-        openCustomPageModal, saveCustomPage, editCustomPage, deleteCustomPage, previewCustomPage, _openPageLink, _copyPageLink, _cpOnMenuLocChange,
-        // Internal
-        _doConfirm, _confirmCb: null,
-        // Settings Sub-Section Navigation
-        _switchSettingsSub, _getSubSectionLabel
-    };
-})();
+    // 2. בדיקה מול ה-DataStore (מה שהדפדפן מציג)
+    const storeData = DataStore.getAll(keyName) || [];
+    console.log(`2. 🧠 ב-DataStore (זיכרון הדפדפן): ${storeData.length} רשומות`);
 
+    // 3. בדיקה מול localStorage
+    const lsRaw = localStorage.getItem('matspanet_' + keyName);
+    const lsData = lsRaw ? JSON.parse(lsRaw) : [];
+    console.log(`3. 💾 ב-localStorage: ${lsData.length} רשומות`);
+
+    // מסקנה אוטומטית
+    if (serverData.length > 0 && storeData.length === 0) {
+        console.error("❌ שגיאה קריטית: הנתונים קיימים בשרת, אך לא נטענו ל-DataStore! (בעיית טעינה)");
+    } else if (serverData.length === 0 && storeData.length > 0) {
+        console.warn("⚠️ אזהרה: הנתונים קיימים בזיכרון, אך נמחקו מהשרת! (בעיית שמירה)");
+    } else {
+        console.log("✅ הנתונים תקינים ותואמים בכל המקומות.");
+    }
+    console.log("===================================\n");
+};
+
+})();
 // App.init() is called from dashboard.html after DataStore.init() completes.
-// Do NOT auto-init here because DataStore.init() is now async.

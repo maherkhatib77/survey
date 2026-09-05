@@ -1,32 +1,29 @@
 [
-  {
-    "value": "שיוך מלא",
-    "label": "שיוך מלא",
-    "labelAr": "إسناد كامل",
-    "order": 1,
-    "isActive": true,
-    "id": "ms4ys0twwh503zqed",
-    "createdAt": "2026-07-28T18:03:14.612Z",
-    "updatedAt": "2026-07-28T18:03:14.612Z"
-  },
-  {
-    "value": "שיוך חלקי",
-    "label": "שיוך חלקי",
-    "labelAr": "إسناد جزئي",
-    "order": 2,
-    "isActive": true,
-    "id": "ms4ys0ty0zfybimne",
-    "createdAt": "2026-07-28T18:03:14.614Z",
-    "updatedAt": "2026-07-28T18:03:14.614Z"
-  },
-  {
-    "value": "לא שויך",
-    "label": "לא שויך",
-    "labelAr": "غير مسند",
-    "order": 3,
-    "isActive": true,
-    "id": "ms4ys0tzw006pe1ik",
-    "createdAt": "2026-07-28T18:03:14.615Z",
-    "updatedAt": "2026-07-28T18:03:14.615Z"
-  }
+    {
+        "value": "שיוך מלא",
+        "label": "שיוך מלא",
+        "labelAr": "إسناد كامل",
+        "isActive": true,
+        "id": "mt86bgck0x105vgwr",
+        "createdAt": "2026-08-25T04:37:19.364Z",
+        "updatedAt": "2026-08-25T05:43:29.254Z"
+    },
+    {
+        "value": "שיוך חלקי",
+        "label": "שיוך חלקי",
+        "labelAr": "إسناد جزئي",
+        "isActive": true,
+        "id": "mt88ojj8hzxqoptt2",
+        "createdAt": "2026-08-25T05:43:29.252Z",
+        "updatedAt": "2026-08-25T05:43:29.254Z"
+    },
+    {
+        "value": "לא שויך",
+        "label": "לא שויך",
+        "labelAr": "غير مسند",
+        "isActive": true,
+        "id": "mt88ojj8drzbq8wrg",
+        "createdAt": "2026-08-25T05:43:29.252Z",
+        "updatedAt": "2026-08-25T05:43:29.254Z"
+    }
 ]

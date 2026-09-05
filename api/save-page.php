@@ -3,38 +3,8 @@
  * save-page.php – Create/update an HTML file in /pages/ directory
  * Receives: { "filename": "about-us", "titleHe": "...", "titleAr": "...", "content": "<p>...</p>" }
  */
-header('Content-Type: application/json; charset=utf-8');
-
-// 🛡️ SECURITY FIX: Restrict CORS to specific allowed origins in production
-// In development, allow localhost for testing
-$allowedOrigins = [
-    'http://localhost',
-    'http://127.0.0.1',
-    'https://your-production-domain.com' // TODO: Replace with actual production domain
-];
-
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-if (in_array($origin, $allowedOrigins, true)) {
-    header('Access-Control-Allow-Origin: ' . $origin);
-} else {
-    // Block requests from unauthorized origins
-    http_response_code(403);
-    echo json_encode(['error' => 'Origin not allowed'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-header('Access-Control-Allow-Methods: POST, OPTIONS, DELETE');
-header('Access-Control-Allow-Headers: Content-Type');
-
-// 🛡️ SECURITY FIX: Add security headers
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('X-XSS-Protection: 1; mode=block');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+require_once __DIR__ . '/config.php';
+apply_security_headers_and_cors();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -86,16 +56,16 @@ if ($action === 'delete') {
     exit;
 }
 
-// Generate HTML file
-$htmlContent = '<!DOCTYPE html>
+    $pageTitle = !empty($titleHe) ? $titleHe : (!empty($titleAr) ? $titleAr : $filename);
+    $htmlContent = '<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>' . htmlspecialchars($titleHe || $titleAr || $filename) . '</title>
+    <title>' . htmlspecialchars($pageTitle) . '</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&family=Tajawal:wght@200;300;400;500;700;800&family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
-    <link rel="stylesheet" href="./css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>🧭</text></svg>">
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         .cp-header { background: linear-gradient(135deg, var(--primary, #0ca7aa) 0%, var(--primary-dark, #09787a) 100%); padding: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
         .cp-header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }

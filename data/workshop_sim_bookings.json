@@ -1,0 +1,36 @@
+[
+    {
+        "id": "sim_booking_1788322440134",
+        "institutionCode": "634840",
+        "schoolName": "חיואר",
+        "principalName": "מנאל דראושה",
+        "contactPerson": "חיפה עליאן",
+        "contactEmail": "maher@hih.org.il",
+        "mobile": "054-7623280",
+        "workshopName": "المعلم يطلب من الطالب تسليم الهاتف والطالب يرفض.",
+        "meetingDate": "2026-10-10",
+        "startTime": "10:00",
+        "endTime": "13:00",
+        "participantsCount": 20,
+        "notes": "2222",
+        "status": "pending",
+        "createdAt": "2026-09-02T04:14:00.134Z"
+    },
+    {
+        "id": "sim_booking_1788546184667",
+        "institutionCode": "642231",
+        "schoolName": "כפר עקב בנות",
+        "principalName": "אפנאן דיאב סואלמה",
+        "contactPerson": "كوثر جبر",
+        "contactEmail": "maher@hih.org.il",
+        "mobile": "054-7623280",
+        "workshopName": "طالب يشعر أن المعلم يميّز بين الطلاب.",
+        "meetingDate": "2026-10-04",
+        "startTime": "10:00",
+        "endTime": "14:00",
+        "participantsCount": 20,
+        "notes": "",
+        "status": "pending",
+        "createdAt": "2026-09-04T18:23:04.667Z"
+    }
+]

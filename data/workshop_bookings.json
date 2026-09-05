@@ -1,0 +1,19 @@
+[
+    {
+        "id": "booking_1788545759973",
+        "institutionCode": "634840",
+        "schoolName": "חיואר",
+        "principalName": "מנאל דראושה",
+        "contactPerson": "كوثر جبر",
+        "contactEmail": "maher@hih.org.il",
+        "mobile": "054-7623280",
+        "workshopName": "القيادة التربوية وقيادة التغيير",
+        "meetingDate": "2026-09-13",
+        "startTime": "10:00",
+        "endTime": "13:00",
+        "participantsCount": 20,
+        "notes": "",
+        "status": "pending",
+        "createdAt": "2026-09-04T18:15:59.973Z"
+    }
+]

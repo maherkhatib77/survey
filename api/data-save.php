@@ -1,94 +1,107 @@
 <?php
 /**
-* data-save.php – שמירת נתוני JSON לשרת cPanel/Apache
-* גרסה מעודכנת: מאפשר כתיבה לכל קובץ .json (לאחר basename),
-* כך שקבצים חדשים לא ייחסמו עוד עם "שם קובץ לא מורשה".
-* מטפל ב-POST /api/data-save
-* מקבל: { "filename": "users.json", "data": [...] }
-*/
-header('Content-Type: application/json; charset=utf-8');
+ * data-save.php – כתיבת קובץ JSON מאובטחת
+ */
+require_once __DIR__ . '/config.php';
+apply_security_headers_and_cors();
 
-// 🛡️ SECURITY FIX: Restrict CORS to specific allowed origins in production
-// In development, allow localhost for testing
-$allowedOrigins = [
-    'http://localhost',
-    'http://127.0.0.1',
-    'https://your-production-domain.com' // TODO: Replace with actual production domain
-];
-
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-if (in_array($origin, $allowedOrigins, true)) {
-    header('Access-Control-Allow-Origin: ' . $origin);
-} else {
-    // Block requests from unauthorized origins
-    http_response_code(403);
-    echo json_encode(['error' => 'Origin not allowed'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-
-// 🛡️ SECURITY FIX: Add security headers
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('X-XSS-Protection: 1; mode=block');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed – use POST']);
     exit;
 }
 
 $raw = file_get_contents('php://input');
-$input = json_decode($raw, true);
+if (empty($raw)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'No data received']);
+    exit;
+}
 
+$input = json_decode($raw, true);
 if (!$input || !isset($input['filename']) || !isset($input['data'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'נתונים לא תקינים'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'Invalid input – missing filename or data']);
     exit;
 }
 
-// === בדיקת אבטחה: basename בלבד (חוסם ניסיונות ../) ===
-$filename = basename($input['filename']);
-$data = $input['data'];
+// 1. AUTHENTICATION
+$session = isset($input['session']) ? $input['session'] : null;
+if (!$session || empty($session['userId'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized: Missing session']);
+    exit;
+}
 
-// === הכלל החדש והגמיש: כל קובץ .json מותר ===
-// basename כבר מונע כתיבה מחוץ לתיקיית data, ולכן אין צורך ברשימה קשיחה
-// ש"שוכחת" קבצים חדשים וגורמת לשגיאת 400.
+$dataDir = dirname(__DIR__) . '/data';
+$usersPath = $dataDir . '/users.json';
+$isValidUser = false;
+
+if (file_exists($usersPath)) {
+    $usersContent = @file_get_contents($usersPath);
+    $users = json_decode($usersContent, true);
+    if (is_array($users)) {
+        foreach ($users as $u) {
+            if (isset($u['id']) && $u['id'] === $session['userId'] && isset($u['isActive']) && $u['isActive'] === true) {
+                $isValidUser = true;
+                break;
+            }
+        }
+    }
+}
+
+if (!$isValidUser) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Forbidden: Invalid or inactive session']);
+    exit;
+}
+
+// 2. FILE VALIDATION
+$filename = basename($input['filename']);
 if (!preg_match('/\.json$/i', $filename)) {
     http_response_code(400);
-    echo json_encode(['error' => 'סוג קובץ לא מורשה – חייב להסתיים ב-.json'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'File must end with .json']);
     exit;
 }
 
-if (!is_array($data) && !is_object($data)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'נתונים לא תקינים – חייב להיות מערך'], JSON_UNESCAPED_UNICODE);
+$blockedFiles = ['dev-creds.json'];
+if (in_array($filename, $blockedFiles)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Cannot overwrite protected file']);
     exit;
 }
 
-// api/data-save.php נמצא ב-public_html/api/, הנתונים ב-public_html/data/
-$dataDir = dirname(__DIR__) . '/data';
 if (!is_dir($dataDir)) {
-    http_response_code(500);
-    echo json_encode(['error' => 'תיקיית data/ לא נמצאה'], JSON_UNESCAPED_UNICODE);
-    exit;
+    if (!mkdir($dataDir, 0755, true)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to create data directory']);
+        exit;
+    }
 }
 
 $targetPath = $dataDir . '/' . $filename;
-$jsonContent = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+$data = $input['data'];
 
-$result = file_put_contents($targetPath, $jsonContent);
+// 3. WRITE WITH FILE LOCKING
+$jsonContent = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+$result = @file_put_contents($targetPath, $jsonContent, LOCK_EX);
 
 if ($result === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'שגיאה בשמירת הקובץ – ייתכן בעיה בהרשאות או בבעלות'], JSON_UNESCAPED_UNICODE);
-    exit;
+    if (file_exists($targetPath)) {
+        @chmod($targetPath, 0664);
+        $result = @file_put_contents($targetPath, $jsonContent, LOCK_EX);
+    }
+    if ($result === false) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Failed to write file. Check folder permissions (should be 755 for folder, 664 for files).',
+            'path' => $targetPath
+        ]);
+        exit;
+    }
 }
 
-echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+@chmod($targetPath, 0664);
+echo json_encode(['success' => true, 'file' => $filename]);
+?>

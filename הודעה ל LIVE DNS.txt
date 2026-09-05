@@ -1,0 +1,6 @@
+"Hello,
+I am getting a 403 Forbidden error when my PHP script (api/data-save.php) tries to read/write JSON files in the /home/ejpisgaorg/public_html/data/ directory.
+I have already set the folder permissions to 755 and files to 644.
+I suspect the files/folders are owned by root or nobody instead of my cPanel user (ejpisgaorg).
+Could you please run a chown -R ejpisgaorg:ejpisgaorg /home/ejpisgaorg/public_html/data/ and verify the ownership?
+Thank you."

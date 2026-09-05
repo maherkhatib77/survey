@@ -1,32 +1,29 @@
 [
-  {
-    "value": "הוגשה בקשה",
-    "label": "הוגשה בקשה",
-    "labelAr": "تم تقديم الطلب",
-    "order": 1,
-    "isActive": true,
-    "id": "lef_001",
-    "createdAt": "2026-07-28T18:03:56.325Z",
-    "updatedAt": "2026-07-28T18:03:56.325Z"
-  },
-  {
-    "value": "מומחה בתחומו",
-    "label": "מומחה בתחומו",
-    "labelAr": "خبير في مجاله",
-    "order": 2,
-    "isActive": true,
-    "id": "lef_002",
-    "createdAt": "2026-07-28T18:03:56.326Z",
-    "updatedAt": "2026-07-28T18:03:56.326Z"
-  },
-  {
-    "value": "נדחתה הבקשה",
-    "label": "נדחתה הבקשה",
-    "labelAr": "تم رفض الطلب",
-    "order": 3,
-    "isActive": true,
-    "id": "lef_003",
-    "createdAt": "2026-07-28T18:03:56.327Z",
-    "updatedAt": "2026-07-28T18:03:56.327Z"
-  }
+    {
+        "value": "הוגשה בקשה",
+        "label": "הוגשה בקשה",
+        "labelAr": "",
+        "isActive": true,
+        "id": "mt86cxestwix08sow",
+        "createdAt": "2026-08-25T04:38:28.132Z",
+        "updatedAt": "2026-08-25T05:44:39.811Z"
+    },
+    {
+        "value": "מומחה בתחומו",
+        "label": "מומחה בתחומו",
+        "labelAr": "",
+        "isActive": true,
+        "id": "mt88q1z3awroybqv8",
+        "createdAt": "2026-08-25T05:44:39.807Z",
+        "updatedAt": "2026-08-25T05:44:39.812Z"
+    },
+    {
+        "value": "נדחתה הבקשה",
+        "label": "נדחתה הבקשה",
+        "labelAr": "",
+        "isActive": true,
+        "id": "mt88q1z48da8ykslh",
+        "createdAt": "2026-08-25T05:44:39.808Z",
+        "updatedAt": "2026-08-25T05:44:39.810Z"
+    }
 ]

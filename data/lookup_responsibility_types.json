@@ -1,1 +1,29 @@
-[]
+[
+    {
+        "value": "psagati",
+        "label": "פסגה",
+        "labelAr": "مركز",
+        "isActive": true,
+        "id": "mt86f3v0tn5n15jye",
+        "createdAt": "2026-08-25T04:40:09.804Z",
+        "updatedAt": "2026-08-26T19:51:25.341Z"
+    },
+    {
+        "value": "school",
+        "label": "בית-ספרי",
+        "labelAr": "مدرسي",
+        "isActive": true,
+        "id": "mt86f3v0wm08fcrta",
+        "createdAt": "2026-08-25T04:40:09.804Z",
+        "updatedAt": "2026-08-26T18:49:43.078Z"
+    },
+    {
+        "value": "school_managed",
+        "label": "בית-ספרי (מנוהל פסגה)",
+        "labelAr": "مدرسي (يدار بواسطة المركز)",
+        "isActive": true,
+        "id": "mt86f3v0tpxouw1kc",
+        "createdAt": "2026-08-25T04:40:09.804Z",
+        "updatedAt": "2026-08-26T18:50:07.745Z"
+    }
+]

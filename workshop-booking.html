@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حجز ورشة تعليمية</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800;900&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif; min-height: 100vh; background: var(--gray-50, #f3f3f3); display: flex; flex-direction: column; }
+        .custom-page-header { background: linear-gradient(135deg, var(--primary, #0ca7aa) 0%, var(--primary-dark, #09787a) 100%); padding: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+        .header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .page-main-title { color: #fff; font-size: 28px; font-weight: 800; margin: 0; font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif; }
+        .btn-back { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); color: #fff; padding: 8px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-back:hover { background: rgba(255,255,255,.3); }
+        .custom-page-content { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 32px 24px; }
+        .custom-page-footer { text-align: center; padding: 18px; color: var(--gray-300, #999999); font-size: 12px; border-top: 1px solid var(--gray-100, #f2f2f2); background: rgba(255,255,255,.7); flex-shrink: 0; }
+        .booking-card { background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); margin-top: 24px; }
+        .booking-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .booking-label { display: block; font-weight: 600; margin-bottom: 6px; color: #333; font-size: 14px; }
+        .booking-input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 15px; transition: border-color 0.2s; }
+        .booking-input:focus { outline: none; border-color: var(--primary, #0ca7aa); box-shadow: 0 0 0 3px rgba(12, 167, 170, 0.1); }
+        .booking-input[readonly] { background-color: #f8f9fa; color: #666; cursor: not-allowed; }
+        .booking-btn { background: var(--primary, #0ca7aa); color: #fff; border: none; padding: 12px 32px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 16px; transition: background 0.2s; }
+        .booking-btn:hover { background: var(--primary-dark, #09787a); }
+        .booking-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .field-error { color: #dc3545; font-size: 13px; margin-top: 6px; display: none; font-weight: 500; background: #fef2f2; padding: 8px; border-radius: 6px; border: 1px solid #fecaca; }
+        .field-hint { color: var(--primary, #0ca7aa); font-size: 12px; margin-top: 4px; display: block; font-weight: 500; }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; min-height: 44px; background: #fff; cursor: text; align-items: center; }
+        .tags-container:focus-within { border-color: var(--primary, #0ca7aa); box-shadow: 0 0 0 3px rgba(12, 167, 170, 0.1); }
+        .tag { display: inline-flex; align-items: center; gap: 6px; background: var(--primary, #0ca7aa); color: #fff; padding: 4px 10px; border-radius: 16px; font-size: 13px; font-weight: 500; }
+        .tag-remove { cursor: pointer; font-size: 18px; line-height: 1; opacity: 0.8; font-weight: bold; }
+        .tag-remove:hover { opacity: 1; }
+        .tag-input { border: none; outline: none; flex: 1; min-width: 200px; font-family: inherit; font-size: 15px; padding: 4px; }
+        .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; margin-top: 4px; }
+        .search-result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; }
+        .search-result-item:hover { background: #f8f9fa; }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-wrapper { position: relative; }
+        @media (max-width: 768px) { 
+            .header-inner { flex-wrap: wrap; } .page-main-title { font-size: 22px; } .booking-grid { grid-template-columns: 1fr; } .booking-card { padding: 20px; } 
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+<body>
+    <header class="custom-page-header">
+        <div class="header-inner">
+            <h1 class="page-main-title" id="pageTitleAr">حجز ورشة تعليمية</h1>
+            <a href="./index.html" class="btn-back" id="btnBack">← الرئيسية</a>
+        </div>
+    </header>
+
+    <main class="custom-page-content">
+        <div id="introText" style="background:#fff; padding:24px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.04); line-height:1.8; font-size:16px; margin-bottom: 24px;"></div>
+
+        <div class="booking-card">
+            <h2 style="margin-bottom:24px; color:var(--primary, #0ca7aa); text-align:center;">🏔️ استمارة حجز ورشة تعليمية</h2>
+            <form id="workshopBookingForm" onsubmit="handleBookingSubmit(event)">
+                <div class="booking-grid">
+                    <div class="booking-group" style="grid-column: 1 / -1;">
+                        <label class="booking-label" id="lbl_inst">رمز المدرسة (سيميل) *</label>
+                        <div class="search-wrapper">
+                            <div class="tags-container" id="institutionTagsContainer">
+                                <input type="text" class="tag-input" id="institutionSearch" placeholder="اكتب رمز المدرسة أو اسم المدرسة للبحث..." autocomplete="off">
+                            </div>
+                            <div class="search-results" id="institutionSearchResults"></div>
+                        </div>
+                        <input type="hidden" id="institutionCode" name="institutionCode">
+                        <input type="hidden" id="schoolName" name="schoolName">
+                        <input type="hidden" id="principalName" name="principalName">
+                    </div>
+                    
+                    <div class="booking-group"><label class="booking-label">اسم المدرسة *</label><input type="text" id="schoolNameDisplay" class="booking-input" readonly></div>
+                    <div class="booking-group"><label class="booking-label">اسم مدير/ة المدرسة *</label><input type="text" id="principalNameDisplay" class="booking-input" readonly></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_contact">اسم جهة الاتصال *</label><input type="text" id="contactPerson" class="booking-input" required></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_mobile">رقم الجوال *</label><input type="tel" id="mobile" class="booking-input" placeholder="05X-XXXXXXX" pattern="05[0-9]-[0-9]{7}" title="التنسيق المطلوب: 05X-XXXXXXX" required><div class="field-error" id="mobileError">⚠️ صيغة رقم الهاتف المحمول غير سليمة. يُرجى الإدخال بهذا التنسيق: 05X-XXXXXXX</div></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_email">البريد الإلكتروني (لإرسال تأكيد الحجز)</label><input type="email" id="contactEmail" class="booking-input" placeholder="example@school.edu"></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_workshop">عنوان الورشة التعليمية *</label><select id="workshopName" class="booking-input" required><option value="">-- اختر ورشة --</option></select></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_date">تاريخ اللقاء *</label><input type="date" id="meetingDate" class="booking-input" required><small class="field-hint" id="allowedDaysHint"></small><div class="field-error" id="dateError"></div></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_time">ساعات اللقاء *</label><div style="display:flex; gap:8px; align-items:center;"><input type="time" id="startTime" class="booking-input" required><span>حتى</span><input type="time" id="endTime" class="booking-input" required></div></div>
+                    <div class="booking-group"><label class="booking-label" id="lbl_participants">عدد المشاركين *</label><input type="number" id="participantsCount" class="booking-input" min="1" max="200" placeholder="مثال: 25" required></div>
+                </div>
+
+                <div class="booking-group" style="margin-top:16px;"><label class="booking-label" id="lbl_notes">ملاحظات</label><textarea id="notes" class="booking-input" rows="3"></textarea></div>
+
+                <button type="submit" class="booking-btn" id="submitBtn">📩 إرسال الحجز</button>
+            </form>
+        </div>
+    </main>
+
+    <footer class="custom-page-footer">
+        بوصلة نت © <span id="footerYear"></span> | مركز تطوير طواقم التربية والتعليم - شرقي القدس
+    </footer>
+
+    <script>
+        document.getElementById('footerYear').textContent = new Date().getFullYear();
+    </script>
+
+    <script src="./js/data.js?v=30.8.0"></script>
+    
+    <script>
+        let schoolsData = [];
+        let workshopSettings = {};
+        let selectedInstitutions = [];
+        let allowedWorkshopDays = [];
+        let bookedDates = [];
+        
+        const DAY_NAMES_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        let normalizedAllowedDays = [];
+        let arabicDayLabels = [];
+
+        async function initBookingPage() {
+            try {
+                await DataStore.init(false, [DataStore.KEYS.WORKSHOP_SETTINGS, DataStore.KEYS.LOOKUP_SCHOOLS]);
+                
+                workshopSettings = (DataStore.getAll('workshop_settings') || [])[0] || {};
+                schoolsData = DataStore.getAll(DataStore.KEYS.LOOKUP_SCHOOLS) || [];
+                
+                try {
+                    const res = await fetch('./api/get-booked-dates.php?type=workshop');
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json.success && Array.isArray(json.dates)) {
+                            bookedDates = json.dates;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load booked dates:', e);
+                }
+                
+                const lbl = workshopSettings.labels || {};
+                const getLbl = (key, defAr) => lbl[key]?.ar || defAr;
+
+                document.getElementById('lbl_inst').textContent = getLbl('institutionCode', 'رمز المؤسسة') + ' *';
+                document.getElementById('lbl_contact').textContent = getLbl('contactPerson', 'اسم شخص الاتصال') + ' *';
+                document.getElementById('lbl_mobile').textContent = getLbl('mobile', 'رقم الهاتف المحمول') + ' *';
+                document.getElementById('lbl_email').textContent = getLbl('email', 'البريد الإلكتروني');
+                document.getElementById('lbl_workshop').textContent = getLbl('workshopName', 'اسم الورشة') + ' *';
+                document.getElementById('lbl_date').textContent = getLbl('meetingDate', 'تاريخ اللقاء') + ' *';
+                document.getElementById('lbl_time').textContent = getLbl('meetingTime', 'وقت اللقاء') + ' *';
+                document.getElementById('lbl_participants').textContent = getLbl('participants', 'عدد المشاركين') + ' *';
+                document.getElementById('lbl_notes').textContent = getLbl('notes', 'ملاحظات');
+
+                const introDiv = document.getElementById('introText');
+                if (workshopSettings.introText) {
+                    introDiv.innerHTML = workshopSettings.introText;
+                } else {
+                    introDiv.innerHTML = '<p>مرحباً بكم في صفحة حجز الورشات التعليمية. يرجى ملء البيانات المطلوبة أدناه بدقة.</p>';
+                }
+
+                const workshopSelect = document.getElementById('workshopName');
+                (workshopSettings.workshops || []).forEach(w => {
+                    const option = document.createElement('option');
+                    option.value = w.name || w;
+                    option.textContent = w.name || w;
+                    workshopSelect.appendChild(option);
+                });
+
+                // ==========================================
+                // 🔑 לוגיקה חסינת-תקלות לזיהוי ימים מותרים (כולל אותיות עבריות!)
+                // ==========================================
+                const rawAllowedDays = workshopSettings.allowedDays || [];
+                console.log('🔹 [Debug] ימים גולמיים שנשמרו בדאשבורד:', rawAllowedDays);
+
+                // 🔑 מילון המרה שכולל את האותיות העבריות הבודדות ('א', 'ב', 'ג' וכו') וכל וריאציה אפשרית
+                const dayMapping = {
+                    'sunday': 'sunday', '0': 'sunday', 'א': 'sunday', 'ראשון': 'sunday', 'الأحد': 'sunday', 'الاحد': 'sunday',
+                    'monday': 'monday', '1': 'monday', 'ב': 'monday', 'שני': 'monday', 'الاثنين': 'monday',
+                    'tuesday': 'tuesday', '2': 'tuesday', 'ג': 'tuesday', 'شלישי': 'tuesday', 'שלישי': 'tuesday', 'الثلاثاء': 'tuesday',
+                    'wednesday': 'wednesday', '3': 'wednesday', 'ד': 'wednesday', 'רביעי': 'wednesday', 'رابع': 'wednesday', 'الأربعاء': 'wednesday', 'الاربعاء': 'wednesday',
+                    'thursday': 'thursday', '4': 'thursday', 'ה': 'thursday', 'חמישי': 'thursday', 'الخميس': 'thursday',
+                    'friday': 'friday', '5': 'friday', 'ו': 'friday', 'שישי': 'friday', 'الجمعة': 'friday',
+                    'saturday': 'saturday', '6': 'saturday', 'ש': 'saturday', 'שבת': 'saturday', 'السبت': 'saturday'
+                };
+
+                normalizedAllowedDays = [];
+                arabicDayLabels = [];
+
+                rawAllowedDays.forEach(savedVal => {
+                    const val = String(savedVal || '').toLowerCase().trim();
+                    if (dayMapping[val]) {
+                        const enName = dayMapping[val];
+                        if (!normalizedAllowedDays.includes(enName)) {
+                            normalizedAllowedDays.push(enName);
+                            
+                            // הוספת תווית ערבית לתצוגה
+                            const dayInfo = Object.entries(dayMapping).find(([k, v]) => v === enName && (k === 'الأحد' || k === 'الاثنين' || k === 'الثلاثاء' || k === 'الأربعاء' || k === 'الخميس' || k === 'الجمعة' || k === 'السبت' || k === 'الاحد' || k === 'الاربعاء'));
+                            if (dayInfo) {
+                                arabicDayLabels.push(dayInfo[0]);
+                            } else {
+                                // גיבוי אם לא נמצא
+                                const fallback = { 'sunday': 'الأحد', 'monday': 'الاثنين', 'tuesday': 'الثلاثاء', 'wednesday': 'الأربعاء', 'thursday': 'الخميس', 'friday': 'الجمعة', 'saturday': 'السبت' };
+                                arabicDayLabels.push(fallback[enName]);
+                            }
+                        }
+                    }
+                });
+
+                console.log('✅ [Debug] ימים מנורמלים (באנגלית לבדיקה):', normalizedAllowedDays);
+                console.log('✅ [Debug] תוויות לתצוגה (בערבית):', arabicDayLabels);
+
+                const hintEl = document.getElementById('allowedDaysHint');
+                if (hintEl) {
+                    if (normalizedAllowedDays.length > 0) {
+                        hintEl.textContent = `💡 أيام الحجز المسموحة: ${arabicDayLabels.join('، ')}`;
+                        hintEl.style.color = 'var(--primary, #0ca7aa)';
+                    } else {
+                        hintEl.textContent = '⚠️ لم تقم الإدارة بتحديد أيام مسموحة للحجز حالياً.';
+                        hintEl.style.color = '#dc3545';
+                    }
+                }
+
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('meetingDate').setAttribute('min', today);
+
+                document.getElementById('meetingDate').addEventListener('change', function() {
+                    const selectedDateStr = this.value;
+                    if (!selectedDateStr) return;
+
+                    const selectedDate = new Date(selectedDateStr + 'T00:00:00');
+                    const errorEl = document.getElementById('dateError');
+
+                    console.log('🔍 [Date Check] תאריך נבחר:', selectedDateStr);
+                    console.log('🔍 [Date Check] יום בשבוע (0-6):', selectedDate.getDay());
+
+                    if (isNaN(selectedDate.getTime())) {
+                        errorEl.textContent = '⚠️ تاريخ غير صالح.';
+                        errorEl.style.display = 'block';
+                        this.value = '';
+                        return;
+                    }
+
+                    const jsDay = selectedDate.getDay(); 
+                    const expectedDayEn = DAY_NAMES_EN[jsDay]; 
+                    
+                    console.log('🔍 [Date Check] יום צפוי (אנגלית):', expectedDayEn);
+                    console.log('🔍 [Date Check] האם מותר?', normalizedAllowedDays.includes(expectedDayEn));
+
+                    const isAllowedDay = normalizedAllowedDays.includes(expectedDayEn);
+
+                    if (normalizedAllowedDays.length === 0) {
+                        errorEl.textContent = '⚠️ عذراً، لم تقم الإدارة بتحديد أيام مسموحة للحجز حالياً.';
+                        errorEl.style.display = 'block';
+                        this.value = '';
+                    } else if (!isAllowedDay) {
+                        errorEl.textContent = `⚠️ عذراً، الحجز غير مسموح في هذا اليوم. الأيام المسموحة هي: ${arabicDayLabels.join('، ')}.`;
+                        errorEl.style.display = 'block';
+                        this.value = ''; 
+                    } else {
+                        const isDateTaken = bookedDates.includes(selectedDateStr);
+
+                        if (isDateTaken) {
+                            errorEl.textContent = `⚠️ عذراً، هذا التاريخ محجوز بالفعل. يرجى اختيار تاريخ آخر متاح.`;
+                            errorEl.style.display = 'block';
+                            this.value = '';
+                        } else {
+                            errorEl.style.display = 'none'; 
+                        }
+                    }
+                });
+
+                initInstitutionSearch();
+                document.getElementById('mobile').addEventListener('input', function() {
+                    validateMobile(this);
+                });
+
+            } catch (err) {
+                console.error('حدث خطأ أثناء تحميل صفحة الحجز:', err);
+                document.querySelector('.booking-card').innerHTML = '<p style="color:red; text-align:center; padding:20px;">حدث خلل أثناء جلب البيانات. نرجو تحديث الصفحة.</p>';
+            }
+        }
+
+        function initInstitutionSearch() {
+            const searchInput = document.getElementById('institutionSearch');
+            const resultsDiv = document.getElementById('institutionSearchResults');
+            const tagsContainer = document.getElementById('institutionTagsContainer');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                if (query.length < 2) { resultsDiv.style.display = 'none'; return; }
+
+                const results = schoolsData.filter(school => {
+                    const code = String(school.code || school.id || school.symbol || '').toLowerCase();
+                    const name = String(school.name || school.nameHe || school.label || school.nameAr || '').toLowerCase();
+                    return code.includes(query) || name.includes(query);
+                }).slice(0, 10);
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="search-result-item" style="color:#999; cursor:default;">لا توجد نتائج</div>';
+                } else {
+                    resultsDiv.innerHTML = results.map(school => {
+                        const displayName = school.name || school.nameHe || school.label || school.nameAr || 'للا اسم';
+                        const displayCode = school.code || school.id || school.symbol || '';
+                        return `<div class="search-result-item" data-code="${displayCode}" data-name="${displayName}" data-principal="${school.principalName || school.principal || ''}"><strong>${displayCode}</strong> - ${displayName}</div>`;
+                    }).join('');
+                }
+                resultsDiv.style.display = 'block';
+            });
+
+            resultsDiv.addEventListener('click', function(e) {
+                const item = e.target.closest('.search-result-item');
+                if (!item || item.style.cursor === 'default') return;
+                if (selectedInstitutions.find(i => i.code === item.dataset.code)) {
+                    showToast({ text: 'هذه المدرسة تم اختيارها مسبقاً', gravity: "top", position: "center", style: { background: "#f59e0b" }, duration: 3000 });
+                    return;
+                }
+                addInstitutionTag(item.dataset.code, item.dataset.name, item.dataset.principal);
+                searchInput.value = '';
+                resultsDiv.style.display = 'none';
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!tagsContainer.contains(e.target) && !resultsDiv.contains(e.target)) resultsDiv.style.display = 'none';
+            });
+            tagsContainer.addEventListener('click', function() { searchInput.focus(); });
+        }
+
+        function addInstitutionTag(code, name, principal) {
+            const tagsContainer = document.getElementById('institutionTagsContainer');
+            const searchInput = document.getElementById('institutionSearch');
+            const tag = document.createElement('div');
+            tag.className = 'tag';
+            tag.dataset.code = code;
+            tag.innerHTML = `<span>${code} - ${name}</span><span class="tag-remove" onclick="removeInstitutionTag('${code}')">&times;</span>`;
+            tagsContainer.insertBefore(tag, searchInput);
+            selectedInstitutions.push({ code, name, principal });
+            updateHiddenFields();
+        }
+
+        function removeInstitutionTag(code) {
+            const tag = document.querySelector(`.tag[data-code="${code}"]`);
+            if (tag) tag.remove();
+            selectedInstitutions = selectedInstitutions.filter(i => i.code !== code);
+            updateHiddenFields();
+        }
+
+        function updateHiddenFields() {
+            if (selectedInstitutions.length > 0) {
+                const first = selectedInstitutions[0];
+                document.getElementById('institutionCode').value = first.code;
+                document.getElementById('schoolName').value = first.name;
+                document.getElementById('principalName').value = first.principal;
+                document.getElementById('schoolNameDisplay').value = first.name;
+                document.getElementById('principalNameDisplay').value = first.principal;
+            } else {
+                ['institutionCode', 'schoolName', 'principalName', 'schoolNameDisplay', 'principalNameDisplay'].forEach(id => {
+                    document.getElementById(id).value = '';
+                });
+            }
+        }
+
+        function validateMobile(input) {
+            const errorEl = document.getElementById('mobileError');
+            if (input.value && !/^05[0-9]-[0-9]{7}$/.test(input.value)) {
+                errorEl.style.display = 'block';
+                input.setCustomValidity('الترميز غير صحيح');
+            } else {
+                errorEl.style.display = 'none';
+                input.setCustomValidity('');
+            }
+        }
+
+        async function handleBookingSubmit(event) {
+            event.preventDefault();
+            if (selectedInstitutions.length === 0) {
+                showToast({ text: 'يجب تحديد مدرسة واحدة كحد أدنى.', gravity: "top", position: "center", style: { background: "#dc3545" }, duration: 3000 });
+                return;
+            }
+
+            const meetingDate = document.getElementById('meetingDate').value;
+            if (existingBookings.some(b => b.meetingDate === meetingDate && (b.status === 'pending' || b.status === 'approved'))) {
+                showToast({ text: 'عذراً، هذا التاريخ محجوز بالفعل.', gravity: "top", position: "center", style: { background: "#dc3545" }, duration: 4000 });
+                return;
+            }
+
+            const bookingData = {
+                id: 'booking_' + Date.now(),
+                institutionCode: document.getElementById('institutionCode').value,
+                schoolName: document.getElementById('schoolName').value,
+                principalName: document.getElementById('principalName').value,
+                contactPerson: document.getElementById('contactPerson').value,
+                contactEmail: document.getElementById('contactEmail').value,
+                mobile: document.getElementById('mobile').value,
+                workshopName: document.getElementById('workshopName').value,
+                meetingDate: meetingDate,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
+                participantsCount: parseInt(document.getElementById('participantsCount').value) || 1,
+                notes: document.getElementById('notes').value,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = '⏳ جاري إرسال الطلب...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('./api/save_booking.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast({ text: '✅ تم استلام طلبك بنجاح!', gravity: "top", position: "center", style: { background: "#16a34a" }, duration: 4000 });
+                    document.getElementById('workshopBookingForm').reset();
+                    document.querySelectorAll('.tag').forEach(t => t.remove());
+                    selectedInstitutions = [];
+                    updateHiddenFields();
+                    document.getElementById('dateError').style.display = 'none';
+                } else {
+                    showToast({ text: '❌ ' + (result.message || 'حدث خطأ'), gravity: "top", position: "center", style: { background: "#dc3545" }, duration: 4000 });
+                }
+            } catch (error) {
+                showToast({ text: '❌ حدث خطأ في الشبكة.', gravity: "top", position: "center", style: { background: "#dc3545" }, duration: 4000 });
+            } finally {
+                submitBtn.textContent = '📩 إرسال الحجز';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function showToast(options) { Toastify(options).showToast(); }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initBookingPage);
+        } else {
+            initBookingPage();
+        }
+    </script>
+</body>
+</html>

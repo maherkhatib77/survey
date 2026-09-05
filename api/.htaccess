@@ -1,18 +1,7 @@
-# Route API requests to PHP scripts
-RewriteEngine On
+<Files "data-save.php">
+    Require all granted
+</Files>
 
-# data-save endpoint
-RewriteRule ^data-save$ data-save.php [L]
-
-# health-check endpoint
-RewriteRule ^health-check$ health-check.php [L]
-
-# health-log endpoint
-RewriteRule ^health-log$ health-log.php [L]
-
-# create-page-file endpoint
-RewriteRule ^create-page-file$ create-page-file.php [L]
-
-# Block direct access to PHP files
-RewriteCond %{THE_REQUEST} \.php [NC]
-RewriteRule ^ - [F]
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>

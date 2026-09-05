@@ -1,0 +1,60 @@
+[
+    {
+        "title": "عناقيد اللغة العربية",
+        "fieldKnowledgeId": "مجالات التخصص",
+        "fixedTheme": "دمج الذكاء الاصطناعي واللغة العبرية في التعليم",
+        "choiceModules": [
+            {
+                "solutionId": "mtop4f3bsm0l7nxrg",
+                "theme": "التنور اللغوي"
+            },
+            {
+                "solutionId": "mtop4f3bw3kn1cl4o",
+                "theme": "تطوير المهارات"
+            },
+            {
+                "solutionId": "mtop4f3clquawzbnk",
+                "theme": "تنمية التفكير"
+            },
+            {
+                "solutionId": "mtop4f3c3rl0w1svn",
+                "theme": "توظيف القصة"
+            },
+            {
+                "solutionId": "mtop4f3k6of8mtjlg",
+                "theme": "منهاج اللغة العربية"
+            }
+        ],
+        "isActive": true,
+        "updatedAt": "2026-09-05T18:09:52.129Z",
+        "id": "cluster_1788547288984",
+        "createdAt": "2026-09-04T18:41:28.984Z"
+    },
+    {
+        "title": "عناقيد الرياضيات",
+        "fieldKnowledgeId": "مجالات التخصص",
+        "fixedTheme": "دمج الذكاء الاصطناعي واللغة العبرية في التعليم",
+        "choiceModules": [
+            {
+                "solutionId": "mtnan4eqgg1xlsdmd",
+                "theme": "التنور الرياضي"
+            },
+            {
+                "solutionId": "mtnan4ev4bhj9f8t4",
+                "theme": "مهارات التفكير"
+            },
+            {
+                "solutionId": "mtnan4ezif1jdl3if",
+                "theme": "منصة קמפוס IL"
+            },
+            {
+                "solutionId": "mtnan4esyz37o41op",
+                "theme": "STEM"
+            }
+        ],
+        "isActive": true,
+        "updatedAt": "2026-09-04T18:46:43.128Z",
+        "id": "cluster_1788547603128",
+        "createdAt": "2026-09-04T18:46:43.128Z"
+    }
+]
