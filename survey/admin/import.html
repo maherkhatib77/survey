@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ייבוא סקר מקובץ - Form Builder Pro</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .import-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+    .upload-area {
+      border: 3px dashed var(--slate-300);
+      border-radius: 16px;
+      padding: 60px 40px;
+      text-align: center;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .upload-area:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      transform: scale(1.02);
+    }
+    .upload-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .file-input {
+      display: none;
+    }
+    .preview-section {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-top: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .detected-field {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .field-type-badge {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .option-item {
+      background: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--slate-200);
+      font-size: 14px;
+    }
+    .processing {
+      text-align: center;
+      padding: 40px;
+    }
+    .spinner {
+      border: 4px solid var(--slate-200);
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="dashboard.html" class="btn btn-outline btn-sm">→ חזור</a>
+        <div>
+          <h1 style="font-size:18px;font-weight:700;">📥 ייבוא סקר מקובץ</h1>
+          <p style="font-size:13px;color:var(--slate-500);">ייבא סקר מקובץ Word, PDF או JSON</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="../index.html" class="btn btn-outline btn-sm">🌐 לאתר</a>
+        <button class="btn btn-outline btn-sm" onclick="logout()">🚪 יציאה</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="import-container">
+    <!-- Upload Area -->
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📄</div>
+      <h2 style="margin-bottom:8px;">גרור קובץ לכאן או לחץ לבחירה</h2>
+      <p style="color:var(--slate-500);margin-bottom:16px;">תומך בקבצי PDF, Word (.docx), JSON</p>
+      <div style="display:flex;gap:12px;justify-content:center;">
+        <span style="background:var(--slate-100);padding:6px 16px;border-radius:20px;font-size:13px;">📕 PDF</span>
+        <span style="background:var(--slate-100);padding:6px 16px;border-radius:20px;font-size:13px;">📘 Word</span>
+        <span style="background:var(--slate-100);padding:6px 16px;border-radius:20px;font-size:13px;">📋 JSON</span>
+      </div>
+      <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.json" onchange="handleFileSelect(event)">
+    </div>
+
+    <!-- Processing -->
+    <div id="processingSection" class="preview-section" style="display:none;">
+      <div class="processing">
+        <div class="spinner"></div>
+        <h3>מנתח את הקובץ...</h3>
+        <p style="color:var(--slate-500);margin-top:8px;">מזהה מבנה טופס ושדות</p>
+      </div>
+    </div>
+
+    <!-- Preview & Edit -->
+    <div id="previewSection" class="preview-section" style="display:none;">
+      <h2 style="margin-bottom:8px;">✅ זוהו השדות הבאים</h2>
+      <p style="color:var(--slate-500);margin-bottom:24px;">בדוק את התוצאה וערוך לפי הצורך לפני השמירה</p>
+      
+      <div class="field-group">
+        <label>כותרת הסקר</label>
+        <input type="text" id="formTitle" placeholder="הזן כותרת לסקר">
+      </div>
+
+      <div class="field-group">
+        <label>תיאור</label>
+        <textarea id="formDescription" rows="2" placeholder="תיאור קצר של הסקר"></textarea>
+      </div>
+
+      <div id="detectedFields"></div>
+
+      <div class="action-buttons">
+        <button class="btn btn-primary btn-lg" style="flex:1;" onclick="saveForm()">💾 שמור כטופס חדש</button>
+        <button class="btn btn-outline btn-lg" onclick="reset()">🔄 ייבא קובץ אחר</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="import.js"></script>
+</body>
+</html>

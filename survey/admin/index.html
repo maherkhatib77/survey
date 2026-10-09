@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>אזור מנהל - Form Builder Pro</title>
+</head>
+<body>
+  <script>
+    // בדיקת התחברות והפניה
+    async function checkAndRedirect() {
+      try {
+        const res = await fetch('../api/auth.php?action=check');
+        const json = await res.json();
+        if (json.loggedIn) {
+          window.location.href = 'dashboard.html';
+        } else {
+          window.location.href = 'login.html';
+        }
+      } catch(e) {
+        window.location.href = 'login.html';
+      }
+    }
+    checkAndRedirect();
+  </script>
+  <p style="text-align:center;padding:40px;">טוען...</p>
+</body>
+</html>

@@ -1,0 +1,183 @@
+[03-Oct-2026 07:33:42 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1,
+[03-Oct-2026 07:33:42 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 07:33:42 UTC] File exists: yes
+[03-Oct-2026 07:33:42 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:34:19 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 07:34:19 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 07:34:19 UTC] File exists: yes
+[03-Oct-2026 07:34:19 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:34:19 UTC] submit action for formId: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 07:34:19 UTC] Form found: yes
+[03-Oct-2026 07:34:19 UTC] Form status: draft
+[03-Oct-2026 07:34:19 UTC] Form file exists: yes
+[03-Oct-2026 07:34:19 UTC] Form not published. Status: draft
+[03-Oct-2026 07:34:19 UTC] Admin user logged in, allowing submission for testing
+[03-Oct-2026 07:34:19 UTC] saveResponse: formId=3d114600-b7d1-4b57-9366-8a5cac24cbd1, filepath=/home/ejpisgaorg/public_html/survey/api/../data/responses/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 07:34:19 UTC] RESPONSES_DIR exists: yes
+[03-Oct-2026 07:34:19 UTC] RESPONSES_DIR writable: yes
+[03-Oct-2026 07:34:19 UTC] writeJSON result: success
+[03-Oct-2026 07:34:19 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 07:34:19 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 07:34:19 UTC] File exists: yes
+[03-Oct-2026 07:34:19 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:34:19 UTC] saveResponse returned: success
+[03-Oct-2026 07:34:33 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 07:34:33 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 07:34:33 UTC] File exists: yes
+[03-Oct-2026 07:34:33 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:35:16 UTC] getForm called for id: de2d2327-5e6d-469c-8330-90dd30ba78d3
+[03-Oct-2026 07:35:16 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/de2d2327-5e6d-469c-8330-90dd30ba78d3.json
+[03-Oct-2026 07:35:16 UTC] File exists: yes
+[03-Oct-2026 07:35:16 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:35:29 UTC] getForm called for id: de2d2327-5e6d-469c-8330-90dd30ba78d3
+[03-Oct-2026 07:35:29 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/de2d2327-5e6d-469c-8330-90dd30ba78d3.json
+[03-Oct-2026 07:35:29 UTC] File exists: yes
+[03-Oct-2026 07:35:29 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 07:35:46 UTC] getForm called for id: de2d2327-5e6d-469c-8330-90dd30ba78d3
+[03-Oct-2026 07:35:46 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/de2d2327-5e6d-469c-8330-90dd30ba78d3.json
+[03-Oct-2026 07:35:46 UTC] File exists: yes
+[03-Oct-2026 07:35:46 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 09:24:25 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 09:24:25 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 09:24:25 UTC] File exists: yes
+[03-Oct-2026 09:24:25 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 09:24:36 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 09:24:36 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 09:24:36 UTC] File exists: yes
+[03-Oct-2026 09:24:36 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 09:24:41 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 09:24:41 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 09:24:41 UTC] File exists: yes
+[03-Oct-2026 09:24:41 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 10:20:36 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 10:20:36 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 10:20:36 UTC] File exists: yes
+[03-Oct-2026 10:20:36 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 16:41:35 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 16:41:35 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 16:41:35 UTC] File exists: yes
+[03-Oct-2026 16:41:35 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 16:45:32 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 16:45:32 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 16:45:32 UTC] File exists: yes
+[03-Oct-2026 16:45:32 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 16:45:42 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 16:45:42 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 16:45:42 UTC] File exists: yes
+[03-Oct-2026 16:45:42 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 16:48:11 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 16:48:11 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 16:48:11 UTC] File exists: yes
+[03-Oct-2026 16:48:11 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:14:07 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 17:14:07 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 17:14:07 UTC] File exists: yes
+[03-Oct-2026 17:14:07 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:14:10 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 17:14:10 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 17:14:10 UTC] File exists: yes
+[03-Oct-2026 17:14:10 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:25:58 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 17:25:58 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 17:25:58 UTC] File exists: yes
+[03-Oct-2026 17:25:58 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:30:42 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 17:30:42 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 17:30:42 UTC] File exists: yes
+[03-Oct-2026 17:30:42 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 17:31:57 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[03-Oct-2026 17:31:57 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[03-Oct-2026 17:31:57 UTC] File exists: yes
+[03-Oct-2026 17:31:57 UTC] Form loaded successfully. Status: draft
+[03-Oct-2026 17:51:47 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 17:51:47 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 17:51:47 UTC] File exists: yes
+[03-Oct-2026 17:51:47 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:52:09 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 17:52:09 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 17:52:09 UTC] File exists: yes
+[03-Oct-2026 17:52:09 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:53:27 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 17:53:27 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 17:53:27 UTC] File exists: yes
+[03-Oct-2026 17:53:27 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 17:54:58 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[03-Oct-2026 17:54:58 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[03-Oct-2026 17:54:58 UTC] File exists: yes
+[03-Oct-2026 17:54:58 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 18:13:35 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 18:13:35 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 18:13:35 UTC] File exists: yes
+[03-Oct-2026 18:13:35 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 18:13:41 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 18:13:41 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 18:13:41 UTC] File exists: yes
+[03-Oct-2026 18:13:41 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 18:13:44 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 18:13:44 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 18:13:44 UTC] File exists: yes
+[03-Oct-2026 18:13:44 UTC] Form loaded successfully. Status: published
+[03-Oct-2026 18:31:26 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[03-Oct-2026 18:31:26 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[03-Oct-2026 18:31:26 UTC] File exists: yes
+[03-Oct-2026 18:31:26 UTC] Form loaded successfully. Status: published
+[04-Oct-2026 02:29:14 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[04-Oct-2026 02:29:14 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[04-Oct-2026 02:29:14 UTC] File exists: yes
+[04-Oct-2026 02:29:14 UTC] Form loaded successfully. Status: published
+[04-Oct-2026 06:55:28 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[04-Oct-2026 06:55:28 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[04-Oct-2026 06:55:28 UTC] File exists: yes
+[04-Oct-2026 06:55:28 UTC] Form loaded successfully. Status: published
+[04-Oct-2026 07:13:26 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[04-Oct-2026 07:13:26 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[04-Oct-2026 07:13:26 UTC] File exists: yes
+[04-Oct-2026 07:13:26 UTC] Form loaded successfully. Status: published
+[05-Oct-2026 07:36:20 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[05-Oct-2026 07:36:20 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[05-Oct-2026 07:36:20 UTC] File exists: yes
+[05-Oct-2026 07:36:20 UTC] Form loaded successfully. Status: published
+[05-Oct-2026 07:38:41 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[05-Oct-2026 07:38:41 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[05-Oct-2026 07:38:41 UTC] File exists: yes
+[05-Oct-2026 07:38:41 UTC] Form loaded successfully. Status: published
+[05-Oct-2026 07:39:15 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[05-Oct-2026 07:39:15 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[05-Oct-2026 07:39:15 UTC] File exists: yes
+[05-Oct-2026 07:39:15 UTC] Form loaded successfully. Status: published
+[05-Oct-2026 07:39:45 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[05-Oct-2026 07:39:45 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[05-Oct-2026 07:39:45 UTC] File exists: yes
+[05-Oct-2026 07:39:45 UTC] Form loaded successfully. Status: published
+[05-Oct-2026 07:40:32 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[05-Oct-2026 07:40:32 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[05-Oct-2026 07:40:32 UTC] File exists: yes
+[05-Oct-2026 07:40:32 UTC] Form loaded successfully. Status: published
+[07-Oct-2026 10:26:41 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[07-Oct-2026 10:26:41 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[07-Oct-2026 10:26:41 UTC] File exists: yes
+[07-Oct-2026 10:26:41 UTC] Form loaded successfully. Status: published
+[07-Oct-2026 10:26:54 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[07-Oct-2026 10:26:54 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[07-Oct-2026 10:26:54 UTC] File exists: yes
+[07-Oct-2026 10:26:54 UTC] Form loaded successfully. Status: published
+[07-Oct-2026 10:26:58 UTC] getForm called for id: a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd
+[07-Oct-2026 10:26:58 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/a88ec61a-55e5-4bcb-83ca-fbb8b2e484dd.json
+[07-Oct-2026 10:26:58 UTC] File exists: yes
+[07-Oct-2026 10:26:58 UTC] Form loaded successfully. Status: published
+[07-Oct-2026 10:27:02 UTC] getForm called for id: cf7934fe-e0a2-4521-9854-254e381b3e24
+[07-Oct-2026 10:27:02 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/cf7934fe-e0a2-4521-9854-254e381b3e24.json
+[07-Oct-2026 10:27:02 UTC] File exists: yes
+[07-Oct-2026 10:27:02 UTC] Form loaded successfully. Status: published
+[07-Oct-2026 12:45:43 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[07-Oct-2026 12:45:43 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[07-Oct-2026 12:45:43 UTC] File exists: yes
+[07-Oct-2026 12:45:43 UTC] Form loaded successfully. Status: draft
+[07-Oct-2026 12:49:04 UTC] getForm called for id: 3d114600-b7d1-4b57-9366-8a5cac24cbd1
+[07-Oct-2026 12:49:04 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/3d114600-b7d1-4b57-9366-8a5cac24cbd1.json
+[07-Oct-2026 12:49:04 UTC] File exists: yes
+[07-Oct-2026 12:49:04 UTC] Form loaded successfully. Status: draft
+[07-Oct-2026 13:03:12 UTC] getForm called for id: c011a6df-6d85-418c-ae2a-086a9f2bed0d
+[07-Oct-2026 13:03:12 UTC] Filepath: /home/ejpisgaorg/public_html/survey/api/../data/forms/c011a6df-6d85-418c-ae2a-086a9f2bed0d.json
+[07-Oct-2026 13:03:12 UTC] File exists: yes
+[07-Oct-2026 13:03:12 UTC] Form loaded successfully. Status: draft

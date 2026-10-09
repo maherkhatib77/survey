@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>דוחות - Form Builder Pro</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="dashboard.html" class="btn btn-outline btn-sm">→ חזור</a>
+        <div>
+          <h1 style="font-size:18px;font-weight:700;" id="reportTitle">📊 דוחות</h1>
+          <p style="font-size:13px;color:var(--slate-500);" id="reportSubtitle"></p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="../index.html" class="btn btn-outline btn-sm">🌐 לאתר</a>
+        <button class="btn btn-outline btn-sm" onclick="logout()">🚪 יציאה</button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="reports-tabs">
+        <button class="reports-tab active" onclick="switchTab('overview',this)">📈 סקירה</button>
+        <button class="reports-tab" onclick="switchTab('fields',this)">📋 שדות</button>
+        <button class="reports-tab" onclick="switchTab('responses',this)">💬 תגובות</button>
+        <button class="reports-tab" onclick="switchTab('export',this)">📤 ייצוא</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding:24px 20px;">
+    <div id="tabContent"></div>
+  </main>
+
+  <div id="responseModal" class="modal-overlay" style="display:none;" onclick="closeResponseModal()">
+    <div class="modal" onclick="event.stopPropagation()" style="max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3>פרטי תגובה</h3>
+        <button onclick="closeResponseModal()" style="background:none;border:none;cursor:pointer;font-size:18px;">✕</button>
+      </div>
+      <div id="responseDetail"></div>
+    </div>
+  </div>
+
+  <!-- ספריות חיצוניות -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  
+  <script src="reports.js"></script>
+</body>
+</html>

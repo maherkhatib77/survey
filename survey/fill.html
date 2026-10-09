@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تعبئة الاستبيان - Form Builder Pro</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    
+    * {
+      font-family: 'Cairo', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="filler-wrapper">
+    <div style="max-width:700px;margin:0 auto 20px;display:flex;justify-content:space-between;align-items:center;">
+      <a href="index.html" class="btn btn-outline btn-sm">إغلاق ✕</a>
+      <span id="pageInfo" style="font-size:14px;color:var(--slate-500);"></span>
+    </div>
+
+    <div style="max-width:700px;margin:0 auto 24px;">
+      <div class="filler-progress">
+        <div class="filler-progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="filler-card" id="formCard">
+      <div id="formContent">
+        <div style="text-align:center;padding:40px;">
+          <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+          <p style="color:var(--slate-500);">جاري تحميل الاستبيان...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script src="js/fill.js"></script>
+</body>
+</html>

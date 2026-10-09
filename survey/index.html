@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منظومة الاستبيانات الإلكترونية</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    
+    * {
+      font-family: 'Cairo', sans-serif;
+    }
+    
+    .public-header {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .public-header h1 { font-size: 32px; margin-bottom: 8px; }
+    .public-header p { font-size: 16px; opacity: 0.9; }
+    .surveys-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .survey-card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+    }
+    .survey-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+    }
+    .survey-card h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--slate-800); }
+    .survey-card p { color: var(--slate-500); font-size: 14px; margin-bottom: 20px; flex: 1; }
+    .survey-card .meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--slate-400);
+      margin-bottom: 20px;
+    }
+    .survey-card .btn { width: 100%; justify-content: center; }
+    .survey-description {
+      color: var(--slate-500);
+      font-size: 14px;
+      margin-bottom: 20px;
+      flex: 1;
+      line-height: 1.6;
+    }
+    .survey-description-short {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .read-more-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 0;
+      margin-top: 8px;
+      text-decoration: underline;
+      transition: color 0.2s;
+    }
+    .read-more-btn:hover {
+      color: var(--primary-dark);
+    }
+    .admin-link {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      text-decoration: none;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .admin-link:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="public-header">
+    <h1>📋 منظومة الاستبيانات الإلكترونية</h1>
+  </div>
+
+  <!-- Surveys List -->
+  <div class="surveys-grid" id="surveysList">
+    <div style="grid-column:1/-1;text-align:center;padding:60px;">
+      <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+      <p style="color:var(--slate-500);">جاري تحميل الاستبيانات المتاحة...</p>
+    </div>
+  </div>
+
+  <!-- Admin Link -->
+  <a href="admin/" class="admin-link">🔐 دخول المدير</a>
+
+  <script>
+    // טעינת סקרים מפורסמים
+    async function loadSurveys() {
+      const list = document.getElementById('surveysList');
+      try {
+        const res = await fetch('api/forms.php?action=list-public');
+        const json = await res.json();
+        
+        if (!json.success || !json.data.length) {
+          list.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:80px 20px;">
+              <div style="font-size:72px;margin-bottom:20px;">📭</div>
+              <h2 style="margin-bottom:8px;color:var(--slate-700);">لا توجد استبيانات متاحة حاليا</h2>
+              <p style="color:var(--slate-500);">عد لزيارتنا لاحقا، أو اطلب من المدير نشر استبيان جديد</p>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = json.data.map((survey, index) => {
+          const description = survey.description || 'بدون وصف';
+          const shortDesc = description.length > 100 ? description.substring(0, 100) + '...' : description;
+          const needsExpand = description.length > 100;
+          
+          return `
+            <div class="survey-card">
+              <h3>${esc(survey.title)}</h3>
+              <div class="survey-description" id="desc-${index}">
+                <div class="${needsExpand ? 'survey-description-short' : ''}">${esc(description)}</div>
+                ${needsExpand ? `<button class="read-more-btn" onclick="toggleDescription(${index}, '${esc(description).replace(/'/g, "\\'")}')">اقرأ المزيد</button>` : ''}
+              </div>
+              <div class="meta">
+                <span>📅 ${formatDate(survey.createdAt)}</span>
+                <span>👥 ${survey.responseCount || 0} مشاركين</span>
+              </div>
+              <a href="fill.html?id=${survey.id}" class="btn btn-primary btn-lg">
+                ✍️ تعبئة الاستبيان
+              </a>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        list.innerHTML = `
+          <div style="grid-column:1/-1;text-align:center;padding:60px;">
+            <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+            <p style="color:var(--slate-500);">خطأ في تحميل الاستبيانات. حاول مرة أخرى لاحقا.</p>
+          </div>
+        `;
+      }
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function formatDate(d) {
+      if (!d) return '';
+      return new Date(d).toLocaleDateString('ar-EG');
+    }
+
+    function toggleDescription(index, fullText) {
+      const descDiv = document.getElementById(`desc-${index}`);
+      const innerDiv = descDiv.querySelector('div:first-child');
+      const btn = descDiv.querySelector('.read-more-btn');
+      
+      if (innerDiv.classList.contains('survey-description-short')) {
+        // הרחב את הטקסט
+        innerDiv.classList.remove('survey-description-short');
+        btn.textContent = 'اقرأ أقل';
+      } else {
+        // קטן את הטקסט
+        innerDiv.classList.add('survey-description-short');
+        btn.textContent = 'اقرأ المزيد';
+      }
+    }
+
+    loadSurveys();
+  </script>
+</body>
+</html>

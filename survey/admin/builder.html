@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>עורך סקרים - Form Builder Pro</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-inner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="dashboard.html" class="btn btn-outline btn-sm">→ חזור</a>
+        <input type="text" id="formTitle" style="font-size:18px;font-weight:700;border:none;background:transparent;outline:none;padding:4px 8px;border-radius:6px;min-width:200px;" onchange="saveFormTitle()">
+        <span id="saveStatus" style="font-size:13px;color:var(--success);display:none;">✓ נשמר</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="togglePreview()">👁️ תצוגה</button>
+        <button class="btn btn-outline btn-sm" onclick="toggleSettings()">⚙️ הגדרות</button>
+        <button id="publishBtn" class="btn btn-sm" onclick="togglePublish()"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Settings Panel -->
+  <div id="settingsPanel" style="display:none;background:white;border-bottom:1px solid var(--slate-200);padding:20px;">
+    <div class="container">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div class="field-group"><label>כותרת</label><input type="text" id="setTitle" onchange="updateSetting('title',this.value)"></div>
+        <div class="field-group"><label>תיאור</label><input type="text" id="setDesc" onchange="updateSetting('description',this.value)"></div>
+        <div class="field-group"><label>צבע ראשי</label><input type="color" id="setColor" onchange="updateSetting('color',this.value)" style="width:60px;height:40px;"></div>
+        <div class="field-group"><label>הודעת תודה</label><input type="text" id="setMsg" onchange="updateSetting('submitMessage',this.value)"></div>
+        <div class="field-group"><label>Webhook URL</label><input type="url" id="setWebhook" placeholder="https://..."></div>
+        <div class="field-group"><label>סטטוס</label>
+          <select id="setStatus" onchange="updateSetting('status',this.value)">
+            <option value="draft">טיוטה</option><option value="published">מפורסם</option><option value="closed">סגור</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Color Palettes -->
+      <div style="border-top:1px solid var(--slate-200);padding-top:20px;">
+        <label style="display:block;font-weight:600;margin-bottom:12px;">🎨 בחר פלטת צבעים</label>
+        <div id="colorPalettes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Builder Layout -->
+  <div class="builder-layout" id="builderLayout">
+    <!-- Widgets Panel -->
+    <div class="widget-panel">
+      <h3>🧩 ווידג'טים</h3>
+      <div class="widgets-grid" id="widgetsGrid"></div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-area">
+      <div class="canvas-inner">
+        <div class="page-tabs" id="pageTabs"></div>
+        <div style="margin-bottom:20px;">
+          <input type="text" id="pageTitle" placeholder="כותרת העמוד" style="font-size:20px;font-weight:700;border:none;border-bottom:2px solid transparent;outline:none;padding:4px 0;width:100%;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='transparent';savePageTitle()">
+        </div>
+        <div id="fieldsList"></div>
+      </div>
+    </div>
+
+    <!-- Properties Panel -->
+    <div class="props-panel" id="propsPanel" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">מאפייני שדה</h3>
+        <button onclick="closeProps()" style="background:none;border:none;cursor:pointer;font-size:18px;">✕</button>
+      </div>
+      <div id="propsContent"></div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="previewModal" class="modal-overlay" style="display:none;">
+    <div style="background:white;border-radius:20px;max-width:700px;width:100%;max-height:90vh;overflow-y:auto;padding:32px;margin:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3>תצוגה מקדימה</h3>
+        <button onclick="togglePreview()" class="btn btn-outline btn-sm">✕ סגור</button>
+      </div>
+      <div id="previewContent"></div>
+    </div>
+  </div>
+
+  <script src="builder.js"></script>
+</body>
+</html>

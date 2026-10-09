@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול מאגרי נתונים - Form Builder Pro</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .sources-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .source-card {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.2s;
+    }
+    .source-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-color: var(--primary);
+    }
+    .source-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+    .source-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin-bottom: 4px;
+    }
+    .source-desc {
+      font-size: 14px;
+      color: var(--slate-500);
+      margin-bottom: 12px;
+    }
+    .source-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--slate-500);
+      margin-bottom: 16px;
+    }
+    .source-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .modal-large {
+      max-width: 900px;
+      width: 90%;
+    }
+    .records-toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .records-toolbar input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--slate-300);
+      border-radius: 8px;
+      font-family: inherit;
+    }
+    .table-container {
+      overflow-x: auto;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .data-table th {
+      background: var(--slate-50);
+      padding: 12px;
+      text-align: right;
+      font-weight: 600;
+      color: var(--slate-700);
+      border-bottom: 2px solid var(--slate-200);
+      position: sticky;
+      top: 0;
+    }
+    .data-table td {
+      padding: 12px;
+      border-bottom: 1px solid var(--slate-100);
+      color: var(--slate-600);
+    }
+    .data-table tr:hover td {
+      background: var(--slate-50);
+    }
+    .field-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .field-row input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--slate-300);
+      border-radius: 6px;
+      font-family: inherit;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--slate-300);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .form-text {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--slate-500);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-inner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="dashboard.html" class="btn btn-outline btn-sm">→ חזור</a>
+        <div>
+          <h1 style="font-size:18px;font-weight:700;">🗄️ ניהול מאגרי נתונים</h1>
+          <p style="font-size:13px;color:var(--slate-500);">ייבוא וניהול מאגרים לשימוש בטפסים</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="../index.html" class="btn btn-outline btn-sm">🌐 לאתר</a>
+        <button class="btn btn-outline btn-sm" onclick="logout()">🚪 יציאה</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding:32px 20px;">
+    <!-- Toolbar -->
+    <div class="sources-toolbar">
+      <h2>המאגרים שלי</h2>
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline btn-lg" onclick="showImportModal()">📥 ייבוא מאגר מ-CSV</button>
+        <button class="btn btn-primary btn-lg" onclick="showCreateModal()">➕ צור מאגר חדש</button>
+      </div>
+    </div>
+
+    <!-- Sources List -->
+    <div id="sourcesList" class="forms-grid"></div>
+  </main>
+
+  <!-- Modal: Create/Edit Source -->
+  <div id="sourceModal" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:600px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 id="modalTitle" style="margin:0;">צור מאגר חדש</h3>
+        <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;font-size:20px;">✕</button>
+      </div>
+      <div class="field-group">
+        <label>שם המאגר</label>
+        <input type="text" id="sourceName" placeholder="לדוגמה: בתי ספר" class="form-control">
+      </div>
+      <div class="field-group">
+        <label>תיאור</label>
+        <textarea id="sourceDescription" rows="3" placeholder="תיאור קצר של המאגר" class="form-control"></textarea>
+      </div>
+      
+      <div id="fieldsSection">
+        <label style="display:block;margin-bottom:8px;font-weight:600;">שדות המאגר</label>
+        <div id="fieldsList"></div>
+        <button class="btn btn-outline btn-sm" onclick="addField()" style="margin-top:8px;">➕ הוסף שדה</button>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal()">ביטול</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveSource()">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: View/Edit Records -->
+  <div id="recordsModal" class="modal-overlay" style="display:none;">
+    <div class="modal modal-large">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 id="recordsTitle" style="margin:0;">רשומות</h3>
+        <button onclick="closeRecordsModal()" style="background:none;border:none;cursor:pointer;font-size:20px;">✕</button>
+      </div>
+      <div class="records-toolbar">
+        <button class="btn btn-secondary" onclick="showAddRecordModal()">➕ הוסף רשומה</button>
+        <button class="btn btn-secondary" onclick="showImportRecordsModal()">📥 ייבוא מ-CSV</button>
+        <input type="text" id="searchRecords" placeholder="🔍 חיפוש..." oninput="filterRecords()">
+      </div>
+      <div id="recordsTable" class="table-container"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Record -->
+  <div id="addRecordModal" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:600px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="margin:0;">הוסף רשומה</h3>
+        <button onclick="closeAddRecordModal()" style="background:none;border:none;cursor:pointer;font-size:20px;">✕</button>
+      </div>
+      <div id="addRecordForm"></div>
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeAddRecordModal()">ביטול</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveRecord()">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Import CSV to Source -->
+  <div id="importModal" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:500px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="margin:0;">ייבוא מאגר מ-CSV</h3>
+        <button onclick="closeImportModal()" style="background:none;border:none;cursor:pointer;font-size:20px;">✕</button>
+      </div>
+      <div class="field-group">
+        <label>שם המאגר</label>
+        <input type="text" id="importSourceName" placeholder="לדוגמה: בתי ספר" class="form-control">
+      </div>
+      <div class="field-group">
+        <label>תיאור</label>
+        <textarea id="importSourceDesc" rows="2" placeholder="תיאור קצר" class="form-control"></textarea>
+      </div>
+      <div class="field-group">
+        <label>העלה קובץ CSV</label>
+        <input type="file" id="csvFile" accept=".csv" class="form-control">
+        <small class="form-text">הקובץ צריך לכלול שורת כותרות בשורה הראשונה. שמות העמודות יהפכו לשדות המאגר.</small>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeImportModal()">ביטול</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="importCSVAsNew()">ייבא</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Import Records to Existing Source -->
+  <div id="importRecordsModal" class="modal-overlay" style="display:none;">
+    <div class="modal" style="max-width:500px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="margin:0;">ייבוא רשומות מ-CSV</h3>
+        <button onclick="closeImportRecordsModal()" style="background:none;border:none;cursor:pointer;font-size:20px;">✕</button>
+      </div>
+      <div class="field-group">
+        <label>בחר מאגר</label>
+        <select id="importSourceSelect" class="form-control">
+          <option value="">-- בחר מאגר --</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>העלה קובץ CSV</label>
+        <input type="file" id="csvFileRecords" accept=".csv" class="form-control">
+        <small class="form-text">שמות העמודות צריכות להתאים לשדות המאגר הקיים.</small>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeImportRecordsModal()">ביטול</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="importCSV()">ייבא</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="sources.js"></script>
+</body>
+</html>

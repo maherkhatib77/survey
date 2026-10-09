@@ -1,0 +1,11 @@
+# הגנה על קבצי JSON - מניעת גישה ישירה
+<FilesMatch "\.json$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# הגנה על תיקיית data
+<FilesMatch "\.(php|json|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
