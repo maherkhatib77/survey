@@ -8,6 +8,8 @@
  * DELETE - דורש התחברות
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -56,6 +58,7 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         $input = getJSONInput();
         if (!$input) sendResponse(['success' => false, 'error' => 'נתונים לא תקינים'], 400);
 
@@ -91,6 +94,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         if ($id) {
             if (deleteFormFile($id)) {
                 sendResponse(['success' => true, 'message' => 'הטופס נמחק בהצלחה']);

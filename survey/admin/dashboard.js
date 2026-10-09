@@ -44,14 +44,13 @@ async function checkAuth() {
 }
 
 async function logout() {
-  try {
-    await fetch(`${API}/auth.php?action=logout`, { 
-      method: 'POST'
-    });
-  } catch (e) {
-    console.error('Logout error:', e);
+  // fbLogout שולח POST עם כותרת CSRF, מנקה אחסון מקומי ומפנה לדף ההתחברות
+  if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+    await FBAuth.fbLogout(API, 'login.html');
+    return;
   }
-  // תמיד נתנתק גם אם ה-API נכשל
+  // Fallback – ניתוק מקומי גם אם שכבת FBAuth לא נטענה
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
   window.location.href = 'login.html';
 }
 

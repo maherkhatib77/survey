@@ -3,6 +3,7 @@
  * Data Sources API - ניהול מאגרי נתונים
  */
 require_once 'config.php';
+csrfBootstrap();
 
 define('SOURCES_DIR', DATA_DIR . '/sources');
 
@@ -24,17 +25,18 @@ switch ($method) {
             sendResponse(['success' => true, 'data' => $sources]);
             
         } elseif ($action === 'get' && $id) {
-            // קבלת מאגר בודד (כולל רשומות)
+            // קבלת מאגר בודד (כולל רשומות) – דורש התחברות: UUID אינו אמצעי אבטחה
+            requireLogin();
             $source = getSource($id);
             if (!$source) {
                 sendResponse(['success' => false, 'error' => 'מאגר לא נמצא'], 404);
             }
             // החזר את המאגר המלא כולל רשומות
-            // זה בטוח כי ה-ID הוא UUID אקראי שקשה לנחש
             sendResponse(['success' => true, 'data' => $source]);
             
         } elseif ($action === 'search' && $id) {
-            // חיפוש במאגר (ציבורי)
+            // חיפוש במאגר – דורש התחברות (מניעת דליפת רשומות)
+            requireLogin();
             $query = $_GET['q'] ?? '';
             $limit = intval($_GET['limit'] ?? 20);
             $source = getSource($id);
@@ -50,6 +52,7 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         
         if ($action === 'create') {
             // יצירת מאגר חדש
@@ -161,6 +164,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         if ($id) {
             if (deleteSource($id)) {
                 sendResponse(['success' => true, 'message' => 'המאגר נמחק']);

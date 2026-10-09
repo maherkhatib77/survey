@@ -3,6 +3,8 @@
  * Users API - ניהול משתמשים
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -49,6 +51,7 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         $input = getJSONInput();
         
         if ($action === 'create') {
@@ -114,6 +117,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         requirePermission('manage_users');
         
         if ($id) {

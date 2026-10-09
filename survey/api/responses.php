@@ -6,6 +6,8 @@
  * DELETE clear - מחיקת תגובות (דורש התחברות)
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -26,6 +28,9 @@ switch ($method) {
         break;
 
     case 'POST':
+        // שליחת תגובה ציבורית (submit) מתאפשרת ללא token – הקוראים הם מבקרי טפסים אנונימיים.
+        // שאר פעולות הכתיבה כאן דורשות token (admin-submit נבדק שוב בהמשך).
+        if ($action !== 'submit') validateCsrf();
         $input = getJSONInput();
         if (!$input || !$formId) {
             sendResponse(['success' => false, 'error' => 'נתונים לא תקינים'], 400);
@@ -35,25 +40,14 @@ switch ($method) {
             // שליחת תגובה - ציבורי (רק לטפסים מפורסמים)
             // בדיקה שהטופס קיים ומפורסם
             $form = getForm($formId);
-            
-            // Debug logging
-            error_log("submit action for formId: $formId");
-            error_log("Form found: " . ($form ? 'yes' : 'no'));
-            if ($form) {
-                error_log("Form status: " . ($form['status'] ?? 'not set'));
-                error_log("Form file exists: " . (file_exists(FORMS_DIR . '/' . sanitizeFilename($formId) . '.json') ? 'yes' : 'no'));
-            }
-            
+
             if (!$form) {
-                error_log("Form not found for formId: $formId");
                 sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
             }
             if (($form['status'] ?? 'draft') !== 'published') {
-                error_log("Form not published. Status: " . ($form['status'] ?? 'not set'));
-                
                 // אפשר למנהלים מחוברים לשלוח תשובות גם לטפסים שלא פורסמו (לבדיקה)
                 if (isLoggedIn()) {
-                    error_log("Admin user logged in, allowing submission for testing");
+                    // מותר לצורך בדיקה
                 } else {
                     sendResponse(['success' => false, 'error' => 'הטופס אינו פעיל. יש לפרסם את הטופס תחילה דרך ממשק הניהול.'], 403);
                 }
@@ -74,20 +68,17 @@ switch ($method) {
             if (isset($input['calculatedValues'])) $response['calculatedValues'] = $input['calculatedValues'];
 
             $saved = saveResponse($formId, $response);
-            
-            // Debug logging
-            error_log("saveResponse returned: " . ($saved ? 'success' : 'failed'));
-            
+
             if ($saved) {
                 sendResponse(['success' => true, 'data' => $response], 201);
             } else {
-                error_log("Failed to save response for formId: $formId");
                 sendResponse(['success' => false, 'error' => 'שגיאה בשמירת התגובה'], 500);
             }
             
         } elseif ($action === 'admin-submit') {
             // שליחת תגובה - מנהל (עובד גם לטפסים שלא מפורסמים)
             requireLogin();
+            validateCsrf();
             
             $form = getForm($formId);
             if (!$form) {
@@ -121,6 +112,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         if ($action === 'clear' && $formId) {
             $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
             if (file_exists($filepath)) {

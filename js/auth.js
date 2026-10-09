@@ -251,8 +251,27 @@ const Auth = (() => {
         return '<span class="badge badge-' + cls + '">' + label + '</span>';
     }
 
+    /**
+     * השלמת איפוס סיסמה באמצעות טוקן חד-פעמי (נשלח בדוא"ל בעקבות "שכחתי סיסמה")
+     */
+    async function resetPassword(token, newPassword) {
+        try {
+            const res = await fetch('./api/auth.php?action=reset_password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ token, password: newPassword })
+            });
+            const data = await res.json().catch(() => ({}));
+            return { success: !!data.success, message: data.message || data.error };
+        } catch (err) {
+            console.error('resetPassword error:', err);
+            return { success: false, message: 'שגיאת תקשורת מול השרת' };
+        }
+    }
+
     return {
-        login, logout, getCurrentUser, getSession, requireAuth,
+        login, logout, getCurrentUser, getSession, requireAuth, resetPassword,
         isAdmin, isGuide,
         hasPermission, hasUserPermission,
         canViewSection, canFullSection,

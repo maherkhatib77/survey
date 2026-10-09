@@ -53,7 +53,11 @@ async function checkAuth() {
 }
 
 async function logout() {
-  await fetch(`${API}/auth.php?action=logout`, { method: 'POST' });
+  if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+    await FBAuth.fbLogout(API, 'login.html');
+    return;
+  }
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
   window.location.href = 'login.html';
 }
 
@@ -431,9 +435,9 @@ async function showChangePasswordModal() {
   const oldPassword = prompt('הזן את הסיסמא הנוכחית:');
   if (!oldPassword) return;
   
-  const newPassword = prompt('הזן סיסמא חדשה (מינימום 6 תווים):');
-  if (!newPassword || newPassword.length < 6) {
-    showError('הסיסמא חייבת להכיל לפחות 6 תווים');
+  const newPassword = prompt('הזן סיסמא חדשה (מינימום 8 תווים):');
+  if (!newPassword || newPassword.length < 8) {
+    showError('הסיסמא חייבת להכיל לפחות 8 תווים');
     return;
   }
   

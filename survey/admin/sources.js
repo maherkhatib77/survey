@@ -569,11 +569,13 @@ function closeImportRecordsModal() {
 
 async function logout() {
     try {
-        await fetch('../api/auth.php?action=logout');
-        window.location.href = 'login.html';
-    } catch (error) {
-        window.location.href = 'login.html';
-    }
+        if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+            await FBAuth.fbLogout('../api', 'login.html');
+            return;
+        }
+    } catch (error) { /* fallback below */ }
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    window.location.href = 'login.html';
 }
 
 function showSuccess(message) {

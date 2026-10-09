@@ -1,3 +1,11 @@
-(js/data.js is a source file, so no need to add it to .gitignore)
+# Environment and Sensitive Data
+.env
+.env.local
+.env.*.local
 
-Nothing to add to .gitignore based on the provided changes.
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

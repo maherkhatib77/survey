@@ -16,7 +16,11 @@ async function checkAuth() {
 }
 
 async function logout() {
-  await fetch(`${API}/auth.php?action=logout`, { method: 'POST' });
+  if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+    await FBAuth.fbLogout(API, 'login.html');
+    return;
+  }
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
   window.location.href = 'login.html';
 }
 

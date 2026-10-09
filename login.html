@@ -45,6 +45,27 @@
         .btn-login:hover { background: var(--primary-dark); }
         .btn-login:disabled { background: var(--gray-300); cursor: not-allowed; }
         .error-msg { color: var(--danger, #e53e3e); font-size: 13px; margin-top: 12px; display: none; }
+        .info-msg { color: var(--primary, #0ca7aa); font-size: 13px; margin-top: 12px; display: none; background: rgba(12,167,170,0.08); border: 1px solid rgba(12,167,170,0.25); border-radius: 8px; padding: 10px 12px; text-align: right; }
+        .forgot-row { margin-top: 14px; text-align: center; }
+        .forgot-link { color: var(--primary, #0ca7aa); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+        .forgot-link:hover { text-decoration: underline; }
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: white; border-radius: 14px; padding: 28px; width: 100%; max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25); text-align: right;
+        }
+        .modal-title { font-size: 19px; font-weight: 800; color: var(--gray-800); margin-bottom: 6px; }
+        .modal-text { font-size: 13.5px; color: var(--gray-500); margin-bottom: 18px; line-height: 1.6; }
+        .btn-secondary {
+            width: 100%; padding: 11px; background: var(--gray-100, #f1f1f1); color: var(--gray-700);
+            border: 1px solid var(--gray-200, #ddd); border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; font-family: inherit; margin-top: 10px;
+        }
+        .btn-secondary:hover { background: var(--gray-200, #e5e5e5); }
     </style>
 </head>
 <body>
@@ -65,6 +86,32 @@
             <button type="submit" class="btn-login" id="loginBtn">התחבר למערכת</button>
             <div class="error-msg" id="errorMsg">שם משתמש או סיסמה שגויים</div>
         </form>
+
+        <div class="forgot-row">
+            <a class="forgot-link" href="#" onclick="openForgotModal(event)">שכחתי סיסמה</a>
+        </div>
+    </div>
+
+    <!-- Modal: שכחתי סיסמה -->
+    <div class="modal-overlay" id="forgotModal">
+        <div class="modal-box">
+            <div class="modal-title">🔑 שחזור סיסמה</div>
+            <p class="modal-text">הזן את שם המשתמש וכתובת הדוא"ל הרשומה במערכת. אם הפרטים תואמים, נשלח אליך קישור לאיפוס הסיסמה (תוקף הקישור: שעה אחת).</p>
+            <form id="forgotForm" onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label for="forgotUsername">שם משתמש</label>
+                    <input type="text" id="forgotUsername" class="form-input" placeholder="הזן שם משתמש" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="forgotEmail">כתובת דוא"ל</label>
+                    <input type="email" id="forgotEmail" class="form-input" placeholder="example@mail.com" required autocomplete="email" dir="ltr" style="text-align:left">
+                </div>
+                <button type="submit" class="btn-login" id="forgotBtn">שלח קישור איפוס</button>
+                <button type="button" class="btn-secondary" onclick="closeForgotModal()">חזרה להתחברות</button>
+                <div class="error-msg" id="forgotErrorMsg"></div>
+                <div class="info-msg" id="forgotInfoMsg"></div>
+            </form>
+        </div>
     </div>
 
     <script src="./js/data.js?v=30.8.0"></script>
@@ -101,6 +148,84 @@
                 btn.textContent = 'התחבר למערכת';
             }
         }
+
+        // ===== שכחתי סיסמה (Password Recovery) =====
+        function openForgotModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('forgotModal').classList.add('open');
+            document.getElementById('forgotErrorMsg').style.display = 'none';
+            document.getElementById('forgotInfoMsg').style.display = 'none';
+            const u = document.getElementById('username').value.trim();
+            if (u) document.getElementById('forgotUsername').value = u;
+            document.getElementById('forgotUsername').focus();
+        }
+
+        function closeForgotModal() {
+            document.getElementById('forgotModal').classList.remove('open');
+            document.getElementById('forgotForm').reset();
+            document.getElementById('forgotErrorMsg').style.display = 'none';
+            document.getElementById('forgotInfoMsg').style.display = 'none';
+        }
+
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            const username = document.getElementById('forgotUsername').value.trim();
+            const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+            const btn = document.getElementById('forgotBtn');
+            const errEl = document.getElementById('forgotErrorMsg');
+            const infoEl = document.getElementById('forgotInfoMsg');
+
+            errEl.style.display = 'none';
+            infoEl.style.display = 'none';
+
+            if (!username || !email) {
+                errEl.textContent = 'נא למלא שם משתמש וכתובת דוא"ל';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'שולח...';
+
+            try {
+                const res = await fetch('./api/auth.php?action=forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ username, email })
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.success) {
+                    infoEl.textContent = data.message || 'אם הפרטים תואמים, נשלח קישור לאיפוס הסיסמה לכתובת הדוא"ל שלך.';
+                    infoEl.style.display = 'block';
+                    btn.textContent = 'נשלח בהצלחה ✓';
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = 'שלח קישור איפוס';
+                    }, 4000);
+                } else {
+                    errEl.textContent = (data && data.message) ? data.message : 'אירעה שגיאה. נא לנסות שוב מאוחר יותר.';
+                    errEl.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'שלח קישור איפוס';
+                }
+            } catch (err) {
+                console.error('Forgot password error:', err);
+                errEl.textContent = 'שגיאת תקשורת מול השרת. נא לנסות שוב.';
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'שלח קישור איפוס';
+            }
+        }
+
+        // סגירת החלון עם Escape ולחיצה מחוצה לו
+        document.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') closeForgotModal();
+        });
+        document.getElementById('forgotModal').addEventListener('click', function(ev) {
+            if (ev.target === this) closeForgotModal();
+        });
 
         // אם המשתמש כבר מחובר, הפנה אותו ישירות לדאשבורד
         (async function checkExistingSession() {
