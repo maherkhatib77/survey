@@ -1,36 +1,183 @@
 <?php
 /**
  * Form Builder Pro - PHP API Configuration
- * הגדרות מערכת + ניהול Sessions
+ * הגדרות מערכת + ניהול Sessions + אבטחה (CSRF / CORS / Brute-force)
  */
 
+// ===== הגדרות Session מאובטחות (חייבות להיות לפני session_start) =====
+$__secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_secure', $__secure ? '1' : '0');
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
 session_start();
 
 // הגדרות בסיסיות
 define('DATA_DIR', __DIR__ . '/../data');
 define('FORMS_DIR', DATA_DIR . '/forms');
 define('RESPONSES_DIR', DATA_DIR . '/responses');
+define('SOURCES_DIR', DATA_DIR . '/sources');
 define('USERS_FILE', DATA_DIR . '/users.json');
+define('LOGIN_ATTEMPTS_FILE', DATA_DIR . '/login_attempts.json');
+define('RESET_TOKENS_FILE', DATA_DIR . '/reset_tokens.json');
 
-// הגדרות ברירת מחדל למנהל
+// ===== הגדרות אבטחה =====
+define('SESSION_LIFETIME', 60 * 60 * 4);          // 4 שעות
+define('MAX_LOGIN_ATTEMPTS', 5);                   // ניסיונות לפני נעילה
+define('LOCKOUT_SECONDS', 15 * 60);                // 15 דקות נעילה
+define('RESET_TOKEN_TTL', 60 * 60);                // קישור איפוס תקף שעה
+
+// שמירת סיסמת ברירת מחדל רק בהתקנה מקומית; בייצור אין לחשוף אותה בשום מקום
 define('DEFAULT_ADMIN_USER', 'admin');
-define('DEFAULT_ADMIN_PASS', 'admin123'); // יש לשנות בהתקנה!
+define('DEFAULT_ADMIN_PASS', getenv('FB_DEFAULT_ADMIN_PASS') ?: 'admin123');
+$__fbHost = explode(':', $_SERVER['HTTP_HOST'] ?? '')[0];
+define('IS_LOCALHOST', filter_var($__fbHost, FILTER_VALIDATE_IP)
+        ? in_array($__fbHost, ['127.0.0.1', '::1'], true)
+        : ($__fbHost === 'localhost' || substr($__fbHost, -strlen('.localhost')) === '.localhost'));
 
-// CORS Headers
+// ===== CORS מבוקר (במקום Access-Control-Allow-Origin: *) =====
+$FB_ALLOWED_ORIGINS = [
+    'http://localhost', 'http://127.0.0.1',
+    'https://ejpisga.org.il', 'https://www.ejpisga.org.il',
+];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowed = false;
+if ($origin !== '') {
+    $host = parse_url($origin, PHP_URL_HOST) ?: '';
+    foreach ($FB_ALLOWED_ORIGINS as $o) {
+        $oh = parse_url($o, PHP_URL_HOST) ?: '';
+        if ($host === $oh || substr($host, -strlen('.' . $oh)) === '.' . $oh) {
+            $allowed = true;
+            header('Access-Control-Allow-Origin: ' . $o);
+            header('Vary: Origin');
+            break;
+        }
+    }
+    if (!$allowed && IS_LOCALHOST) { // הקלות בפיתוח מקומי בלבד
+        $allowed = true;
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+    }
+    if (!$allowed) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Origin not allowed'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+}
+
+// כותרות אבטחה
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
+// מאפשר ל-Javascript לקרוא את טוקן ה-CSRF מכותרת התגובה (נדרש ב-CORS cross-origin)
+header('Access-Control-Expose-Headers: X-CSRF-Token');
 
 // Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    http_response_code(204);
+    exit();
+}
+
+// ===== הגנת CSRF (Double Submit Cookie + תוקף) =====
+// ההגנה מבוססת על cookie לא-HttpOnly (fb_csrf) שהלקוח מחזיר בכותרת X-CSRF-Token.
+// אין תלות ב-Session – לכן הפעולות הציבוריות (שכחתי סיסמה / איפוס עם טוקן) עובדות גם
+// כשהמשתמש אינו מחובר, וכל פעולת POST/DELETE מאומתת באותו מנגנון אחיד.
+
+/**
+ * השלכת Cookie XSS (או יצירת אחד חדש אם אינו קיים).
+ * מחזיר את ערך הטוקן.
+ */
+function issueCsrfCookie() {
+    $token = isset($_COOKIE['fb_csrf']) && preg_match('/^[a-f0-9]{64}$/', $_COOKIE['fb_csrf'])
+             ? $_COOKIE['fb_csrf']
+             : bin2hex(random_bytes(32));
+
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+             || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+    // SameSite=Lax: דפדפנים עדכניים דורשים Secure עבור Lax ב-HTTPS.
+    // ב-localhost (פיתוח, HTTP) – Cookie ללא Secure כדי שהזרימה תעבוד מקומית.
+    setcookie('fb_csrf', $token, [
+        'expires'  => time() + 12 * 3600,
+        'path'     => '/',
+        'httponly' => false,   // הנדרש כדי ש-js יוכל לקרוא ולהחזיר בכותרת
+        'samesite' => 'Lax',
+        'secure'   => $https,
+    ]);
+    return $token;
+}
+
+/**
+ * עטיפת request עם Cookie ה-CSRF – חובה לכל קובץ API.
+ * מבטיחה שה-Cookie קיים כבר בהזמנה הראשונה (גם GET ציבורי), כך שלקוח יכול
+ * לשלוף אותו מה-Cookie ולשלוח בכותרת עוד לפני כל התחברות.
+ *
+ * הערה: ב-POST עם multipart/form-data (העלאת קבצים) שמאי PHP עלול שלא להמשיך
+ * לקרוא את שאר השדה לאחר setcookie; נדלדל את buffer כדי שה-Cookie אכן יישלח.
+ */
+function csrfBootstrap() {
+    $token = issueCsrfCookie();
+    if ($token !== '' && !headers_sent()) {
+        header('X-CSRF-Token: ' . $token, false); // נתיב גיבוי להזרקת הטוקן גם ללא Cookie
+    }
+    if (ob_get_length() !== false) {
+        ob_flush();
+        flush();
+    }
+}
+
+function getCsrfToken() {
+    return issueCsrfCookie();
+}
+
+/**
+ * אימות טוקן CSRF לבקשות כתיבה (POST/PUT/DELETE/PATCH).
+ * GET/OPTIONS מדלגים אוטומטית.
+ */
+function validateCsrf() {
+    if (in_array($_SERVER['REQUEST_METHOD'], ['GET', 'HEAD', 'OPTIONS'], true)) return;
+
+    // נתיב גיבוי: העלאת קבצים (multipart) שנשלחת ללא Cookie של צד שלישי / אחרי
+    // הזרקת הטוקן מכותרת התגובה – מאפשרים גם שדה 'csrf_token' בגוף הבקשה.
+    $sent = trim($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? ''));
+    $cookie = $_COOKIE['fb_csrf'] ?? '';
+
+    if ($sent === '' || $cookie === '' || !preg_match('/^[a-f0-9]{64}$/', $cookie)
+        || !hash_equals($cookie, $sent)) {
+        http_response_code(419);
+        echo json_encode(['success' => false, 'error' => 'אישור אבטחה (CSRF) נכשל. רענן את הדף ונסה שוב.'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+    // החייאת תוקף ה-Cookie בכל שימוש תקין
+    issueCsrfCookie();
+    // דלדול buffer – מבטיח שה-Cookie נשלח בפועל גם ב-POST multipart (העלאת קבצים)
+    if (ob_get_length() !== false) {
+        ob_flush();
+        flush();
+    }
+}
+
+// ===== פקיעת תוקף Session =====
+if (isset($_SESSION['login_time']) && (time() - $_SESSION['login_time']) > SESSION_LIFETIME) {
+    $_SESSION = [];
+    session_destroy();
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'ההתחברות פגה. יש להתחבר מחדש'], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
 // ===== בדיקת התחברות =====
 function isLoggedIn() {
-    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+    // תאימות: logged_in (סקרים) או userId (מצפן נט)
+    return (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true)
+           || !empty($_SESSION['userId']);
 }
 
 function requireLogin() {
@@ -39,6 +186,11 @@ function requireLogin() {
         echo json_encode(['success' => false, 'error' => 'נדרשת התחברות'], JSON_UNESCAPED_UNICODE);
         exit();
     }
+}
+
+// ===== זיהוי המשתמש הנוכחי (לצורך createdBy / הרשאות) =====
+function getCurrentUserId() {
+    return $_SESSION['userId'] ?? null;
 }
 
 // ===== ניהול משתמשים =====
@@ -67,6 +219,7 @@ function getUsers() {
             ]
         ];
         ensureDirectories();
+        $users[0]['defaultPassword'] = true; // מסמן שטרם הוחלפה סיסמת ברירת המחדל
         writeJSON(USERS_FILE, $users);
         return $users;
     }
@@ -111,11 +264,36 @@ function getCurrentUser() {
     return null;
 }
 
+/**
+ * מודל הרשאות מאוחד (סמכות השרת):
+ * - role 'admin'  => כל ההרשאות, כולל ניהול משתמשים.
+ * - role 'user'   => ההרשאות המפורשות של המשתמש, כאשר manage_users תמיד מסונן החוצה
+ *                    (מניעת העלאת הרשאות Privilege Escalation דרך עדכון פרופיל/משתמש).
+ */
+function getUserEffectivePermissions($user) {
+    if (!$user) return [];
+    $perms = $user['permissions'] ?? [];
+    if (($user['role'] ?? 'user') === 'admin') {
+        return [
+            'create_forms'   => true,
+            'edit_forms'     => true,
+            'delete_forms'   => true,
+            'view_responses' => true,
+            'export_data'    => true,
+            'manage_users'   => true,
+        ];
+    }
+    // משתמש רגיל – לעולם לא מקבל ניהול משתמשים, גם אם נשמר בשוגם ב-JSON
+    $perms['manage_users'] = false;
+    return $perms;
+}
+
 function hasPermission($permission) {
     $user = getCurrentUser();
     if (!$user) return false;
-    if ($user['role'] === 'admin') return true;
-    return isset($user['permissions'][$permission]) && $user['permissions'][$permission];
+    if (($user['role'] ?? 'user') === 'admin') return true;
+    $perms = getUserEffectivePermissions($user);
+    return !empty($perms[$permission]);
 }
 
 function requirePermission($permission) {
@@ -126,10 +304,50 @@ function requirePermission($permission) {
     }
 }
 
+// ===== הגנת Brute-Force (נעילת חשבון זמנית) =====
+function recordLoginAttempt($username, $success) {
+    $attempts = readJSON(LOGIN_ATTEMPTS_FILE) ?: [];
+    // ניקוי רשומות ישנות
+    $now = time();
+    foreach ($attempts as $k => $rec) {
+        if (($now - ($rec['last'] ?? 0)) > LOCKOUT_SECONDS * 4) unset($attempts[$k]);
+    }
+    $key = strtolower($username);
+    if ($success) {
+        unset($attempts[$key]);
+    } else {
+        if (!isset($attempts[$key])) $attempts[$key] = ['count' => 0, 'first' => $now, 'last' => $now];
+        $attempts[$key]['count']++;
+        $attempts[$key]['last'] = $now;
+    }
+    writeJSON(LOGIN_ATTEMPTS_FILE, array_values($attempts) ? $attempts : (object)$attempts);
+}
+
+function isAccountLocked($username) {
+    $attempts = readJSON(LOGIN_ATTEMPTS_FILE) ?: [];
+    $rec = $attempts[strtolower($username)] ?? null;
+    if (!$rec) return [false, 0];
+    if (($rec['count'] ?? 0) >= MAX_LOGIN_ATTEMPTS && (time() - ($rec['last'] ?? 0)) < LOCKOUT_SECONDS) {
+        $remaining = LOCKOUT_SECONDS - (time() - $rec['last']);
+        return [true, $remaining];
+    }
+    // חלון זמן עבר – איפוס מונוטוני
+    if (($rec['count'] ?? 0) >= MAX_LOGIN_ATTEMPTS && (time() - ($rec['last'] ?? 0)) >= LOCKOUT_SECONDS) {
+        unset($attempts[strtolower($username)]);
+        writeJSON(LOGIN_ATTEMPTS_FILE, $attempts);
+    }
+    return [false, 0];
+}
+
 function authenticateUser($username, $password) {
     $users = getUsers();
     foreach ($users as $user) {
         if ($user['username'] === $username && password_verify($password, $user['password'])) {
+            // שדרוג אוטומטי של סיסמאות ישנות להאש חדש
+            if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+                $user['password'] = password_hash($password, PASSWORD_DEFAULT);
+                saveUsers($users);
+            }
             return $user;
         }
     }
@@ -137,46 +355,258 @@ function authenticateUser($username, $password) {
 }
 
 function loginUser($username, $password) {
+    // בדיקת נעילה לפני אימות
+    list($locked, $remaining) = isAccountLocked($username);
+    if ($locked) {
+        $mins = ceil($remaining / 60);
+        return ['success' => false, 'error' => "החשבון ננעל זמנית עקב ניסיונות התחברות כושלים. נסה שוב בעוד {$mins} דקות."];
+    }
+
     $user = authenticateUser($username, $password);
     if ($user) {
         // בדיקה אם המשתמש פעיל
         if (isset($user['active']) && !$user['active']) {
             return ['success' => false, 'error' => 'המשתמש מושבת. פנה למנהל המערכת'];
         }
-        
+
+        recordLoginAttempt($username, true);
+
+        // מניעת Session Fixation – יצירת Session ID חדש אחרי התחברות
+        session_regenerate_id(true);
         $_SESSION['logged_in'] = true;
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['userId'] = $user['id'];
         $_SESSION['login_time'] = time();
-        
+
         // עדכון זמן כניסה אחרון
         updateLastLogin($username);
-        
+
         return [
-            'success' => true, 
-            'username' => $user['username'], 
+            'success' => true,
+            'username' => $user['username'],
             'role' => $user['role'],
             'fullName' => $user['fullName'] ?? '',
-            'permissions' => $user['permissions'] ?? []
+            // ההרשאות האפקטיביות לפי מודל ההרשאות (מנהל = הכל; רגיל = ללא ניהול משתמשים)
+            'permissions' => getUserEffectivePermissions($user)
         ];
     }
+    recordLoginAttempt($username, false);
     return ['success' => false, 'error' => 'שם משתמש או סיסמא שגויים'];
 }
 
 function logoutUser() {
     // ניקוי כל משתני ה-session
     $_SESSION = array();
-    
+
     // מחיקת cookie ה-session אם קיים
     if (isset($_COOKIE[session_name()])) {
         setcookie(session_name(), '', time()-42000, '/');
     }
-    
+    // הערה: cookie ה-CSRF אינו נמחק – הוא Cookie אורח חסר ערך מאובטח בפני עצמו
+    // (Double Submit) והלקוח ממשיך להשתמש בו בבקשות שאחרי ההתנתקות.
+
     // הרס ה-session
     session_destroy();
-    
+
     return ['success' => true];
+}
+
+// ===== שליחת דוא"ל כללית (עם Fallback לרישום קובץ כשהSMTP לא מוגדר/נכשל) =====
+/**
+ * מחזיר מעטפת SMTP או null אם לא מוגדרת (פיתוח מקומי).
+ */
+function fbGetMailConfigOrNull() {
+    if (!function_exists('get_smtp_config')) return null;
+    $cfg = @get_smtp_config();
+    if (!is_array($cfg) || empty($cfg['host']) || empty($cfg['username'])) return null;
+    return $cfg;
+}
+
+/**
+ * שליחת מייל HTML פשוט דרך PHPMailer עם fallback:
+ * אם SMTP אינו מוגדר או השליחה נכשלת – נרשם העתק ב-data/mail_outbox.json
+ * כדי שהמנהל יוכל לשלח/לבדוק ידנית (סביבת פיתוח). אף קישור לא נחשף ללקוח.
+ */
+function fbSendMail($toEmail, $toName, $subject, $htmlBody) {
+    $cfg = fbGetMailConfigOrNull();
+    if ($cfg) {
+        if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+            $base = __DIR__ . '/../../api/PHPMailer/';
+            foreach (['PHPMailer.php','SMTP.php','Exception.php'] as $f) {
+                if (is_readable($base . $f)) require_once $base . $f;
+            }
+        }
+        if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+            try {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host       = $cfg['host'];
+                $mail->Port       = $cfg['port'] ?? 465;
+                $mail->SMTPAuth   = true;
+                $mail->SMTPSecure = $cfg['secure'] ?? 'ssl';
+                $mail->Username   = $cfg['username'];
+                $mail->Password   = $cfg['password'];
+                $mail->CharSet    = 'UTF-8';
+                $mail->setFrom($cfg['from_email'], $cfg['from_name']);
+                $mail->addAddress($toEmail, $toName ?: '');
+                $mail->Subject = $subject;
+                $mail->isHTML(true);
+                $mail->Body = $htmlBody;
+                if ($mail->send()) return true;
+            } catch (\Throwable $e) {
+                error_log('fbSendMail failed: ' . $e->getMessage());
+            }
+        }
+    }
+    // Fallback רישום (לא נזרק לפלט) – לצפייה ע"י המנהל בסביבת פיתוח
+    $outbox = DATA_DIR . '/mail_outbox.json';
+    $items = is_readable($outbox) ? (json_decode(file_get_contents($outbox), true) ?: []) : [];
+    $items[] = ['to' => $toEmail, 'name' => $toName, 'subject' => $subject,
+                'body' => $htmlBody, 'at' => date('c')];
+    @file_put_contents($outbox, json_encode(array_slice($items, -50), JSON_UNESCAPED_UNICODE), LOCK_EX);
+    return false;
+}
+
+// ===== שחזור סיסמה (Forgot Password) =====
+function findUserByEmail($email) {
+    $email = strtolower(trim((string)$email));
+    if ($email === '') return null;
+    foreach (getUsers() as $user) {
+        if (!empty($user['email']) && strcasecmp(trim($user['email']), $email) === 0) return $user;
+    }
+    return null;
+}
+
+function findUserByIdentifier($identifier) {
+    $users = getUsers();
+    $identifier = trim($identifier);
+    foreach ($users as $user) {
+        if ($user['username'] === $identifier) return $user;
+        if (!empty($user['email']) && strcasecmp($user['email'], $identifier) === 0) return $user;
+    }
+    return null;
+}
+
+function createPasswordResetToken($user) {
+    $token = bin2hex(random_bytes(32));
+    $tokens = readJSON(RESET_TOKENS_FILE) ?: [];
+    // ניקוי טוקנים פגים + הגבלת טוקנים פעילים למשתמש
+    $now = time();
+    $tokens = array_values(array_filter($tokens, function($t) use ($now, $user) {
+        return ($t['expires'] ?? 0) > $now && ($t['used'] ?? false) === false
+               && ($t['created'] ?? 0) > $now - 86400;
+    }));
+    $tokens[] = [
+        'tokenHash' => hash('sha256', $token),
+        'username'  => $user['username'],
+        'email'     => $user['email'] ?? '',
+        'expires'   => $now + RESET_TOKEN_TTL,
+        'created'   => $now,
+        'used'      => false
+    ];
+    writeJSON(RESET_TOKENS_FILE, $tokens);
+    return $token;
+}
+
+function buildResetEmailHtml($toName, $resetLink) {
+    return '
+        <div dir="rtl" style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px">
+            <h2 style="color:#1e293b">בקשה לאיפוס סיסמה</h2>
+            <p>שלום ' . htmlspecialchars($toName ?: 'משתמש') . ',</p>
+            <p>קיבלנו בקשה לאיפוס הסיסמה לחשבון שלך במערכת הסקרים.</p>
+            <p><a href="' . htmlspecialchars($resetLink) . '"
+                style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none">
+                לאיפוס הסיסמה</a></p>
+            <p>הקישור תקף לשעה (60 דקות) ויכול לשמש לשימוש אחד בלבד.</p>
+            <p style="color:#64748b;font-size:13px">אם לא אתה ביקשת איפוס סיסמה – התעלם מהבקשה והמייל.</p>
+        </div>';
+}
+
+function buildResetLink($token) {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    // הכתובת תמיד מצביעה על מסך האיפוס של מערכת הסקרים
+    $path = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    $path = preg_replace('#/api$#', '', $path); // .../survey/api -> .../survey
+    return sprintf('%s://%s%s/reset-password.html?token=%s', $scheme, $host, $path, $token);
+}
+
+function sendPasswordResetEmail($toEmail, $toName, $token) {
+    $resetLink = buildResetLink($token);
+    return fbSendMail($toEmail, $toName, 'איפוס סיסמה - Form Builder Pro',
+                      buildResetEmailHtml($toName, $resetLink));
+}
+
+function requestPasswordReset($identifier) {
+    list($locked, $remaining) = isAccountLocked($identifier);
+    if ($locked) {
+        $mins = ceil($remaining / 60);
+        return ['success' => false, 'error' => "יותר מדי בקשות. נסה שוב בעוד {$mins} דקות."];
+    }
+    // מניעת מיפוי משתמשים – תמיד מחזירים הצלחה
+    $response = ['success' => true, 'message' => 'אם הכתובת קיימת במערכת, נשלח אליה קישור לאיפוס הסיסמה.'];
+
+    $user = findUserByIdentifier($identifier);
+    if ($user && !empty($user['email']) && ($user['active'] ?? true)) {
+        $token = createPasswordResetToken($user);
+        $sent = sendPasswordResetEmail($user['email'], $user['fullName'] ?? $user['username'], $token);
+        if (!$sent) {
+            // לא לחשוף פרטי משתמש בשגיאה
+            error_log("Password reset email failed for user hash: " . substr(md5($user['username']), 0, 8));
+        }
+    }
+    recordLoginAttempt($identifier, false); // שימוש באותו מנגנון הגבלת קצב
+    return $response;
+}
+
+function validateResetToken($token) {
+    $tokens = readJSON(RESET_TOKENS_FILE) ?: [];
+    $hash = hash('sha256', $token);
+    foreach ($tokens as $i => $t) {
+        if (($t['used'] ?? false)) continue;
+        if (hash_equals($t['tokenHash'], $hash)) {
+            if (($t['expires'] ?? 0) < time()) return null;
+            return ['index' => $i, 'token' => $t];
+        }
+    }
+    return null;
+}
+
+function completePasswordReset($token, $newPassword) {
+    $found = validateResetToken($token);
+    if (!$found) {
+        return ['success' => false, 'error' => 'הקישור אינו תקין או שפג תוקפו. יש לבקש קישור חדש.'];
+    }
+    if (strlen($newPassword) < 8) {
+        return ['success' => false, 'error' => 'הסיסמא החדשה חייבת להכיל לפחות 8 תווים.'];
+    }
+    $tokens = readJSON(RESET_TOKENS_FILE) ?: [];
+    $idx = $found['index'];
+    $username = $tokens[$idx]['username'];
+
+    $users = getUsers();
+    $updated = false;
+    foreach ($users as &$user) {
+        if ($user['username'] === $username) {
+            $user['password'] = password_hash($newPassword, PASSWORD_DEFAULT);
+            $updated = true;
+            break;
+        }
+    }
+    if (!$updated) return ['success' => false, 'error' => 'משתמש לא נמצא'];
+    saveUsers($users);
+
+    // סימון הטוקן כ"use" + ביטול כל הטוקנים הפעילים של אותו משתמש
+    foreach ($tokens as &$t) {
+        if ($t['username'] === $username) $t['used'] = true;
+    }
+    writeJSON(RESET_TOKENS_FILE, $tokens);
+
+    // שחרור נעילה
+    recordLoginAttempt($username, true);
+
+    return ['success' => true, 'message' => 'הסיסמה עודכנה בהצלחה. ניתן להתחבר.'];
 }
 
 function changePassword($oldPassword, $newPassword) {
@@ -190,6 +620,7 @@ function changePassword($oldPassword, $newPassword) {
                 return ['success' => false, 'error' => 'סיסמא נוכחית שגויה'];
             }
             $user['password'] = password_hash($newPassword, PASSWORD_DEFAULT);
+            unset($user['defaultPassword']);
             $currentUser = &$user;
             break;
         }
@@ -244,38 +675,72 @@ function addUser($userData) {
 }
 
 function updateUser($userId, $userData) {
-    if (!hasPermission('manage_users')) {
+    $currentUser = getCurrentUser();
+    if (!$currentUser) {
+        return ['success' => false, 'error' => 'נדרשת התחברות'];
+    }
+
+    // עדכון פרטי המשתמש הנוכחי (פרופיל) מוזרם ל-userId של העצמי – תמיד מותר
+    $isSelf = ($currentUser['id'] ?? null) === $userId;
+    $isAdminRole = (($currentUser['role'] ?? 'user') === 'admin');
+    $canManageUsers = $isAdminRole || !empty(($currentUser['permissions'] ?? [])['manage_users']);
+
+    // מי שאינו בעל ניהול משתמשים – רשאי לעדכן רק את עצמו
+    if (!$canManageUsers && !$isSelf) {
         return ['success' => false, 'error' => 'אין לך הרשאה לערוך משתמשים'];
     }
-    
+
     $users = getUsers();
     $userFound = false;
-    
+
     foreach ($users as &$user) {
         if ($user['id'] === $userId) {
             $userFound = true;
-            
-            // עדכון שדות
+
+            // שדות בסיס – מותרים תמיד (עצמי או מנהל)
             if (isset($userData['fullName'])) $user['fullName'] = $userData['fullName'];
             if (isset($userData['email'])) $user['email'] = $userData['email'];
-            if (isset($userData['role'])) $user['role'] = $userData['role'];
-            if (isset($userData['permissions'])) $user['permissions'] = $userData['permissions'];
-            if (isset($userData['active'])) $user['active'] = $userData['active'];
-            
-            // עדכון סיסמא אם סופקה
-            if (isset($userData['password']) && !empty($userData['password'])) {
-                $user['password'] = password_hash($userData['password'], PASSWORD_DEFAULT);
+
+            if ($canManageUsers) {
+                if (isset($userData['role'])) {
+                    $newRole = $userData['role'] === 'admin' ? 'admin' : 'user';
+                    // הגנה: לא להוריד את תפקיד המנהל מהמנהל האחרון במערכת
+                    $otherAdmins = array_filter($users, function($u) use ($userId) {
+                        return ($u['role'] ?? '') === 'admin' && ($u['id'] ?? '') !== $userId;
+                    });
+                    if ($newRole !== 'admin' && ($user['role'] ?? '') === 'admin' && !$otherAdmins) {
+                        return ['success' => false, 'error' => 'לא ניתן להסיר את תפקיד המנהל מהמנהל האחרון במערכת'];
+                    }
+                    $user['role'] = $newRole;
+                }
+                if (isset($userData['permissions'])) {
+                    $p = $userData['permissions'];
+                    $user['permissions'] = [
+                        'create_forms'   => !empty($p['create_forms']),
+                        'edit_forms'     => !empty($p['edit_forms']),
+                        'delete_forms'   => !empty($p['delete_forms']),
+                        'view_responses' => !empty($p['view_responses']),
+                        'export_data'    => !empty($p['export_data']),
+                        'manage_users'   => ($user['role'] ?? '') === 'admin' ? true : !empty($p['manage_users']),
+                    ];
+                }
+                if (isset($userData['active'])) $user['active'] = (bool)$userData['active'];
+                if (isset($userData['password']) && !empty($userData['password'])) {
+                    $user['password'] = password_hash($userData['password'], PASSWORD_DEFAULT);
+                    unset($user['defaultPassword']);
+                }
             }
-            
+            // עדכון עצמי (פרופיל) – אינו יכול לשנות role/permissions/active/password
+
             break;
         }
     }
-    
+
     if ($userFound) {
         saveUsers($users);
         return ['success' => true];
     }
-    
+
     return ['success' => false, 'error' => 'משתמש לא נמצא'];
 }
 
@@ -348,6 +813,7 @@ function ensureDirectories() {
     if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0755, true);
     if (!is_dir(FORMS_DIR)) mkdir(FORMS_DIR, 0755, true);
     if (!is_dir(RESPONSES_DIR)) mkdir(RESPONSES_DIR, 0755, true);
+    if (!is_dir(SOURCES_DIR)) mkdir(SOURCES_DIR, 0755, true);
 }
 
 function readJSON($filepath) {
@@ -399,19 +865,7 @@ function getPublishedForms() {
 
 function getForm($id) {
     $filepath = FORMS_DIR . '/' . sanitizeFilename($id) . '.json';
-    error_log("getForm called for id: $id");
-    error_log("Filepath: $filepath");
-    error_log("File exists: " . (file_exists($filepath) ? 'yes' : 'no'));
-    
-    $form = readJSON($filepath);
-    
-    if ($form) {
-        error_log("Form loaded successfully. Status: " . ($form['status'] ?? 'not set'));
-    } else {
-        error_log("Failed to load form");
-    }
-    
-    return $form;
+    return readJSON($filepath);
 }
 
 function saveForm($form) {
@@ -439,22 +893,13 @@ function getFormResponses($formId) {
 function saveResponse($formId, $response) {
     ensureDirectories();
     $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
-    
-    // Debug logging
-    error_log("saveResponse: formId=$formId, filepath=$filepath");
-    error_log("RESPONSES_DIR exists: " . (is_dir(RESPONSES_DIR) ? 'yes' : 'no'));
-    error_log("RESPONSES_DIR writable: " . (is_writable(RESPONSES_DIR) ? 'yes' : 'no'));
-    
+
     $responses = readJSON($filepath) ?: [];
     $responses[] = $response;
-    
+
     $result = writeJSON($filepath, $responses);
-    error_log("writeJSON result: " . ($result !== false ? 'success' : 'failed'));
-    
     if ($result === false) {
-        error_log("Failed to write to: $filepath");
-        error_log("File exists: " . (file_exists($filepath) ? 'yes' : 'no'));
-        error_log("File writable: " . (is_writable($filepath) ? 'yes' : 'no'));
+        error_log("Failed to write response to: $filepath");
     }
     
     $form = getForm($formId);
@@ -481,11 +926,9 @@ function sendResponse($data, $code = 200) {
 }
 
 function generateUUID() {
-    return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000,
-        mt_rand(0, 0x3fff) | 0x8000,
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-    );
+    $b = random_bytes(16); // CSPRNG – UUID v4 אמיתי
+    $b[6] = chr((ord($b[6]) & 0x0f) | 0x40);
+    $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);
+    $h = bin2hex($b);
+    return substr($h,0,8).'-'.substr($h,8,4).'-'.substr($h,12,4).'-'.substr($h,16,4).'-'.substr($h,20,12);
 }

@@ -3,6 +3,7 @@
  * Data Sources API - ניהול מאגרי נתונים
  */
 require_once 'config.php';
+csrfBootstrap();
 
 define('SOURCES_DIR', DATA_DIR . '/sources');
 
@@ -24,17 +25,18 @@ switch ($method) {
             sendResponse(['success' => true, 'data' => $sources]);
             
         } elseif ($action === 'get' && $id) {
-            // קבלת מאגר בודד (כולל רשומות)
+            // קבלת מאגר בודד (כולל רשומות) – דורש התחברות: UUID אינו אמצעי אבטחה
+            requireLogin();
             $source = getSource($id);
             if (!$source) {
                 sendResponse(['success' => false, 'error' => 'מאגר לא נמצא'], 404);
             }
             // החזר את המאגר המלא כולל רשומות
-            // זה בטוח כי ה-ID הוא UUID אקראי שקשה לנחש
             sendResponse(['success' => true, 'data' => $source]);
             
         } elseif ($action === 'search' && $id) {
-            // חיפוש במאגר (ציבורי)
+            // חיפוש במאגר – דורש התחברות (מניעת דליפת רשומות)
+            requireLogin();
             $query = $_GET['q'] ?? '';
             $limit = intval($_GET['limit'] ?? 20);
             $source = getSource($id);
@@ -50,6 +52,7 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         
         if ($action === 'create') {
             // יצירת מאגר חדש
@@ -78,13 +81,46 @@ switch ($method) {
             if (!isset($_FILES['file'])) {
                 sendResponse(['success' => false, 'error' => 'לא הועלה קובץ'], 400);
             }
-            
+
             $file = $_FILES['file'];
             if ($file['error'] !== UPLOAD_ERR_OK) {
-                sendResponse(['success' => false, 'error' => 'שגיאה בהעלאה'], 400);
+                $uploadErrors = [
+                    UPLOAD_ERR_INI_SIZE   => 'הקובץ גדול ממכסת ההעלאה המותרת בשרת (upload_max_filesize)',
+                    UPLOAD_ERR_FORM_SIZE  => 'הקובץ גדול מהמכסה בטופס',
+                    UPLOAD_ERR_PARTIAL    => 'הקובץ הועלה חלקית – נסה שוב',
+                    UPLOAD_ERR_NO_FILE    => 'לא נבחר קובץ',
+                    UPLOAD_ERR_NO_TMP_DIR => 'שגיאת שרת: תיקיית זמנית חסרה',
+                    UPLOAD_ERR_CANT_WRITE => 'שגיאת שרת: כתיבה לדיסק נכשלה',
+                    UPLOAD_ERR_EXTENSION  => 'ההעלאה נבלמה על ידי תוסף PHP',
+                ];
+                sendResponse(['success' => false, 'error' => $uploadErrors[$file['error']] ?? 'שגיאה בהעלאת הקובץ'], 400);
             }
-            
+
+            // סינון סוג קובץ: CSV/טקסט בלבד
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExt = ['csv', 'txt'];
+            $mimeOk = true;
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = finfo_file($finfo, $file['tmp_name']);
+                finfo_close($finfo);
+                $mimeOk = in_array($mime, ['text/plain', 'text/csv', 'application/octet-stream', 'text/x-csv'], true)
+                         || strpos($mime, 'text/') === 0;
+            }
+            if (!in_array($ext, $allowedExt, true) || !$mimeOk) {
+                sendResponse(['success' => false, 'error' => 'נא להעלות קובץ CSV בלבד'], 400);
+            }
+
+            // הגבלת גודל (5MB) – גם אם השרת מאפשר יותר
+            if ($file['size'] > 5 * 1024 * 1024) {
+                sendResponse(['success' => false, 'error' => 'גודל הקובץ עולה על 5MB'], 400);
+            }
+
             $csvData = parseCSV($file['tmp_name']);
+            if (empty($csvData['headers'])) {
+                sendResponse(['success' => false, 'error' => 'הקובץ ריק או שאינו מכיל שורת כותרות תקינה'], 400);
+            }
+
             $source = [
                 'id' => generateUUID(),
                 'name' => $_POST['name'] ?? 'מאגר מיובא',
@@ -93,15 +129,17 @@ switch ($method) {
                 'records' => $csvData['records'],
                 'createdAt' => date('c'),
                 'updatedAt' => date('c'),
-                'recordCount' => count($csvData['records'])
+                'recordCount' => count($csvData['records']),
+                'createdBy' => getCurrentUserId() ?: null,
             ];
-            
+
             if (saveSource($source)) {
                 sendResponse(['success' => true, 'data' => $source], 201);
             } else {
-                sendResponse(['success' => false, 'error' => 'שגיאה בשמירה'], 500);
+                error_log('sources.php import-csv: saveSource failed for ' . $source['id']);
+                sendResponse(['success' => false, 'error' => 'שגיאה בשמירת המאגר – יש לבדוק הרשאות כתיבה לתיקיית הנתונים'], 500);
             }
-            
+
         } elseif ($action === 'update' && $id) {
             // עדכון מאגר
             $input = getJSONInput();
@@ -161,6 +199,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         if ($id) {
             if (deleteSource($id)) {
                 sendResponse(['success' => true, 'message' => 'המאגר נמחק']);

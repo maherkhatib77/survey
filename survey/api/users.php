@@ -3,6 +3,8 @@
  * Users API - ניהול משתמשים
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -24,10 +26,11 @@ switch ($method) {
             sendResponse(['success' => true, 'data' => $usersSafe]);
             
         } elseif ($action === 'me') {
-            // פרטי המשתמש הנוכחי
+            // פרטי המשתמש הנוכחי + ההרשאות האפקטיביות לפי מודל ההרשאות
             $user = getCurrentUser();
             if ($user) {
                 unset($user['password']);
+                $user['permissions'] = getUserEffectivePermissions($user);
                 sendResponse(['success' => true, 'data' => $user]);
             } else {
                 sendResponse(['success' => false, 'error' => 'משתמש לא נמצא'], 404);
@@ -49,6 +52,7 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         $input = getJSONInput();
         
         if ($action === 'create') {
@@ -67,8 +71,7 @@ switch ($method) {
             sendResponse($result, $result['success'] ? 201 : 400);
             
         } elseif ($action === 'update' && $id) {
-            // עדכון משתמש
-            requirePermission('manage_users');
+            // עדכון משתמש – הרשאות נבדכות בתוך updateUser (מנהל: הכל; רגיל: רק את עצמו)
             $result = updateUser($id, $input);
             sendResponse($result, $result['success'] ? 200 : 400);
             
@@ -114,6 +117,7 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
         requirePermission('manage_users');
         
         if ($id) {

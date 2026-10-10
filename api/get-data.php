@@ -69,16 +69,14 @@ if (in_array($file, $publicFiles, true)) {
 }
 
 // 3. Protected files (require session validation)
-// Currently verifying session token / user session
-session_start();
-$isLoggedIn = !empty($_SESSION['userId']);
+require_once __DIR__ . '/helpers.php';
 
-// Check for session header / token if present
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-$sessionToken = $_GET['token'] ?? '';
+$input = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+}
 
-// Fallback session check from cookie/session
-if (!$isLoggedIn && empty($sessionToken)) {
+if (!is_authenticated($input)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized: Access to this data requires authentication']);
     exit;
