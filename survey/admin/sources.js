@@ -56,10 +56,37 @@ function renderSources() {
             <div class="source-actions">
                 <button class="btn btn-sm btn-outline" onclick="viewRecords('${source.id}')">👁️ צפה ברשומות</button>
                 <button class="btn btn-sm btn-outline" onclick="editSource('${source.id}')">✏️ ערוך</button>
+                <button class="btn btn-sm btn-outline" onclick="exportSource('${source.id}', 'csv')" title="ייצוא לקובץ CSV">📥 CSV</button>
+                <button class="btn btn-sm btn-outline" onclick="exportSource('${source.id}', 'excel')" title="ייצוא לקובץ Excel">📊 Excel</button>
                 <button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="deleteSource('${source.id}')">🗑️ מחק</button>
             </div>
         </div>
     `).join('');
+}
+
+/**
+ * ייצוא מאגר – פותח כתורן מוסתר כך שהדפדפן מוריד את הקובץ ישירות
+ * (ה-Session/Cookie נשלחים אוטומטית, ולכן אין צורך בטוקן CSRF ב-GET).
+ */
+function exportSource(id, format) {
+    const source = sources.find(s => s.id === id);
+    if (source && (source.recordCount || 0) === 0) {
+        showError('המאגר ריק – אין מה לייצא');
+        return;
+    }
+    const url = `../api/sources.php?action=export&id=${encodeURIComponent(id)}&format=${format}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+// ייצוא מהחלון "צפה ברשומות" – מייצא את כל המאגר הפתוח (לא רק את התוצאות המסוננות)
+function exportCurrentSource(format) {
+    if (!currentSource) return;
+    exportSource(currentSource.id, format);
 }
 
 function showCreateModal() {
@@ -469,7 +496,24 @@ async function importCSVAsNew() {
             body: formData
         });
         
-        const result = await response.json();
+        // קריאה עמידה: השרת מחזיר JSON תקין, אך שאריות HTML/Warning ישנות
+        // עלולות להישאר בתגובה – מנקים ומאתרים את בלוק ה-JSON שבתוכה.
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            const startIdx = text.indexOf('{');
+            const endIdx = text.lastIndexOf('}');
+            if (startIdx !== -1 && endIdx > startIdx) {
+                try { result = JSON.parse(text.slice(startIdx, endIdx + 1)); } catch (e2) { result = null; }
+            }
+            if (!result) {
+                console.error('Raw server response:', text);
+                showError('תגובת השרת אינה תקינה – נא בדקו את log השגיאות של PHP');
+                return;
+            }
+        }
         
         if (result.success) {
             closeImportModal();

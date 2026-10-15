@@ -1,10 +1,10 @@
 [
     {
         "username": "admin",
-        "password": "$2y$10$ZaFMhjVS7pfjEZ5jLX8aL..z5QpFKHGxTHFmF93gnXbVf4Qo2NpZW",
+        "password": "$2y$10$trzAHOKY0HVB4Z7M3vwD0OUnM.17fNbMCCbmkn9YMQD.PGW8RceJy",
         "role": "admin",
         "createdAt": "2026-10-02T06:41:01+02:00",
-        "lastLogin": "2026-10-09T06:15:58+00:00",
+        "lastLogin": "2026-10-10T15:48:37+00:00",
         "active": true,
         "id": "35e9825a-9a4f-420e-91a1-27589502c895"
     },

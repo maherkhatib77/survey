@@ -364,27 +364,46 @@ async function preloadAllSources() {
   for (const field of recordFields) {
     if (!loadedSources[field.sourceId]) {
       console.log('Loading source:', field.sourceId, 'for field:', field.id);
+      let records = null;
+
+      // נסיון 1: שליאת המאגר המלא עם Cookie של Session (המסלול הרגיל)
       try {
-        const res = await fetch(`api/sources.php?action=get&id=${field.sourceId}`);
-        
-        if (!res.ok) {
-          console.error('Failed to load source:', res.status, res.statusText);
-          loadedSources[field.sourceId] = [];
-          continue;
-        }
-        
-        const json = await res.json();
-        console.log('Source loaded:', json.success ? 'success' : 'failed', 'Records:', json.data?.records?.length || 0);
-        
-        if (json.success && json.data.records) {
-          loadedSources[field.sourceId] = json.data.records;
-          console.log('Loaded', json.data.records.length, 'records for source:', field.sourceId);
+        const res = await fetch(`api/sources.php?action=get&id=${field.sourceId}`, {
+          credentials: 'same-origin'
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data.records)) {
+            records = json.data.records;
+          }
         } else {
-          console.error('Source load failed:', json.error || 'Unknown error');
-          loadedSources[field.sourceId] = [];
+          console.warn('Source get failed with status', res.status, '– trying public fallback');
         }
       } catch (e) {
-        console.error('Error loading source:', e);
+        console.warn('Error loading source via get:', e);
+      }
+
+      // נסל 2 (fallback): גישה ציבורית לשדות בלבד – עובדת גם כשה-Cookie
+      // של ה-Session לא מגיע לשרת (חסימת מעקב/Privacy Badger בסביבת localhost)
+      if (records === null) {
+        try {
+          const res2 = await fetch(`api/sources.php?action=fields&id=${field.sourceId}`);
+          if (res2.ok) {
+            const json2 = await res2.json();
+            if (json2.success && Array.isArray(json2.data.records)) {
+              records = json2.data.records;
+            }
+          }
+        } catch (e) {
+          console.error('Error loading source via fields fallback:', e);
+        }
+      }
+
+      if (records !== null) {
+        loadedSources[field.sourceId] = records;
+        console.log('Loaded', records.length, 'records for source:', field.sourceId);
+      } else {
+        console.error('Failed to load source:', field.sourceId);
         loadedSources[field.sourceId] = [];
       }
     } else {

@@ -193,18 +193,43 @@
         const res = await fetch('../api/auth.php?action=login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ username, password })
         });
-        const json = await res.json();
 
-        if (json.success) {
+        // קריאה ידנית של הטקסט + פענוח JSON עמיד לשאריות HTML/Warning של PHP
+        // (שאריות כגון "Deprecated:" או Warning שוברים json() והופכים כל כשל
+        //  להודעה הכללית "שגיאת תקשורת" – גם כאשר השרת כן החזיר תשובה תקינה)
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); }
+        catch (parseErr) {
+          // חילוץ גוף JSON מתוך טקסט מעורבב (אם נמצא)
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) { try { json = JSON.parse(m[0]); } catch (e2) {} }
+          if (!json) {
+            console.error('Login response is not JSON. Status:', res.status, 'Body head:', text.slice(0, 300));
+            errorEl.textContent = '❌ תגובת שרת אינה תקינה (HTTP ' + res.status + '). בדקו את לוג השגיאות של PHP.';
+            errorEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = '🔓 התחבר';
+            return;
+          }
+        }
+
+        if (res.ok && json.success) {
           window.location.href = 'dashboard.html';
+        } else if (res.status === 401 || !res.ok) {
+          // 401 = סיסמה שגויה / משתמש לא פעיל – מציגים את הודעת השרת המדויקת
+          errorEl.textContent = '❌ ' + (json.error || 'שם משתמש או סיסמא שגויים');
+          errorEl.style.display = 'block';
         } else {
           errorEl.textContent = '❌ ' + (json.error || 'שגיאה בהתחברות');
           errorEl.style.display = 'block';
         }
       } catch (err) {
-        errorEl.textContent = '❌ שגיאת תקשורת. נסה שוב.';
+        console.error('Login network error:', err);
+        errorEl.textContent = '❌ שגיאת תקשורת מול השרת. ודאו שהשרת (Apache/XAMPP) פועל ובדקו את Console/Network.';
         errorEl.style.display = 'block';
       }
 
