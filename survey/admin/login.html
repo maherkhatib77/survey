@@ -85,6 +85,33 @@
       color: #1e40af;
       text-align: center;
     }
+    /* ===== שכחתי סיסמה ===== */
+    .forgot-row { text-align: center; margin-top: 4px; }
+    .forgot-link { color: var(--primary); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .forgot-link:hover { text-decoration: underline; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.6);
+      display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    .modal-card h2 { font-size: 19px; color: var(--slate-800); margin-bottom: 6px; }
+    .modal-card p.sub { font-size: 13px; color: var(--slate-500); margin-bottom: 18px; }
+    .modal-card .field-group { margin-bottom: 14px; }
+    .info-msg {
+      background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;
+      padding: 12px; border-radius: 10px; font-size: 13px; display: none; margin-top: 12px;
+      word-break: break-word;
+    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+    .btn-secondary {
+      width: 100%; padding: 12px; font-size: 14px; border-radius: 10px;
+      border: 2px solid var(--slate-200); background: #fff; color: var(--slate-600); cursor: pointer;
+    }
+    .btn-secondary:hover { border-color: var(--slate-300); }
   </style>
 </head>
 <body>
@@ -107,14 +134,35 @@
         <input type="password" id="password" placeholder="הזן סיסמא" required autocomplete="current-password">
       </div>
       <button type="submit" class="btn btn-primary" id="loginBtn">🔓 התחבר</button>
+      <div class="forgot-row">
+        <a class="forgot-link" href="#" onclick="openForgotModal(event)">שכחתי סיסמה</a>
+      </div>
     </form>
 
     <a href="../index.html" class="back-link">← חזור לאתר הראשי</a>
+  </div>
 
-    <div class="default-creds">
-      <strong>פרטי התחברות ברירת מחדל:</strong><br>
-      משתמש: <code>admin</code> | סיסמא: <code>admin123</code><br>
-      <small>מומלץ לשנות סיסמא לאחר הכניסה הראשונה</small>
+  <!-- Modal: שכחתי סיסמה -->
+  <div class="modal-overlay" id="forgotModal" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
+    <div class="modal-card">
+      <h2 id="forgotTitle">🔑 שכחתי סיסמה</h2>
+      <p class="sub">הזן שם משתמש וכתובת דוא"ל כפי שנרשמו במערכת. אם הפרטים יתאימו – נשלח קישור לאיפוס הסיסמה.</p>
+      <form id="forgotForm" onsubmit="handleForgotPassword(event)">
+        <div class="field-group">
+          <label for="forgotUsername">שם משתמש</label>
+          <input type="text" id="forgotUsername" placeholder="הזן שם משתמש" required autocomplete="username">
+        </div>
+        <div class="field-group">
+          <label for="forgotEmail">כתובת דוא"ל</label>
+          <input type="email" id="forgotEmail" placeholder="example@mail.com" required autocomplete="email" dir="ltr" style="text-align:left">
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary" id="forgotBtn">שלח קישור איפוס</button>
+          <button type="button" class="btn-secondary" onclick="closeForgotModal()">ביטול</button>
+        </div>
+        <div class="error-msg" id="forgotErrorMsg" style="margin-top:12px"></div>
+        <div class="info-msg" id="forgotInfoMsg"></div>
+      </form>
     </div>
   </div>
 
@@ -145,24 +193,142 @@
         const res = await fetch('../api/auth.php?action=login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ username, password })
         });
-        const json = await res.json();
 
-        if (json.success) {
+        // קריאה ידנית של הטקסט + פענוח JSON עמיד לשאריות HTML/Warning של PHP
+        // (שאריות כגון "Deprecated:" או Warning שוברים json() והופכים כל כשל
+        //  להודעה הכללית "שגיאת תקשורת" – גם כאשר השרת כן החזיר תשובה תקינה)
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); }
+        catch (parseErr) {
+          // חילוץ גוף JSON מתוך טקסט מעורבב (אם נמצא)
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) { try { json = JSON.parse(m[0]); } catch (e2) {} }
+          if (!json) {
+            console.error('Login response is not JSON. Status:', res.status, 'Body head:', text.slice(0, 300));
+            errorEl.textContent = '❌ תגובת שרת אינה תקינה (HTTP ' + res.status + '). בדקו את לוג השגיאות של PHP.';
+            errorEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = '🔓 התחבר';
+            return;
+          }
+        }
+
+        if (res.ok && json.success) {
           window.location.href = 'dashboard.html';
+        } else if (res.status === 401 || !res.ok) {
+          // 401 = סיסמה שגויה / משתמש לא פעיל – מציגים את הודעת השרת המדויקת
+          errorEl.textContent = '❌ ' + (json.error || 'שם משתמש או סיסמא שגויים');
+          errorEl.style.display = 'block';
         } else {
           errorEl.textContent = '❌ ' + (json.error || 'שגיאה בהתחברות');
           errorEl.style.display = 'block';
         }
       } catch (err) {
-        errorEl.textContent = '❌ שגיאת תקשורת. נסה שוב.';
+        console.error('Login network error:', err);
+        errorEl.textContent = '❌ שגיאת תקשורת מול השרת. ודאו שהשרת (Apache/XAMPP) פועל ובדקו את Console/Network.';
         errorEl.style.display = 'block';
       }
 
       btn.disabled = false;
       btn.textContent = '🔓 התחבר';
     }
+
+    // ===== שכחתי סיסמה (Password Recovery) =====
+    async function getCsrfToken() {
+      const c = document.cookie.match(/(?:^|;\s*)fb_csrf=([^;]*)/);
+      if (c && /^[a-f0-9]{64}$/.test(decodeURIComponent(c[1]))) return decodeURIComponent(c[1]);
+      try { await fetch('../api/auth.php?action=csrf-token', { credentials: 'same-origin' }); } catch (e) {}
+      const c2 = document.cookie.match(/(?:^|;\s*)fb_csrf=([^;]*)/);
+      return c2 ? decodeURIComponent(c2[1]) : '';
+    }
+
+    function openForgotModal(e) {
+      if (e) e.preventDefault();
+      document.getElementById('forgotModal').classList.add('open');
+      document.getElementById('forgotErrorMsg').style.display = 'none';
+      document.getElementById('forgotInfoMsg').style.display = 'none';
+      const u = document.getElementById('username').value.trim();
+      if (u) document.getElementById('forgotUsername').value = u;
+      document.getElementById('forgotUsername').focus();
+    }
+
+    function closeForgotModal() {
+      document.getElementById('forgotModal').classList.remove('open');
+      document.getElementById('forgotForm').reset();
+      document.getElementById('forgotErrorMsg').style.display = 'none';
+      document.getElementById('forgotInfoMsg').style.display = 'none';
+    }
+
+    async function handleForgotPassword(e) {
+      e.preventDefault();
+      const username = document.getElementById('forgotUsername').value.trim();
+      const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+      const btn = document.getElementById('forgotBtn');
+      const errEl = document.getElementById('forgotErrorMsg');
+      const infoEl = document.getElementById('forgotInfoMsg');
+
+      errEl.style.display = 'none';
+      infoEl.style.display = 'none';
+
+      if (!username || !email) {
+        errEl.textContent = '❌ נא למלא שם משתמש וכתובת דוא"ל';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ שולח...';
+
+      try {
+        const token = await getCsrfToken();
+        const res = await fetch('../api/auth.php?action=forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+          credentials: 'same-origin',
+          body: JSON.stringify({ username, email })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success) {
+          let msg = data.message || 'אם הפרטים תואמים לחשבון רשום, נשלח קישור לאיפוס הסיסמה.';
+          // מצב פיתוח מקומי (ללא SMTP): הצג קישור איפוס ישיר כדי לא לנעול את המנהל בחוץ
+          try {
+            const devRes = await fetch('../api/auth.php?action=dev-reset-link&email=' + encodeURIComponent(email), { credentials: 'same-origin' });
+            const devJson = await devRes.json().catch(() => ({}));
+            if (devJson.success && devJson.resetLink) {
+              msg += ' (מצב פיתוח: ' + devJson.resetLink + ')';
+            }
+          } catch (e2) {}
+          infoEl.textContent = '✅ ' + msg;
+          infoEl.style.display = 'block';
+          btn.textContent = 'נשלח ✓';
+          setTimeout(() => { btn.disabled = false; btn.textContent = 'שלח קישור איפוס'; }, 4000);
+        } else {
+          errEl.textContent = '❌ ' + ((data && (data.error || data.message)) ? (data.error || data.message) : 'אירעה שגיאה. נסה שוב מאוחר יותר.');
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'שלח קישור איפוס';
+        }
+      } catch (err) {
+        console.error('Forgot password error:', err);
+        errEl.textContent = '❌ שגיאת תקשורת מול השרת. נא לנסות שוב.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'שלח קישור איפוס';
+      }
+    }
+
+    // סגירת החלון עם Escape ולחיצה מחוצה לו
+    document.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape') closeForgotModal();
+    });
+    document.getElementById('forgotModal').addEventListener('click', function(ev) {
+      if (ev.target === this) closeForgotModal();
+    });
 
     checkAuth();
   </script>

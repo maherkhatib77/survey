@@ -34,6 +34,13 @@ async function checkAuth() {
           usersBtn.style.display = 'none';
         }
       }
+
+      // הצג/הסתר כפתור "צור סקר חדש" לפי הרשאה
+      const isAdmin = currentUser.role === 'admin';
+      const canCreate = isAdmin || currentUser.permissions?.create_forms !== false;
+      document.querySelectorAll('[data-action="create-form"]').forEach(el => {
+        el.style.display = canCreate ? '' : 'none';
+      });
     }
     
     return true;
@@ -44,14 +51,13 @@ async function checkAuth() {
 }
 
 async function logout() {
-  try {
-    await fetch(`${API}/auth.php?action=logout`, { 
-      method: 'POST'
-    });
-  } catch (e) {
-    console.error('Logout error:', e);
+  // fbLogout שולח POST עם כותרת CSRF, מנקה אחסון מקומי ומפנה לדף ההתחברות
+  if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+    await FBAuth.fbLogout(API, 'login.html');
+    return;
   }
-  // תמיד נתנתק גם אם ה-API נכשל
+  // Fallback – ניתוק מקומי גם אם שכבת FBAuth לא נטענה
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
   window.location.href = 'login.html';
 }
 
@@ -88,7 +94,29 @@ async function updateForm(form) {
 }
 
 async function deleteForm(id) {
-  await fetch(`${API}/forms.php?id=${id}`, { method: 'DELETE' });
+  const res = await fetch(`${API}/forms.php?id=${id}`, { method: 'DELETE' });
+  if (res.status === 403) {
+    const j = await res.json().catch(() => ({}));
+    alert('❌ ' + (j.error || 'אין לך הרשאה למחוק סקרים'));
+    return false;
+  }
+  return true;
+}
+
+// ===== Helpers: הרשאות ובעלות =====
+function fbIsAdmin() {
+  return !!currentUser && currentUser.role === 'admin';
+}
+function fbCan(perm) {
+  if (!currentUser) return false;
+  if (fbIsAdmin()) return true;
+  const p = currentUser.permissions || {};
+  return p[perm] !== false; // ברירת מחדל: מאופשר – השרת חוסם בפועל
+}
+function fbOwnsForm(form) {
+  if (fbIsAdmin()) return true;
+  if (!form || !form.createdBy) return false; // סקרים היסטוריים ללא בעלים – רק למנהל
+  return form.createdBy === currentUser.username;
 }
 
 // ===== Render =====
@@ -175,15 +203,15 @@ function render() {
         </div>
         <div class="form-actions">
           <div class="form-actions-row">
-            <a href="builder.html?id=${form.id}" class="btn btn-sm btn-outline">✏️ ערוך</a>
+            ${fbCan('edit_forms') && fbOwnsForm(form) ? `<a href="builder.html?id=${form.id}" class="btn btn-sm btn-outline">✏️ ערוך</a>` : ''}
             <a href="../fill.html?id=${form.id}" target="_blank" class="btn btn-sm btn-outline" style="color:var(--primary);">👁️ תצוגה</a>
-            <a href="reports.html?id=${form.id}" class="btn btn-sm btn-outline" style="color:var(--purple);">📊 דוחות</a>
+            ${fbCan('view_responses') ? `<a href="reports.html?id=${form.id}" class="btn btn-sm btn-outline" style="color:var(--purple);">📊 דוחות</a>` : ''}
           </div>
           <div class="form-actions-row">
             <button class="btn btn-sm btn-outline" style="color:var(--success);" onclick="copyLink('${link}')">🔗 העתק קישור</button>
-            <button class="btn btn-sm btn-outline" style="color:var(--primary);" onclick="duplicateForm('${form.id}')">📋 שכפל</button>
-            <button class="btn btn-sm btn-outline" style="color:var(--warning);" onclick="askDeleteResponses('${form.id}', '${esc(form.settings.title)}')">🗑️ מחק תגובות</button>
-            <button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="askDelete('${form.id}')">🗑️</button>
+            ${fbCan('create_forms') ? `<button class="btn btn-sm btn-outline" style="color:var(--primary);" onclick="duplicateForm('${form.id}')">📋 שכפל</button>` : ''}
+            ${fbCan('delete_forms') && fbOwnsForm(form) ? `<button class="btn btn-sm btn-outline" style="color:var(--warning);" onclick="askDeleteResponses('${form.id}', '${esc(form.settings.title)}')">🗑️ מחק תגובות</button>` : ''}
+            ${fbCan('delete_forms') && fbOwnsForm(form) ? `<button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="askDelete('${form.id}')">🗑️</button>` : ''}
           </div>
         </div>
       </div>
@@ -211,6 +239,10 @@ async function createNewForm() {
 function askDelete(id) {
   const form = forms.find(f => f.id === id);
   if (!form) return;
+  if (!fbCan('delete_forms') || !fbOwnsForm(form)) {
+    alert('❌ אין לך הרשאה למחוק סקר זה');
+    return;
+  }
   
   deleteTargetId = id;
   
