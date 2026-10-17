@@ -93,7 +93,14 @@ fbSetContentType('application/json; charset=utf-8'); // ברירת מחדל: API
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
+// CSP מוגן: 'unsafe-inline' נחוץ כי המערכת משתמשת ב-onclick/סקריפטים inline.
+// רשימת ה-CDN נגזרה לפי השימוש בפועל: jsdelivr (דוחות: Chart.js/html2canvas/pptxgen),
+// cdnjs (ייבוא: pdf.js/mammoth), sheetjs (ייצוא אקסל באתר הראשי), גוגל פונטים.
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; worker-src 'self' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+// הוספת report-only: אינה חוסמת דבר – רק מדווחת בקונסול על הפרות פוטנציאליות.
+// כך ניתן לפתור בהדרגה את תלויות ה-CDN (jsdelivr/cdnjs/sheetjs בדוחות ובייבוא)
+// ולהעביר את החוקים לכותרת האוכפת בעתיד, בלי לשבור משהו עכשיו.
+header("Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
 header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
