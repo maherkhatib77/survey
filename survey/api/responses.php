@@ -114,6 +114,104 @@ switch ($method) {
             } else {
                 sendResponse(['success' => false, 'error' => 'שגיאה בשמירת התגובה'], 500);
             }
+
+        } elseif ($action === 'import') {
+            // ייבוא תגובות מקובץ JSON שיוצר בייצוא הדוחות / מגיבוי
+            // הגוף: { formId, responses: [...] } או מעטפת מלאה { form: {...}, responses: [...] }
+            requireLogin();
+            requirePermission('create_forms');
+            validateCsrf();
+
+            // זיהוי formId: מה-GET או מתוך המעטפה/התגובות שבגוף
+            $impFormId = $formId;
+            if (!$impFormId && isset($input['formId'])) $impFormId = $input['formId'];
+            if (!$impFormId && isset($input['form']['id'])) $impFormId = $input['form']['id'];
+
+            if (!$impFormId) {
+                sendResponse(['success' => false, 'error' => 'לא זוהה מזהה סקר (formId) בקובץ הייבוא'], 400);
+            }
+            $form = getForm($impFormId);
+            if (!$form) {
+                sendResponse(['success' => false, 'error' => 'הסקר "' . htmlspecialchars($impFormId, ENT_QUOTES) . '" אינו קיים במערכת. יש ליצור סקר זהה או להשתמש בקובץ הייצוא של הסקר הקיים.'], 404);
+            }
+            // בעלות: משתמש רגיל מייבא רק לסקרים שלו
+            $__cu = getCurrentUser();
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin') {
+                if (($form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                    sendResponse(['success' => false, 'error' => 'אין לך גישה לייבוא תגובות לסקר זה'], 403);
+                }
+            }
+
+            // חילוץ רשימת התגובות – תמיכה בשלושה פורמטים:
+            // א) מעטפת ייצוא מלאה: { form: {...}, responses: [...] }
+            // ב) אובייקט: { responses: [...] }
+            // ג) מערך גולמי של תגובות
+            $rows = null;
+            if (isset($input['responses']) && is_array($input['responses'])) {
+                $rows = $input['responses'];
+            } elseif (is_array($input) && array_values($input) === $input) {
+                $rows = $input; // מערך גולמי
+            }
+            if ($rows === null || count($rows) === 0) {
+                sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות בקובץ. ודא שהקובץ הוא פלט "ייצוא JSON" של המערכת'], 400);
+            }
+
+            // טעינת תגובות קיימות לשם מניעת כפילויות לפי id
+            $existing = getFormResponses($impFormId);
+            $existingIds = [];
+            foreach ($existing as $e) {
+                if (isset($e['id'])) $existingIds[$e['id']] = true;
+            }
+
+            $imported = 0;
+            $skipped = 0;
+            $invalid = 0;
+            $newItems = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || !isset($row['data']) || !is_array($row['data'])) {
+                    $invalid++;
+                    continue;
+                }
+                $rid = isset($row['id']) && is_string($row['id']) ? $row['id'] : generateUUID();
+                if (isset($existingIds[$rid])) { $skipped++; continue; }
+                $existingIds[$rid] = true;
+                $resp = [
+                    'id' => $rid,
+                    'formId' => $impFormId,
+                    'data' => $row['data'],
+                    'submittedAt' => isset($row['submittedAt']) ? $row['submittedAt'] : date('c'),
+                    'respondentInfo' => $row['respondentInfo'] ?? ['ip' => 'import', 'userAgent' => 'json-import'],
+                ];
+                if (isset($row['signature'])) $resp['signature'] = $row['signature'];
+                if (isset($row['calculatedValues'])) $resp['calculatedValues'] = $row['calculatedValues'];
+                $newItems[] = $resp;
+                $imported++;
+            }
+
+            if ($imported > 0) {
+                // כתיבה אטומית: קריאת המערך הקיים + הוספה + שמירה בבת אחת
+                $merged = array_merge($existing, $newItems);
+                $filepath = RESPONSES_DIR . '/' . sanitizeFilename($impFormId) . '.json';
+                if (!file_exists(RESPONSES_DIR)) @mkdir(RESPONSES_DIR, 0755, true);
+                $fp = @fopen($filepath, 'c');
+                $okWrite = false;
+                if ($fp && flock($fp, LOCK_EX)) {
+                    ftruncate($fp, 0);
+                    rewind($fp);
+                    $okWrite = (fwrite($fp, json_encode($merged, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+                    fflush($fp);
+                    flock($fp, LOCK_UN);
+                    fclose($fp);
+                } elseif ($fp) { fclose($fp); }
+                if (!$okWrite) {
+                    error_log('responses import: failed writing ' . $filepath);
+                    sendResponse(['success' => false, 'error' => 'כשל בכתיבת קובץ התגובות. בדוק הרשאות כתיבה לתיקיית data/responses'], 500);
+                }
+                $form['responseCount'] = count($merged);
+                saveForm($form);
+            }
+
+            sendResponse(['success' => true, 'imported' => $imported, 'skippedDuplicates' => $skipped, 'invalid' => $invalid]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }

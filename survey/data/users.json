@@ -1,68 +1,68 @@
 [
-    {
-        "username": "admin",
-        "password": "$2y$10$trzAHOKY0HVB4Z7M3vwD0OUnM.17fNbMCCbmkn9YMQD.PGW8RceJy",
-        "role": "admin",
-        "createdAt": "2026-10-02T06:41:01+02:00",
-        "lastLogin": "2026-10-10T15:48:37+00:00",
-        "active": true,
-        "id": "35e9825a-9a4f-420e-91a1-27589502c895"
+  {
+    "username": "admin",
+    "password": "$2y$10$trzAHOKY0HVB4Z7M3vwD0OUnM.17fNbMCCbmkn9YMQD.PGW8RceJy",
+    "role": "admin",
+    "createdAt": "2026-10-02T06:41:01+02:00",
+    "lastLogin": "2026-10-10T15:48:37+00:00",
+    "active": true,
+    "id": "35e9825a-9a4f-420e-91a1-27589502c895"
+  },
+  {
+    "id": "43e3c7e4-c93d-4066-80a1-9dfa674fa013",
+    "username": "039279682",
+    "password": "$2y$10$9YvkaBrq4UjWYJSFZdLI.ey2SwWDDcBejjOclGaM5MKx5T5dAO6tq",
+    "fullName": "ברהום אימאן",
+    "email": "iman.barhum@ejpisga.org.il",
+    "role": "user",
+    "permissions": {
+      "create_forms": true,
+      "edit_forms": true,
+      "delete_forms": true,
+      "view_responses": true,
+      "export_data": true,
+      "manage_users": false
     },
-    {
-        "id": "43e3c7e4-c93d-4066-80a1-9dfa674fa013",
-        "username": "039279682",
-        "password": "$2y$10$9YvkaBrq4UjWYJSFZdLI.ey2SwWDDcBejjOclGaM5MKx5T5dAO6tq",
-        "fullName": "ברהום אימאן",
-        "email": "iman.barhum@ejpisga.org.il",
-        "role": "user",
-        "permissions": {
-            "create_forms": true,
-            "edit_forms": true,
-            "delete_forms": true,
-            "view_responses": true,
-            "export_data": true,
-            "manage_users": false
-        },
-        "active": true,
-        "createdAt": "2026-10-02T20:25:04+02:00",
-        "lastLogin": "2026-10-09T19:35:04+00:00"
+    "active": true,
+    "createdAt": "2026-10-02T20:25:04+02:00",
+    "lastLogin": "2026-10-09T19:35:04+00:00"
+  },
+  {
+    "id": "bd6c2827-4a71-459d-947c-8f50ad093724",
+    "username": "021395892",
+    "password": "$2y$10$hyAznoQGvHD5dpx2A3YtXeC/Kl1Vf8k2KiY2QlocM16irp7KIxLla",
+    "fullName": "איבראהים מנאל",
+    "email": "manalibr9.4@gmail.com",
+    "role": "user",
+    "permissions": {
+      "create_forms": true,
+      "edit_forms": true,
+      "delete_forms": true,
+      "view_responses": true,
+      "export_data": true,
+      "manage_users": false
     },
-    {
-        "id": "bd6c2827-4a71-459d-947c-8f50ad093724",
-        "username": "021395892",
-        "password": "$2y$10$hyAznoQGvHD5dpx2A3YtXeC\/Kl1Vf8k2KiY2QlocM16irp7KIxLla",
-        "fullName": "איבראהים מנאל",
-        "email": "manalibr9.4@gmail.com",
-        "role": "user",
-        "permissions": {
-            "create_forms": true,
-            "edit_forms": true,
-            "delete_forms": true,
-            "view_responses": true,
-            "export_data": true,
-            "manage_users": false
-        },
-        "active": true,
-        "createdAt": "2026-10-02T20:26:18+02:00",
-        "lastLogin": "2026-10-07T12:43:40+00:00"
+    "active": true,
+    "createdAt": "2026-10-02T20:26:18+02:00",
+    "lastLogin": "2026-10-07T12:43:40+00:00"
+  },
+  {
+    "id": "d64481ea-39b6-4326-bdc7-e610cf854e00",
+    "username": "305397515",
+    "password": "$2y$10$P9rH7JSlxXjs0waCt6Fh4eTKhlzHNSYf1idi.v7MA9/fgRQ3WdI8C",
+    "fullName": "אבו שאח הדיל",
+    "email": "hadil.a.sh@ejpisga.org.il",
+    "role": "admin",
+    "permissions": {
+      "create_forms": true,
+      "edit_forms": true,
+      "delete_forms": true,
+      "view_responses": true,
+      "export_data": true,
+      "manage_users": true
     },
-    {
-        "id": "d64481ea-39b6-4326-bdc7-e610cf854e00",
-        "username": "305397515",
-        "password": "$2y$10$P9rH7JSlxXjs0waCt6Fh4eTKhlzHNSYf1idi.v7MA9\/fgRQ3WdI8C",
-        "fullName": "אבו שאח הדיל",
-        "email": "hadil.a.sh@ejpisga.org.il",
-        "role": "admin",
-        "permissions": {
-            "create_forms": true,
-            "edit_forms": true,
-            "delete_forms": true,
-            "view_responses": true,
-            "export_data": true,
-            "manage_users": true
-        },
-        "active": true,
-        "createdAt": "2026-10-03T12:06:04+02:00",
-        "lastLogin": "2026-10-09T06:15:20+00:00"
-    }
+    "active": true,
+    "createdAt": "2026-10-03T12:06:04+02:00",
+    "lastLogin": "2026-10-09T06:15:20+00:00"
+  }
 ]

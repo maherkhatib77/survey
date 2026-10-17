@@ -907,8 +907,18 @@ function renderExport() {
       <div style="border:2px solid var(--slate-200);border-radius:var(--radius);padding:24px;text-align:center;">
         <div style="font-size:36px;margin-bottom:12px;">🔧</div>
         <h4 style="margin-bottom:8px;">ייצוא JSON</h4>
-        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">מתאים לאינטגרציה ו-API</p>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">מתאים לאינטגרציה ו-API (ולשחזור באמצעות ייבוא)</p>
         <button class="btn btn-primary" onclick="exportJSON()" ${!responses.length?'disabled style="opacity:0.5;"':''}>הורד JSON</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">📥</div>
+        <h4 style="margin-bottom:8px;">ייבוא תגובות מקובץ JSON</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">שחזור נתונים מקובץ "ייצוא JSON" של המערכת. תגובות כפולות (לפי מזהה) דולגות אוטומטית.</p>
+        <input type="file" id="importResponsesFile" accept=".json,application/json" style="display:none;" onchange="importResponsesFromFile(this)" />
+        <button class="btn btn-success" onclick="document.getElementById('importResponsesFile').click()">בחר קובץ JSON וייבא</button>
+        <div id="importResult" style="margin-top:12px;font-size:13px;"></div>
       </div>
     </div>
     <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--slate-200);">
@@ -933,6 +943,97 @@ function exportCSV() {
 function exportJSON() {
   const data = { form: form.settings, responses, exportedAt: new Date().toISOString() };
   download(JSON.stringify(data, null, 2), `${form.settings.title}.json`, 'application/json');
+}
+
+/**
+ * ייבוא תגובות מקובץ JSON שיוצר ע"י "ייצוא JSON" של המערכת (או מגיבוי קובץ התגובות).
+ * נשלח ל-POST api/responses.php?action=import&formId=<id> עם טוקן CSRF.
+ */
+async function importResponsesFromFile(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  const resultBox = document.getElementById('importResult');
+  const setMsg = (html, color) => { if (resultBox) { resultBox.innerHTML = html; if (color) resultBox.style.color = color; } };
+
+  // ולידציה גסנה: עד 20MB
+  if (file.size > 20 * 1024 * 1024) {
+    setMsg('❌ הקובץ גדול מדי (מקסימום 20MB)', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  let payload;
+  try {
+    const text = await file.text();
+    payload = JSON.parse(text);
+  } catch (e) {
+    setMsg('❌ הקובץ אינו JSON חוקי (' + e.message + ')', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  // זיהוי רשימת התגובות בקובץ: מעטפה {responses:[...]}, מערך גולמי, או קובץ תגובות גולמי
+  let rows = null;
+  if (payload && Array.isArray(payload.responses)) rows = payload.responses;
+  else if (Array.isArray(payload)) rows = payload;
+  if (!rows || rows.length === 0) {
+    setMsg('❌ לא נמצאו תגובות בקובץ. יש להשתמש בפלט "ייצוא JSON" של המערכת', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  setMsg('⏳ מייבא ' + rows.length + ' תגובות...', '#1565c0');
+  try {
+    const res = await fetch(`${API}/responses.php?action=import&formId=${encodeURIComponent(form.id)}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formId: form.id, responses: rows }),
+    });
+    let out = null;
+    try { out = await res.json(); } catch (e) { /* ננסה לחלץ מתוך תגובה מעורבת */ }
+    if (!out) {
+      const txt = await res.text().catch(() => '');
+      const m = txt.match(/\{[\s\S]*\}\s*$/);
+      if (m) { try { out = JSON.parse(m[0]); } catch (e) {} }
+      if (!out) {
+        setMsg('❌ השירות החזיר תשובה לא צפויה (HTTP ' + res.status + '). בדוק את לוג ה-PHP.', '#c62828');
+        inputEl.value = '';
+        return;
+      }
+    }
+    // גיבוי עצמי ל-CSRF: installAutoCsrf של fb-auth.js מוסיף אוטומטית את הטוקן
+    // ומבצע ניסיון חוזר אחד ב-419. אם בכל זאת נכשל – מנסים שוב עם טוקן עדש מהשרת.
+    if (res.status === 419 || (out && out.csrfFail)) {
+      try {
+        const fresh = await FBAuth.ensureCsrfToken('../api');
+        if (fresh) {
+          const retry = await fetch(`${API}/responses.php?action=import&formId=${encodeURIComponent(form.id)}`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': fresh },
+            body: JSON.stringify({ formId: form.id, responses: rows }),
+          });
+          out = await retry.json().catch(() => null);
+          if (retry.ok && out && out.success) res.status = retry.status; // ממשיכים לזרימת ההצלחה
+          else if (out && out.error) { setMsg('❌ ' + out.error, '#c62828'); inputEl.value = ''; return; }
+        }
+      } catch (e) { /* נופל להודעה הכללית למטה */ }
+    }
+    if (res.ok && out.success) {
+      const dup = out.skippedDuplicates ? ` (${out.skippedDuplicates} כפילויות דולגו)` : '';
+      const bad = out.invalid ? ` (${out.invalid} שורות לא תקינות נדחו)` : '';
+      setMsg(`✅ יובאו ${out.imported} תגובות${dup}${bad}. מרענן נתונים...`, '#2e7d32');
+      inputEl.value = '';
+      await init(); // טעינה מחדש מלאה של הנתונים והדוח
+    } else {
+      setMsg('❌ ' + (out.error || 'הייבוא נכשל'), '#c62828');
+      inputEl.value = '';
+    }
+  } catch (e) {
+    setMsg('❌ שגיאת תקשורת: ' + e.message, '#c62828');
+    inputEl.value = '';
+  }
 }
 
 function exportFormStructure() {
