@@ -1030,7 +1030,11 @@ function getAllForms() {
     $files = glob(FORMS_DIR . '/*.json');
     foreach ($files as $file) {
         $form = readJSON($file);
-        if ($form) $forms[] = $form;
+        if ($form) {
+            // מקור האמת למונה הוא קובץ התגובות – לא השדה השמור בטופס
+            $form['responseCount'] = countRealResponses($form['id']);
+            $forms[] = $form;
+        }
     }
     usort($forms, function($a, $b) {
         return strtotime($b['updatedAt'] ?? $b['createdAt'] ?? 'now') - strtotime($a['updatedAt'] ?? $a['createdAt'] ?? 'now');
@@ -1047,7 +1051,46 @@ function getPublishedForms() {
 
 function getForm($id) {
     $filepath = FORMS_DIR . '/' . sanitizeFilename($id) . '.json';
-    return readJSON($filepath);
+    $form = readJSON($filepath);
+    if ($form) $form['responseCount'] = countRealResponses($form['id']);
+    return $form;
+}
+
+/**
+ * ספירת תגובות אמיתיות מתוקתקת – מקור האמת היחיד הוא קובץ ה-responses.
+ * נועד לחזק את השדה responseCount שנשמר בקובץ הטופס (עלול להיצמד/להישחק).
+ */
+function countRealResponses($formId) {
+    $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+    return countResponsesData(readJSON($filepath));
+}
+
+/**
+ * מונה תגובות אמיתי – הקריאה היחידה האמינה למספר התגובות.
+ * תומך בשני הפורמטים שנשמרו לאורך ההיסטוריה:
+ *  א) מערך רשומות ישירות [ {...}, {...} ]
+ *  ב) מעטפה { responses: [...] } / { data: [...] }
+ * כמו כן מסנן שגיאות JSON שכפו כרשומה יחידה (למשל {"success":false,...}).
+ */
+function countResponsesData($data) {
+    if (!is_array($data)) return 0;
+    // מעטפה עם שדה responses/data
+    if (isset($data['responses']) && is_array($data['responses'])) {
+        return count(array_filter($data['responses'], function($r) {
+            return is_array($r) && !isset($r['success']);
+        }));
+    }
+    if (isset($data['data']) && is_array($data['data']) && array_key_exists('success', $data)) {
+        return count(array_filter($data['data'], function($r) {
+            return is_array($r) && !isset($r['success']);
+        }));
+    }
+    // מערך רשומות ישירות – ספירה בלבד של איברים בעלי id/formId
+    $n = 0;
+    foreach ($data as $r) {
+        if (is_array($r) && (isset($r['id']) || isset($r['formId']))) $n++;
+    }
+    return $n;
 }
 
 function saveForm($form) {

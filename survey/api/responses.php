@@ -30,7 +30,7 @@ switch ($method) {
             sendResponse(['success' => true, 'data' => $responses]);
         } elseif ($action === 'count' && $formId) {
             $responses = getFormResponses($formId);
-            sendResponse(['success' => true, 'count' => count($responses)]);
+            sendResponse(['success' => true, 'count' => countRealResponses($formId)]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
@@ -207,7 +207,7 @@ switch ($method) {
                     error_log('responses import: failed writing ' . $filepath);
                     sendResponse(['success' => false, 'error' => 'כשל בכתיבת קובץ התגובות. בדוק הרשאות כתיבה לתיקיית data/responses'], 500);
                 }
-                $form['responseCount'] = count($merged);
+                $form['responseCount'] = countRealResponses($impFormId);
                 saveForm($form);
             }
 
