@@ -4,6 +4,14 @@
  * הגדרות מערכת + ניהול Sessions + אבטחה (CSRF / CORS / Brute-force)
  */
 
+// ===== עיבוי מלא של שגיאות PHP =====
+// כל Warning/Notice/Deprecated יתועד ל-log של השרת בלבד ו NOT יודפס לתוך
+// גוף התגובה – אחרת פלט כמו "Constant already defined" שובר את ה-JSON
+// וגורם ללקוח להציג "שגיאה בחיבור לשרת" למרות שהפעולה בוצעה בהצלחה.
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 // ===== הגדרות Session מאובטחות (חייבות להיות לפני session_start) =====
 $__secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
             || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
@@ -67,8 +75,21 @@ if ($origin !== '') {
     }
 }
 
-// כותרות אבטחה
-header('Content-Type: application/json; charset=utf-8');
+// כותרות בסיס.
+// הערה קריטית: PHP שולח מראש "Content-Type: text/html" לכל בקשה, ולכן
+// header(..., true) אינו תמיד דורס אותה – תלוי בגרסה/ב-SAPI. כדי שהייצוא
+// למאגרים (CSV/Excel) לא ירד בטעות כ-JSON, כל קובץ API מגדיר את הסוג שלו
+// באמצעות fbSetContentType() עם replace=true לפני שליחת כל תוכן.
+/**
+ * הגדרת Content-Type לתגובה – דורס את ברירת המחדל של PHP (text/html).
+ * חייב להיקרא לפני שליחת כל תוכן (אחרת הכותרת כבר נשלחה והשינוי נתעלם).
+ */
+function fbSetContentType($type) {
+    if (!headers_sent()) {
+        header('Content-Type: ' . $type, true);
+    }
+}
+fbSetContentType('application/json; charset=utf-8'); // ברירת מחדל: API מחזיר JSON
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
@@ -91,26 +112,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // כשהמשתמש אינו מחובר, וכל פעולת POST/DELETE מאומתת באותו מנגנון אחיד.
 
 /**
+ * המרת ערך Cookie לגולתם (blob) של PHP – כך ש-Cookie שנחסם/נמחק בדפדפן
+ * או שנקרסע ע"י פרוקסי לא ישבור את parse_ini: כל תו שאינו בטוח מקודד כ-%XX.
+ */
+function fbCsrfEncode($token) {
+    return rawurlencode($token);
+}
+
+/**
+ * חילוץ טוקן CSRF מתוך גולתם ה-Cookies של PHP (_COOKIE).
+ * הערה קריטית: PHP ממיר '+' לרווח בזמן parse_ini של Cookies, ולכן אם הטוקן
+ * (hex) היה מגיע עם '+', הוא היה נקרסע לשוני בין השרת לדפדפן.
+ * כדי למנוע זאת – הטוקן נשמר בגולתם מקודד (percent-encoded) והוא תמיד [a-f0-9]
+ * אחרי חילוץ; בנוסף אנו מנסים לחלץ מה-header גולמי (Cookie:) כתעודת ביטוח.
+ */
+function fbExtractCsrfCookie() {
+    $candidates = [];
+    if (isset($_COOKIE['fb_csrf'])) $candidates[] = $_COOKIE['fb_csrf'];
+
+    // חילוץ מה-header הגולמי – עוקף עיוותי parse_ini (למשל '+' → ' ')
+    $raw = $_SERVER['HTTP_COOKIE'] ?? ($_SERVER['COOKIE'] ?? '');
+    if ($raw !== '') {
+        foreach (explode(';', $raw) as $part) {
+            $part = trim($part);
+            if (stripos($part, 'fb_csrf=') === 0) {
+                $candidates[] = substr($part, strlen('fb_csrf='));
+                break;
+            }
+        }
+    }
+
+    foreach ($candidates as $c) {
+        $c = trim((string)$c);
+        // ייתכן שהערך מקודד (%XX) – ננסה לפענח
+        $decoded = rawurldecode($c);
+        if (preg_match('/^[a-f0-9]{64}$/', $decoded)) return $decoded;
+        if (preg_match('/^[a-f0-9]{64}$/', $c)) return $c;
+    }
+    return '';
+}
+
+/**
  * השלכת Cookie XSS (או יצירת אחד חדש אם אינו קיים).
  * מחזיר את ערך הטוקן.
  */
 function issueCsrfCookie() {
-    $token = isset($_COOKIE['fb_csrf']) && preg_match('/^[a-f0-9]{64}$/', $_COOKIE['fb_csrf'])
-             ? $_COOKIE['fb_csrf']
-             : bin2hex(random_bytes(32));
+    $existing = fbExtractCsrfCookie();
+    $token = preg_match('/^[a-f0-9]{64}$/', $existing) ? $existing : bin2hex(random_bytes(32));
 
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
              || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 
     // SameSite=Lax: דפדפנים עדכניים דורשים Secure עבור Lax ב-HTTPS.
     // ב-localhost (פיתוח, HTTP) – Cookie ללא Secure כדי שהזרימה תעבוד מקומית.
-    setcookie('fb_csrf', $token, [
+    // הערה: setcookie מפענח את הערך לפני הקידוד שלו – לכן אנו מעבירים blob
+    // percent-encoded ששומר על ערכי hex במדויק גם דרך parse_ini של PHP.
+    setcookie('fb_csrf', fbCsrfEncode($token), [
         'expires'  => time() + 12 * 3600,
         'path'     => '/',
         'httponly' => false,   // הנדרש כדי ש-js יוכל לקרוא ולהחזיר בכותרת
         'samesite' => 'Lax',
         'secure'   => $https,
     ]);
+    // שמירת גיבוי בצד השרת – מאפשר אימות גם אם ה-Cookie אבד בדפדפן
+    $_SESSION['csrf_fallback'] = $token;
     return $token;
 }
 
@@ -127,9 +192,16 @@ function csrfBootstrap() {
     if ($token !== '' && !headers_sent()) {
         header('X-CSRF-Token: ' . $token, false); // נתיב גיבוי להזרקת הטוקן גם ללא Cookie
     }
-    if (ob_get_length() !== false) {
-        ob_flush();
-        flush();
+    // PHP-FPM/Apache: עיכוב כתיבת הגוף עד שכל הכותרות (כולל Set-Cookie של fb_csrf)
+    // נשלחו בפועל – מבטיח שהדפדפן החזיק את ה-Cookie כבר בבקשת ה-POST הראשונה.
+    if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if (ob_get_length() === false) {
+            ob_start();
+        }
+        if (ob_get_length() !== false) {
+            ob_flush();
+            flush();
+        }
     }
 }
 
@@ -147,12 +219,21 @@ function validateCsrf() {
     // נתיב גיבוי: העלאת קבצים (multipart) שנשלחת ללא Cookie של צד שלישי / אחרי
     // הזרקת הטוקן מכותרת התגובה – מאפשרים גם שדה 'csrf_token' בגוף הבקשה.
     $sent = trim($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? ''));
-    $cookie = $_COOKIE['fb_csrf'] ?? '';
+    // חילוץ ערך ה-Cookie בצורה חסינה לעיוותי parse_ini (למשל '+' → רווח)
+    $cookie = fbExtractCsrfCookie();
+
+    // גיבוי אחרון: אם ה-Cookie לא הגיע לשרת (מסדרונות פרוקסי/איפוס Cookie), משווים
+    // מול טוקן "אם" שהלקוח למד ממכשיר זה בעבר – נשמר ב-session הצד-שרתי.
+    if ($cookie === '' && $sent !== '' && preg_match('/^[a-f0-9]{64}$/', $sent)
+        && !empty($_SESSION['csrf_fallback']) && hash_equals($_SESSION['csrf_fallback'], $sent)) {
+        issueCsrfCookie(); // השלמת ההשתלה החסרה
+        return;
+    }
 
     if ($sent === '' || $cookie === '' || !preg_match('/^[a-f0-9]{64}$/', $cookie)
         || !hash_equals($cookie, $sent)) {
         http_response_code(419);
-        echo json_encode(['success' => false, 'error' => 'אישור אבטחה (CSRF) נכשל. רענן את הדף ונסה שוב.'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => false, 'error' => 'אישור אבטחה (CSRF) נכשל. רענן את הדף ונסה שוב.', 'csrfFail' => true], JSON_UNESCAPED_UNICODE);
         exit();
     }
     // החייאת תוקף ה-Cookie בכל שימוש תקין
@@ -186,6 +267,48 @@ function requireLogin() {
         echo json_encode(['success' => false, 'error' => 'נדרשת התחברות'], JSON_UNESCAPED_UNICODE);
         exit();
     }
+}
+
+/**
+ * בדיקה האם מאגר נתונים (Source) חשוף לציבור.
+ * מאגר נחשב ציבורי אם מסומן במפורש settings.publicSources=true,
+ * או אם הוא רשום ברשימת ה-sourceIds של שדות מסוג 'record' בטופס מפורסם
+ * (מצב סטנדרטי: מנהל פרסם סקר המכיל שדות מתוך מאגרים – אלו חייבים
+ * להיות זמינים גם לממלא הטופס האנונימי, אחרת השדות ייראו ריקים).
+ */
+function isSourcePublicForAnonymous($sourceId) {
+    $sid = sanitizeFilename($sourceId);
+    if ($sid === '') return false;
+
+    // סימון מפורש בקובץ המאגר
+    $srcPath = SOURCES_DIR . '/' . $sid . '.json';
+    if (is_file($srcPath)) {
+        $src = readJSON($srcPath);
+        if (!empty($src['settings']['public'])) return true;
+    }
+
+    // סריקת טפסים מפורסמים: האם המאגר מקור לשדה record בטופס published
+    foreach (glob(FORMS_DIR . '/*.json') ?: [] as $f) {
+        $form = readJSON($f);
+        if (!$form || ($form['status'] ?? 'draft') !== 'published') continue;
+        if (!empty($form['settings']['publicSources'])) return true;
+        $pages = $form['pages'] ?? [];
+        foreach ($pages as $p) {
+            foreach ($p['fields'] ?? [] as $fld) {
+                if (($fld['type'] ?? '') === 'record' && ($fld['sourceId'] ?? '') === $sourceId) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * נתיב גישה למאגר בודד לפי ID (ללא תלות בפונקציות רשימה)
+ */
+function getSourceFilepath($id) {
+    return SOURCES_DIR . '/' . sanitizeFilename($id) . '.json';
 }
 
 // ===== זיהוי המשתמש הנוכחי (לצורך createdBy / הרשאות) =====
@@ -339,10 +462,33 @@ function isAccountLocked($username) {
     return [false, 0];
 }
 
+/**
+ * בדיקה האם ערך Hash חסר/פגום ב-users.json.
+ * משתמש שנמחק/נכתב ידנית עלול להישאר ללא שדה password – במצב כזה
+ * password_verify() זורק TypeError → PHP 8 מחזיר Fatal Error (500) →
+ * הדפדפן מקבל תשובה לא-JSON ו-"res.json()" נכשל → ההודעה "שגיאת תקשורת".
+ */
+function isBrokenPasswordHash($user) {
+    if (!isset($user['password']) || !is_string($user['password']) || $user['password'] === '') return true;
+    // hash חייב להתחיל ב-$ (bcrypt=$2y$, argon=$argon...) ולא לכלול תווים חריגים
+    if ($user['password'][0] !== '$') return true;
+    if (!preg_match('/^\$(2[xyabn]?|argon2id)\$[A-Za-z0-9\/$.=]+$/', $user['password'])) return true;
+    return false;
+}
+
 function authenticateUser($username, $password) {
     $users = getUsers();
     foreach ($users as $user) {
-        if ($user['username'] === $username && password_verify($password, $user['password'])) {
+        if ($user['username'] !== $username) continue;
+
+        // הגנה מפני קריסה: hash פגום/חסר – לא קוראים ל-password_verify אלא מדווחים ללוג
+        if (isBrokenPasswordHash($user)) {
+            error_log('Login blocked - broken/missing password hash for user: ' . $username
+                      . '. Use forgot-password to restore access.');
+            return false;
+        }
+
+        if (password_verify($password, $user['password'])) {
             // שדרוג אוטומטי של סיסמאות ישנות להאש חדש
             if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
                 $user['password'] = password_hash($password, PASSWORD_DEFAULT);
@@ -379,8 +525,13 @@ function loginUser($username, $password) {
         $_SESSION['userId'] = $user['id'];
         $_SESSION['login_time'] = time();
 
-        // עדכון זמן כניסה אחרון
-        updateLastLogin($username);
+        // עדכון זמן כניסה אחרון – עטוף בtry/catch: כשל דיסק/פרמיישן לא
+        // צריך להפוך הצלחת התחברות ל-Fatal Error (שנתפסת כ"שגיאת תקשורת")
+        try {
+            updateLastLogin($username);
+        } catch (\Throwable $e) {
+            error_log('updateLastLogin failed for ' . $username . ': ' . $e->getMessage());
+        }
 
         return [
             'success' => true,
@@ -818,8 +969,32 @@ function ensureDirectories() {
 
 function readJSON($filepath) {
     if (!file_exists($filepath)) return null;
-    $content = file_get_contents($filepath);
-    return json_decode($content, true);
+
+    // נעילה קריאה (LOCK_SH): מונעת קריאת קובץ באמצע כתיבה של בקשה מקבילית
+    // (תרחיש טיפוסי ב-XAMPP/Windows: JSON חלקי/שבור => json_decode מחזיר null
+    //  והמערכת "לא מצליחה לקרוא" את קבצי ה-JSON).
+    $fh = @fopen($filepath, 'rb');
+    if ($fh === false) {
+        error_log('readJSON: cannot open file: ' . $filepath . ' (' . (error_get_last()['message'] ?? '') . ')');
+        return null;
+    }
+    @flock($fh, LOCK_SH);
+    $content = stream_get_contents($fh);
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+
+    // הסרת BOM (תו \xEF\xBB\xBF) – גורם ל-json_decode להיכשל על קבצים שנוצרו ע"י Excel/Notepad
+    if (strncmp($content, "\xEF\xBB\xBF", 3) === 0) {
+        $content = substr($content, 3);
+    }
+
+    $data = json_decode($content, true);
+    if ($data === null && trim($content) !== 'null') {
+        error_log('readJSON: invalid JSON in ' . $filepath . ' | php-error: ' . json_last_error_msg()
+                  . ' | first-bytes: ' . bin2hex(substr($content, 0, 16)));
+        return null;
+    }
+    return $data;
 }
 
 function writeJSON($filepath, $data) {

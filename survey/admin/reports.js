@@ -51,7 +51,19 @@ async function init() {
   form = formJson.data;
 
   const resRes = await fetch(`${API}/responses.php?action=list&formId=${id}`);
-  const resJson = await resRes.json();
+  // זיהוי ברור של פג תוקף Session – במקום "0 תגובות" נציג הודעה ונחזיר להתחברות.
+  if (resRes.status === 401) {
+    alert('פג תוקף ההתחברות. יש להתחבר מחדש.');
+    window.location.href = 'login.html';
+    return;
+  }
+  let resJson = {};
+  try { resJson = await resRes.json(); } catch (e) { resJson = { success: false }; }
+  if (!resJson.success && resJson.error) {
+    console.warn('שגיאה בטעינת תגובות:', resRes.status, resJson.error);
+    const banner = document.getElementById('reportSubtitle');
+    if (banner) banner.textContent = `⚠️ לא ניתן לטעון תגובות: ${resJson.error}`;
+  }
   responses = resJson.success ? resJson.data : [];
   filteredResponses = [...responses]; // אתחול - ללא סינון
 
