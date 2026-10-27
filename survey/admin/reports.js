@@ -920,6 +920,14 @@ function renderExport() {
         <button class="btn btn-success" onclick="document.getElementById('importResponsesFile').click()">בחר קובץ JSON וייבא</button>
         <div id="importResult" style="margin-top:12px;font-size:13px;"></div>
       </div>
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🪄</div>
+        <h4 style="margin-bottom:8px;">השלמת שדות אוטומטיים מהמאגר</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">משלים תגובות ישנות (למשל שם מוסד/מנהל/מפקח לפי סמל המוסד) ע"פ המאגר. לא דורס תשובות קיימות, ויוצר גיבוי לפני שינוי.</p>
+        <button class="btn btn-primary" onclick="runBackfill(false)">🔍 בדיקה מקדימה (Preview)</button>
+        <button class="btn btn-success" onclick="runBackfill(true)" style="margin-inline-start:8px;">▶️ בצע השלמה</button>
+        <div id="backfillResult" style="margin-top:12px;font-size:13px;text-align:start;"></div>
+      </div>
     </div>
     <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--slate-200);">
       <h4 style="margin-bottom:12px;">🌐 API Endpoints</h4>
@@ -1033,6 +1041,49 @@ function exportJSON() {
  * ייבוא תגובות מקובץ JSON שיוצר ע"י "ייצוא JSON" של המערכת (או מגיבוי קובץ התגובות).
  * נשלח ל-POST api/responses.php?action=import&formId=<id> עם טוקן CSRF.
  */
+// ===== השלמת שדות אוטומטיים מהמאגר (Backfill) =====
+async function runBackfill(apply) {
+  const box = document.getElementById('backfillResult');
+  if (!box) return;
+  box.innerHTML = '<span style="color:var(--slate-500);">⏳ סורק תגובות...</span>';
+  try {
+    let res;
+    if (apply) {
+      if (!confirm('לבצע השלמה בפועל? ייווצר קובץ גיבוי לפני השינוי.')) { box.innerHTML = ''; return; }
+      res = await FBAuth.writeRequest(`${API}/backfill.php?action=run&formId=${form.id}`, { method: 'POST' });
+    } else {
+      res = await FBAuth.fbFetch(`${API}/backfill.php?action=preview&formId=${form.id}`);
+    }
+    const data = res && res.data ? res.data : null;
+    if (!res || !res.success || !data) {
+      box.innerHTML = `<span style="color:#dc2626;">❌ ${ (res && res.error) ? res.error : 'שגיאה בתפעול' }</span>`;
+      return;
+    }
+    if (data.message) { box.innerHTML = `<span style="color:var(--slate-500);">${data.message}</span>`; return; }
+    let html = `<div style="background:var(--slate-50);border-radius:8px;padding:12px;">`;
+    html += `<b>${data.dryRun ? '🔍 בדיקה מקדימה' : '✅ ההשלמה בוצעה'}</b> — סה"כ תגובות: ${data.totalResponses} | שינויים: <b>${data.changes}</b> | שדות שכבר היו מלאים: ${data.alreadyFilled}<br>`;
+    if (data.backup) html += `📦 גיבוי נשמר: <code>${data.backup}</code><br>`;
+    if (data.unmatchedSymbols && data.unmatchedSymbols.length) {
+      html += `⚠️ סמלים שלא נמצאו במאגר: <code>${data.unmatchedSymbols.join(', ')}</code><br>`;
+    }
+    if (data.details && data.details.length) {
+      html += `<details style="margin-top:6px;"><summary>פירוט שינויים (${data.details.length})</summary><ul style="margin:6px 0;padding-inline-start:20px;">`;
+      data.details.slice(0, 100).forEach(d => {
+        html += `<li>תגובה <code>${String(d.responseId||'').slice(0,8)}</code> → <b>${d.target || d.field}</b>: ${d.to && typeof d.to === 'string' ? d.to : ''}</li>`;
+      });
+      html += `</ul></details>`;
+    }
+    if (!data.dryRun && data.changes > 0) {
+      html += `<div style="margin-top:8px;"><button class="btn btn-primary" onclick="location.reload()">רענן דף כדי לראות את הנתונים המעודכנים</button></div>`;
+    }
+    html += `</div>`;
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('Backfill error:', e);
+    box.innerHTML = `<span style="color:#dc2626;">❌ שגיאה: ${e.message}</span>`;
+  }
+}
+
 async function importResponsesFromFile(inputEl) {
   const file = inputEl.files && inputEl.files[0];
   if (!file) return;
