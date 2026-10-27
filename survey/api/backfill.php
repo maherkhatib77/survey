@@ -100,13 +100,68 @@ function bfResolveSymbol($symRaw, $field) {
 // משמש כאשר שם השדה אינו זהה לעמודת המאגר (למשל "المرحلة التعليمية" מול "שלב חינוך במוסד").
 function bfTranslationMap(): array {
     return [
-        'שלב חינוך במוסד' => ['المرحلة التعليمية', 'مرحلة التعليم في المدرسة', 'المرحلة'],
-        'סוג חינוך מוסד'   => ['نوع التعليم في المدرسة', 'نوع التربية', 'سוג الحوكمة'],
-        'מעמד משפטי'       => ['المكانة القانونية', 'الوضع القانوني'],
+        'שלב חינוך במוסד' => ['المرحلة التعليمية', 'مرحلة التعليم في المدرسة', 'المرحلة', 'المرحلة التعليمية في المؤسسة'],
+        'סוג חינוך מוסד'   => ['نوع التعليم في المدرسة', 'نوع التربية', 'سוג החינוך', 'نوع التربية في المؤسسة'],
+        'מעמד משפטי'       => ['المكانة القانونية', 'الوضع القانوني', 'المكانة القانونية للمؤسسة'],
         'שם מוסד'          => ['اسم المدرسة', 'اسم المؤسسة'],
         'שם מנהל'          => ['اسم المدير', 'اسم المدير/ة'],
-        'שם מפקח'          => ['اسم المفتش', 'اسم المفتش/ة', 'المفتح'],
+        'שם מפקח'          => ['اسم المفتش', 'اسم المفتش/ة', 'المفتش'],
     ];
+}
+
+// נרמול טקסט להשוואה גסה: הסרת BOM/לו"ה/רווחים כפולים, הורדת סימני פסיק ונקודותיים, אותיות קטנות
+function bfNormText($s): string {
+    $s = str_replace("\xEF\xBB\xBF", '', (string)$s);
+    $s = trim(preg_replace('/\s+/u', ' ', $s));
+    $s = str_replace(['،', '؟', '؛', '.', '،'], ['', '?', '', '', ''], $s);
+    if (function_exists('mb_strtolower')) return mb_strtolower($s, 'UTF-8');
+    return strtolower($s); // מספיק לASCII; בעברית/ערבית אין הבחנת רישיות
+}
+
+// השוואת substring ידידותית-יוניקוד (עם fallback אם mbstring אינו זמין)
+function bfStrContains(string $haystack, string $needle): bool {
+    if ($needle === '') return false;
+    if (function_exists('mb_strpos')) return mb_strpos($haystack, $needle, 0, 'UTF-8') !== false;
+    return strpos($haystack, $needle) !== false;
+}
+
+// זיהוי "שאלת מטריצה" שהתשובה שלה היא הציר המתאים לעמודת מאגר נתונה
+// (למשל עמודה "שלב חינוך במוסד" <-> שאלה "المرحلة التعليمية").
+function bfMatrixQuestionForColumn(string $col, array $allFields): ?string {
+    $dict = bfTranslationMap();
+    $variants = array_merge([$col], $dict[$col] ?? []);
+    $normVariants = array_map('bfNormText', $variants);
+    foreach ($allFields as $f) {
+        if (($f['type'] ?? '') !== 'matrix') continue;
+        $qn = bfNormText($f['label'] ?? '');
+        foreach ($normVariants as $nv) {
+            if ($nv !== '' && ($qn === $nv || bfStrContains($qn, $nv))) {
+                return $f['id'];
+            }
+        }
+    }
+    return null;
+}
+
+// האם התגובה לשאלת מטריצה ריקה? (מבנה אחסון לקוח: {rowId => colValue | [colValues]})
+function bfMatrixIsEmpty($cur): bool {
+    if ($cur === null || $cur === '' || $cur === []) return true;
+    if (is_array($cur)) {
+        foreach ($cur as $rv) {
+            if (is_array($rv)) { if ($rv) return false; }
+            elseif (is_scalar($rv) && trim((string)$rv) !== '') return false;
+        }
+        return true;
+    }
+    return trim((string)$cur) === '';
+}
+
+// התאמת תווית שדה/שאלה לעמודת מאגר: זהות (נרמול) או היכללה דו-כיוונית
+function bfLabelMatchesColumn(string $labelNorm, string $colNorm): bool {
+    if ($labelNorm === '' || $colNorm === '') return false;
+    return $labelNorm === $colNorm
+        || bfStrContains($labelNorm, $colNorm)
+        || bfStrContains($colNorm, $labelNorm);
 }
 
 // בניית מפת targetField -> sourceField: מיפויי autoFill מוצהרים + תרגום אוטומטי של עמודות המאגר
@@ -120,21 +175,31 @@ function bfBuildMappings(array $allFields, ?array $symbolField): array {
             if ($tid && $src !== '') $m[$tid] = $src;
         }
     }
-    // תרגום: עבור שדות יעד שלא הוגדר להם מיפוי — נסה להתאים לפי מילון
+    // תרגום: עבור שדות יעד שלא הוגדר להם מיפוי — נסה להתאים לפי מילון + התאמת חלקית
     if ($symbolField && !empty($symbolField['sourceId'])) {
         $index = bfBuildSourceIndex($symbolField['sourceId']);
         $cols = [];
         foreach ($index as $rec) { foreach ($rec as $k => $v) $cols[bfCleanKey((string)$k)] = true; break; }
         $dict = bfTranslationMap();
+        $normCols = [];
+        foreach (array_keys($cols) as $c) $normCols[$c] = bfNormText($c);
         foreach ($allFields as $f) {
             $tid = $f['id'];
             if (isset($m[$tid])) continue;
             if (($f['type'] ?? '') === 'record') continue; // שדות רשומה אחרים מטופלים בהצמדת רשומה
-            $lbl = bfCleanKey(preg_replace('/\s+/u', ' ', (string)($f['label'] ?? '')));
+            $lbl = bfNormText($f['label'] ?? '');
             if ($lbl === '') continue;
-            foreach ($cols as $col => $_) {
-                $variants = $dict[$col] ?? [];
-                if (in_array($lbl, $variants, true)) { $m[$tid] = $col; break; }
+            foreach ($normCols as $col => $cn) {
+                // 1) גרסה עברית של העמודה מופיעה ברשימת התרגומים של התווית
+                $hit = false;
+                foreach ($dict as $heCol => $arVariants) {
+                    if ($heCol !== $col) continue;
+                    foreach ($arVariants as $var) {
+                        if (bfLabelMatchesColumn($lbl, bfNormText($var))) { $hit = true; break 2; }
+                    }
+                }
+                // 2) התאמה חלקית ישירה בין תווית השדה לשם עמודת המאגר
+                if (!$hit && bfLabelMatchesColumn($lbl, $cn)) { $m[$tid] = $col; break; }
             }
         }
     }
@@ -166,6 +231,22 @@ function bfDecodeRecordValue($v) {
     return '';
 }
 
+// הצמדת רשומת מאגר (record) לערך שנבחר בשדה record — לפי displayField, עמודה ראשונה או מפתח index
+function bfAttachRecordValue($val, $tgtField) {
+    if (!is_array($tgtField) || empty($tgtField['sourceId'])) return null;
+    $idx = bfBuildSourceIndex($tgtField['sourceId']);
+    // 1) חיפוש לפי עמודת התצוגה
+    $df = bfCleanKey((string)($tgtField['displayField'] ?? ''));
+    if ($df !== '') {
+        foreach ($idx as $r) { if (($r[$df] ?? '') === $val) return $r; }
+    }
+    // 2) לפי המפתח הראשי (עמודת הקוד)
+    if (isset($idx[$val])) return $idx[$val];
+    // 3) לפי עמודה ראשונה
+    foreach ($idx as $r) { if ((string)reset($r) === $val) return $r; }
+    return null;
+}
+
 // השלמת שדה יעד אחד (רק אם ריק) — מחזיר true אם בוצע שינוי
 function bfSetIfEmpty(array &$data, string $targetId, $newVal, array $byId, array &$updatedList, array &$skippedList, string $via = ''): bool {
     $newStr = is_scalar($newVal) ? trim((string)$newVal) : '';
@@ -186,20 +267,9 @@ function bfSetIfEmpty(array &$data, string $targetId, $newVal, array $byId, arra
     // התאמת הערך לסוג שדה היעד (record/select/radio/checkbox -> מבנה אחסון תקין)
     $final = $newStr;
     if ($tType === 'record' && !empty($tgt['sourceId'])) {
-        $idx = bfBuildSourceIndex($tgt['sourceId']);
-        $rec = null;
-        // 1) חיפוש לפי עמודת התצוגה
-        $df = bfCleanKey((string)($tgt['displayField'] ?? ''));
-        if ($df !== '') {
-            foreach ($idx as $r) { if (($r[$df] ?? '') === $newStr) { $rec = $r; break; } }
-        }
-        // 2) לפי המפתח הראשי (עמודת הקוד)
-        if (!$rec && isset($idx[$newStr])) $rec = $idx[$newStr];
-        // 3) לפי עמודה ראשונה
-        if (!$rec) { foreach ($idx as $r) { if ((string)reset($r) === $newStr) { $rec = $r; break; } } }
+        $rec = bfAttachRecordValue($newStr, $tgt);
         if ($rec) {
             $data[$targetId] = $rec; // יש ללקוח את כל הרשומה -> הצגה תקינה בדוח/CSV
-            $changed = true;
         } else {
             $data[$targetId] = $newStr; // לא נמצאה רשומה — נשמור כמחרוזת (הצגה חלקית אך עדיף מריק)
         }
@@ -208,6 +278,15 @@ function bfSetIfEmpty(array &$data, string $targetId, $newVal, array $byId, arra
         $data[$targetId] = $final;
     } else {
         $data[$targetId] = $final;
+    }
+    // עבור שדה record: עדכן גם את "רשומת הבחירה" (_record) ואת עמודת ה-value שלה
+    // כך שמנגנוני autoFill בדוחות/מילוי יזהו את ההצמדה במבנה הסטנדרטי של הלקוח.
+    if ($tType === 'record' && !empty($tgt['sourceId']) && isset($data[$targetId]) && is_array($data[$targetId])) {
+        $rf = bfCleanKey((string)($tgt['recordField'] ?? ''));
+        if ($rf === '') $rf = (string)reset(array_keys($data[$targetId]));
+        if ($rf !== '' && array_key_exists($rf, $data[$targetId])) {
+            $data[$targetId . '_record'] = [$rf => $data[$targetId][$rf]];
+        }
     }
     $updatedList[] = [
         'responseId' => '',
@@ -222,7 +301,9 @@ function bfSetIfEmpty(array &$data, string $targetId, $newVal, array $byId, arra
 // פונקציית הליבה להשלמת autoFill על גבי תגובה בודדת
 // $allFields = כל שדות הטופס; $symbolField = שדה הרשומה עם סמל המוסד (או null);
 // $mappings = מפת targetField->sourceField מכל שדות ה-autoFill
-function bfApplyAutoFill(array &$data, ?array $symbolField, array $mappings, array $byId, array &$updatedList, array &$skippedList, array &$unmatchedList): int {
+// $allFieldsRef = כל שדות הטופס (כולל מטריצות) לזיהוי צירי מילוי; נדרש להשלמת מטריצות.
+function bfApplyAutoFill(array &$data, ?array $symbolField, array $mappings, array $byId, array &$updatedList, array &$skippedList, array &$unmatchedList, array $allFieldsRef = []): int {
+    if (!$allFieldsRef) $allFieldsRef = array_values($byId);
     $changedCount = 0;
 
     // מקור רשומה ישיר: _record של שדה הסמל (נשמר ע"י הלקוח בעת הבחירה)
@@ -298,16 +379,74 @@ function bfApplyAutoFill(array &$data, ?array $symbolField, array $mappings, arr
             $skippedList[] = ['responseId' => '', 'target' => ($tf['label'] ?? $tid), 'kept' => $curStr];
             continue;
         }
-        $lbl = bfCleanKey(preg_replace('/\s+/u', ' ', (string)($tf['label'] ?? '')));
+        $lbl = bfNormText($tf['label'] ?? '');
         $dict = bfTranslationMap();
         $srcCol = null;
         foreach ($cleanRec as $col => $val) {
-            if (in_array($lbl, $dict[$col] ?? [], true)) { $srcCol = $col; break; }
+            $matched = false;
+            foreach ($dict[$col] ?? [] as $var) {
+                if (bfLabelMatchesColumn($lbl, bfNormText($var))) { $matched = true; break; }
+            }
+            if (!$matched && bfLabelMatchesColumn($lbl, bfNormText($col))) $matched = true;
+            if ($matched) { $srcCol = $col; break; }
         }
         if ($srcCol === null) continue;
         $val = is_scalar($cleanRec[$srcCol]) ? trim((string)$cleanRec[$srcCol]) : '';
         if ($val === '') continue;
         if (bfSetIfEmpty($data, $tid, $val, $byId, $updatedList, $skippedList, 'record-attach:' . $srcCol)) $changedCount++;
+    }
+
+    // 4) השלמת צירי מטריצה (matrix rows) מעמודות המאגר:
+    //    אם שאלת המטריצה תוארת לעמודת מאגר (למשל "المرحلة التعليمية" <-> "שלב חינוך במוסד"),
+    //    והמשיב לא סימן באף שורה — סמן אוטומטית את השורה שהתווית שלה תואמת לערך במאגר.
+    $matrixFilled = [];
+    foreach ($cleanRec as $col => $val) {
+        if (!is_scalar($val)) continue;
+        $valStr = trim((string)$val);
+        if ($valStr === '' || $valStr === 'כן' || $valStr === 'לא') continue;
+        $qid = bfMatrixQuestionForColumn(bfCleanKey((string)$col), $allFieldsRef);
+        if ($qid === null || !isset($byId[$qid])) continue;
+        if (array_key_exists($qid, $matrixFilled)) continue; // עמודה אחת לכל שאלה לכל היותר
+        $q = $byId[$qid];
+        $rows = !empty($q['matrixRows']) ? $q['matrixRows'] : ($q['rows'] ?? []);
+        if (!$rows) continue;
+        $cur = $data[$qid] ?? [];
+        if (!bfMatrixIsEmpty($cur)) {
+            $skippedList[] = ['responseId' => '', 'target' => ($q['label'] ?? $qid), 'kept' => 'כבר נענתה'];
+            $matrixFilled[$qid] = true;
+            continue;
+        }
+        // חיפוש שורת מטריצה שהתווית שלה תואמת לערך במאגר (התאמה מלאה או היכללה דו-כיוונית)
+        $rowMatch = null; $rowIdMatch = null;
+        $valNorm = bfNormText($valStr);
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $rt = (string)($row['label'] ?? '');
+            $rtNorm = bfNormText($rt);
+            if ($rtNorm !== '' && ($rtNorm === $valNorm
+                || bfStrContains($rtNorm, $valNorm)
+                || bfStrContains($valNorm, $rtNorm))) { $rowMatch = $rt; $rowIdMatch = $row['id'] ?? $rt; break; }
+        }
+        if ($rowMatch === null) continue;
+        // מבנה אחסון לקוח: {rowId => colValue}; עבור הצמדת מאגר נשתמש בערך העמודה הראשונה
+        // כערך "מסומן" — זהה ל-V שמציג הדוח.
+        $firstColVal = '';
+        $colsArr = !empty($q['matrixColumns']) ? $q['matrixColumns'] : ($q['columns'] ?? []);
+        if ($colsArr) {
+            $c0 = reset($colsArr);
+            $firstColVal = is_array($c0) ? (string)($c0['value'] ?? '') : (string)$c0;
+        }
+        if ($firstColVal === '') $firstColVal = '1';
+        $data[$qid] = [$rowIdMatch => $firstColVal];
+        $matrixFilled[$qid] = true;
+        $updatedList[] = [
+            'responseId' => '',
+            'target' => ($q['label'] ?? $qid) . ' → ' . $rowMatch,
+            'from' => null,
+            'to' => $valStr,
+            'via' => 'matrix-column:' . bfCleanKey((string)$col)
+        ];
+        $changedCount++;
     }
 
     return $changedCount;
@@ -376,7 +515,7 @@ try {
         if (!is_array($data)) $data = [];
         $__rid = $resp['id'] ?? '';
         $__upd = []; $__skp = []; $__unm = [];
-        $__n = bfApplyAutoFill($data, $symbolField, $mappings, $byId, $__upd, $__skp, $__unm);
+        $__n = bfApplyAutoFill($data, $symbolField, $mappings, $byId, $__upd, $__skp, $__unm, $allFields);
         foreach ($__upd as $u) { $u['responseId'] = $__rid; $updatedList[] = $u; }
         foreach ($__skp as $s) { $s['responseId'] = $__rid; $skippedList[] = $s; }
         foreach ($__unm as $u2) { $u2['responseId'] = $__rid; $unmatchedList[] = $u2; }
