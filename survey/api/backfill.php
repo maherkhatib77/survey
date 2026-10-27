@@ -505,18 +505,96 @@ function mcNumericValue($col) {
 function mcCellNormalize($cell) {
     if ($cell === null || $cell === '' || $cell === []) return null;
     if (is_array($cell)) {
+        // מבנה אובייקט (למשל {value:"bdegree_keira", label:"..."} או רשומת מאגר) — חילוץ ערך
+        foreach (['value', 'id', 'label'] as $k) {
+            if (isset($cell[$k]) && is_scalar($cell[$k]) && trim((string)$cell[$k]) !== '') return [trim((string)$cell[$k])];
+        }
         $flat = [];
-        foreach ($cell as $x) if (is_scalar($x) && trim((string)$x) !== '') $flat[] = trim((string)$x);
+        foreach ($cell as $x) {
+            if (is_scalar($x) && trim((string)$x) !== '') $flat[] = trim((string)$x);
+            elseif (is_array($x)) { // רשימה של אובייקטי עמודה
+                foreach (['value', 'id', 'label'] as $k) {
+                    if (isset($x[$k]) && is_scalar($x[$k]) && trim((string)$x[$k]) !== '') { $flat[] = trim((string)$x[$k]); break; }
+                }
+            }
+        }
         return $flat ?: null;
     }
     if (is_scalar($cell)) return [trim((string)$cell)];
     return null;
 }
 
+/** האם לתגובה יש מילוי כלשהו (גם חלקי) בשאלת המטריצה? בדיקה לפי שורות הטופס + כל מפתח */
+function mcHasAnyFill($cur, array $rows) {
+    if (!is_array($cur) || !$cur) return false;
+    foreach ($rows as $r) {
+        if (mcCellNormalize($cur[$r['id']] ?? ($cur[$r['label']] ?? null)) !== null) return true;
+    }
+    // מפתחות לא מוכרים (למשל אחרי שינוי/המרת שורות) — אם יש בהם ערך → נחשב כמילוי
+    foreach ($cur as $k => $v) {
+        if (mcCellNormalize($v) !== null) return true;
+    }
+    return false;
+}
+
 /** מיפוי ערך-עמודה -> id העמודה (עבור כתיבה במבנה האחסון) */
 function mcColIdByValue(array $cols, $val) {
     foreach ($cols as $c) {
         if ($c['value'] === $val || $c['id'] === $val || $c['label'] === $val) return $c['id'];
+    }
+    return null;
+}
+
+/** זיהוי id העמודה שבה המשיב השתמש בתגובה (לצורך ממוצע/שכיח).
+ *  תואם גם מבנה ישן שבו נשמר value/label ולא id. */
+function mcResolveAnswerColId($rawVal, array $targetCols, ?array $sourceCols = null) {
+    if (!is_scalar($rawVal)) return null;
+    $val = trim((string)$rawVal);
+    if ($val === '') return null;
+    // 1) התאמה ישירה מול עמודות השאלה הנוכחית
+    $cid = mcColIdByValue($targetCols, $val);
+    if ($cid !== null) return $cid;
+    // 2) נרמול חסר: השוואת טקסט מטבע-לשונית (עברית/ערבית, רווחים/פסיקים)
+    $norm = function ($s) {
+        $s = trim((string)$s);
+        if (function_exists('mb_strtolower')) $s = mb_strtolower($s, 'UTF-8');
+        $s = str_replace(['_', ' ', '-', '،'], ['_', '', '', ''], $s);
+        $s = str_replace(["׳", "״"], ['', ''], $s);
+        return $s;
+    };
+    foreach ($targetCols as $c) {
+        if ($norm($c['value']) === $norm($val) || $norm($c['label']) === $norm($val)) return $c['id'];
+    }
+    // 3) התאמה מול עמודות שאלת המקור (אם ידועות) -> מציאת עמודה עקבית בערכים
+    if ($sourceCols !== null) {
+        $srcIdx = null;
+        foreach ($sourceCols as $i => $sc) {
+            if ($sc['value'] === $val || $sc['id'] === $val || $sc['label'] === $val) { $srcIdx = $i; break; }
+        }
+        if ($srcIdx === null) {
+            foreach ($sourceCols as $i => $sc) {
+                if ($norm($sc['value']) === $norm($val) || $norm($sc['label']) === $norm($val)) { $srcIdx = $i; break; }
+            }
+        }
+        if ($srcIdx !== null) {
+            // א. מיפוי לפי index בסולם — שני הסולמות מאותו משפחת ליקרט (אותו מספר שלבים,
+            //    והשלב הראשון שלהם הוא השלילה/המינימום של הסולם). זה מכסה מצב שבו מטריצות
+            //    באותו סקר כתובות בעברית ובערבית או בניסוחים שונים של אותו סולם.
+            $isLikert = function ($cols) use ($norm) {
+                $first = $norm($cols[0]['label'] ?? '') . ' ' . $norm($cols[0]['value'] ?? '');
+                return (bool)preg_match('/^(לא|אף|אינם|זרו|لا|ليست|بدرجة_قليلة|غير)/u', $first) || preg_match('/(لا|قليلة|low|min|never|אף_פעם)/u', $first);
+            };
+            if (count($targetCols) === count($sourceCols) && count($sourceCols) >= 2
+                && $isLikert($sourceCols) && $isLikert($targetCols)) {
+                return $targetCols[$srcIdx]['id'];
+            }
+            // ב. מיפוי לפי טקסט נרמל של עמודת המקור מול היעד
+            $srcLabel = '';
+            foreach ($sourceCols as $i => $sc) if ($i === $srcIdx) $srcLabel = $sc['label'];
+            foreach ($targetCols as $tc) {
+                if ($norm($tc['label']) === $norm($srcLabel) || $norm($tc['value']) === $norm($srcLabel)) return $tc['id'];
+            }
+        }
     }
     return null;
 }
@@ -552,16 +630,19 @@ function mcSuggest($rowLabel, array $respondentMatrixAnswers, ?array $historyRow
     // A+B: שקלול תשובות המשיב בשאר המטריצות
     $nums = [];      // ערכים מספריים
     $counts = [];    // שכיחות ערכים (גם לא-מספריים)
-    foreach ($respondentMatrixAnswers as $vals) {
-        foreach ($vals as $v) {
-            $cid = mcColIdByValue($cols, $v);
-            if ($cid === null) continue; // ערך שלא שייך לעמודות השאלה הנתונה
-            $colObj = null;
-            foreach ($cols as $c) if ($c['id'] === $cid) { $colObj = $c; break; }
-            $nv = mcNumericValue($colObj);
-            if ($nv !== null) $nums[] = $nv;
-            $counts[$v] = ($counts[$v] ?? 0) + 1;
-        }
+    foreach ($respondentMatrixAnswers as $entry) {
+        // כל איבר הוא [rawValue, sourceCols|null]
+        $v = is_array($entry) ? ($entry[0] ?? null) : $entry;
+        $srcCols = is_array($entry) ? ($entry[1] ?? null) : null;
+        if (!is_scalar($v)) continue;
+        $cid = mcResolveAnswerColId((string)$v, $cols, $srcCols);
+        if ($cid === null) continue; // ערך שלא ניתן לשייך לעמודות השאלה הנתונה
+        $colObj = null;
+        foreach ($cols as $c) if ($c['id'] === $cid) { $colObj = $c; break; }
+        $nv = mcNumericValue($colObj);
+        if ($nv !== null) $nums[] = $nv;
+        $key = $colObj['value'];
+        $counts[$key] = ($counts[$key] ?? 0) + 1;
     }
     // A) ממוצע -> העמודה המספרית הקרובה
     if (count($nums) >= 2) {
@@ -584,7 +665,7 @@ function mcSuggest($rowLabel, array $respondentMatrixAnswers, ?array $historyRow
         if (mcColIdByValue($cols, $mode) !== null) return [$mode, 'mode'];
     }
     // D) ברירת מחדל: עמודה אמצעית (בסולם מספרי) או ראשונה
-    $numericCols = array_values(array_filter($cols, fn($c) => mcNumericValue($c) !== null));
+    $numericCols = array_values(array_filter($cols, function ($c) { return mcNumericValue($c) !== null; }));
     if ($numericCols) {
         $mid = $numericCols[(int)floor(count($numericCols) / 2)];
         return [$mid['value'], 'default-mid'];
@@ -602,7 +683,7 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
     foreach (($form['pages'] ?? []) as $page) {
         foreach (($page['fields'] ?? []) as $f) $allFields[] = $f;
     }
-    $matrixFields = array_values(array_filter($allFields, fn($f) => ($f['type'] ?? '') === 'matrix'));
+    $matrixFields = array_values(array_filter($allFields, function ($f) { return ($f['type'] ?? '') === 'matrix'; }));
     if (!$matrixFields) {
         return ['totalResponses' => count($responses), 'changes' => 0, 'details' => [], 'skipped' => 0, 'message' => 'לסקר זה אין שאלות מטריצה'];
     }
@@ -610,6 +691,8 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
     // מעבר ראשון: איסוף תשובות לפי משיב (להיסטוריה) ומילויים קיימים
     $respKeys = [];       // idx -> respondentKey
     $answersByKey = [];   // key => [ [fieldId => [rowLabel => [values]]], ... ]
+    $matrixColsById = []; // fieldId -> columns (לצורך תרגום ערכי מקור)
+    foreach ($matrixFields as $mf) $matrixColsById[$mf['id']] = mcColumns($mf);
     foreach ($responses as $i => $resp) {
         if (!is_array($resp)) continue;
         $data = $resp['data'] ?? [];
@@ -634,6 +717,7 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
 
     $updatedList = [];
     $skippedCount = 0;
+    $skippedEmpty = 0;   // מטריצות שלא נענו כלל — לא ממלאים (כבוד הנענה)
     $changedCount = 0;
 
     // מעבר שני: זיהוי ומילוי חוסרים
@@ -641,11 +725,8 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
         if (!is_array($resp)) continue;
         $key = $respKeys[$i] ?? ('idx:' . $i);
         $histEntries = $answersByKey[$key] ?? [];
-        // היסטוריה = כל תגובות אותו משיב *מלבד* התגובה הנוכחית
-        $history = [];
-        foreach ($histEntries as $j => $h) { if ($j !== array_search($resp, $histEntries, false)) {} }
-        // פשוט יותר: נשתמש בכל יתר הערכים של אותו משיב
-        foreach ($histEntries as $h) $history[] = $h;
+        // היסטוריה = תגובות אותו משיב (כולל הנוכחית — שורות שנענו בה לא נדרסות בכל מקרה)
+        $history = $histEntries;
 
         if (!isset($resp['data']) || !is_array($resp['data'])) $resp['data'] = [];
         $newData = [];
@@ -658,28 +739,94 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
             $fid = $mf['id'];
             $cur = $resp['data'][$fid] ?? null;
             if (!is_array($cur)) $cur = [];
+            // הגנה על כבוד הנענה: אם המשיב לא מילא כלום בשאלה זו — אין למלא עבורו.
+            // השלמה מתבצעת רק במטריצות שנענו חלקית (דילוג על שורות בודדות).
+            if (!mcHasAnyFill($cur, $rows)) { $skippedEmpty++; continue; }
             $filledHere = 0;
 
-            // תשובות המשיב בשאר המטריצות (לצורך ממוצע/שכיח)
+            // תשובות המשיב בשאר המטריצות (לצורך ממוצע/שכיח) — כולל עמודות המקור לתרגום
             $otherAnswers = [];
             foreach ($matrixFields as $of) {
                 if ($of['id'] === $fid) continue;
+                $srcCols = $matrixColsById[$of['id']] ?? null;
                 foreach ($history as $h) {
-                    foreach (($h[$of['id']] ?? []) as $vals) $otherAnswers[] = $vals;
+                    foreach (($h[$of['id']] ?? []) as $vals) {
+                        foreach ($vals as $vv) $otherAnswers[] = [$vv, $srcCols];
+                    }
                 }
             }
 
             foreach ($rows as $r) {
                 $existing = mcCellNormalize($cur[$r['id']] ?? ($cur[$r['label']] ?? null));
                 if ($existing !== null) { $skippedCount++; continue; } // נענה — לא דורסים
-                // היסטוריה לאותה שורה בדיוק (בתגובות אחרות של אותו משיב)
+
+                // (1) היסטוריה: אותו משיב ענה על אותה שורה בדיוק בתגובה אחרת -> העתקה מדויקת
                 $histVal = null;
                 foreach ($history as $h) {
                     if (isset($h[$fid][$r['label']])) { $hv = $h[$fid][$r['label']]; $histVal = $hv[0] ?? null; if ($histVal !== null) break; }
                 }
-                $sug = mcSuggest($r['label'], $otherAnswers, $histVal, $cols);
-                if ($sug === null) continue;
-                [$val, $via] = $sug;
+                if ($histVal !== null) {
+                    $hcid = mcResolveAnswerColId($histVal, $cols);
+                    if ($hcid === null) {
+                        foreach ($matrixFields as $of) {
+                            if ($of['id'] === $fid) continue;
+                            $tmp = mcResolveAnswerColId($histVal, $matrixColsById[$of['id']] ?? []);
+                            if ($tmp !== null) {
+                                foreach ($matrixColsById[$of['id']] as $oc) if ($oc['id'] === $tmp) { $hcid = mcResolveAnswerColId($oc['value'], $cols, [$oc]); break 2; }
+                                foreach ($matrixColsById[$of['id']] as $oc) if ($oc['id'] === $tmp) { $hcid = mcResolveAnswerColId($oc['label'], $cols, [$oc]); break 2; }
+                            }
+                        }
+                    }
+                    if ($hcid !== null) {
+                        $cur[$r['id']] = $hcid;
+                        $filledHere++; $changedCount++;
+                        $hLabel = $hcid; foreach ($cols as $c) if ($c['id'] === $hcid) $hLabel = $c['value'];
+                        $updatedList[] = ['responseId' => $resp['id'] ?? '', 'target' => ($mf['label'] ?? $fid) . ' → ' . $r['label'], 'from' => null, 'to' => $hLabel, 'via' => 'matrix:history'];
+                        continue;
+                    }
+                }
+
+                // (2) הסקה מסולם המטריצה הנוכחית עצמה (ממוצע/שכיח של יתר השורות שנענו)
+                $selfAnswers = [];
+                $selfNums = []; $selfCounts = [];
+                foreach ($rows as $rr) {
+                    if ($rr['id'] === $r['id']) continue;
+                    $ex = mcCellNormalize($cur[$rr['id']] ?? ($cur[$rr['label']] ?? null));
+                    if ($ex === null) continue;
+                    foreach ($ex as $v) {
+                        $cid2 = mcColIdByValue($cols, $v);
+                        if ($cid2 === null) continue;
+                        $colObj2 = null; foreach ($cols as $c) if ($c['id'] === $cid2) $colObj2 = $c;
+                        $nv2 = mcNumericValue($colObj2);
+                        if ($nv2 !== null) $selfNums[] = $nv2;
+                        $selfCounts[$colObj2['value']] = ($selfCounts[$colObj2['value']] ?? 0) + 1;
+                    }
+                }
+                $val = null; $via = null;
+                if (count($selfNums) >= 1) {
+                    $avg = array_sum($selfNums) / count($selfNums);
+                    $best = null; $bestDist = INF;
+                    foreach ($cols as $c) {
+                        $nv = mcNumericValue($c);
+                        if ($nv === null) continue;
+                        $dist = abs($nv - $avg);
+                        if ($dist < $bestDist) { $bestDist = $dist; $best = $c['value']; }
+                    }
+                    if ($best !== null) { $val = $best; $via = 'self-avg(' . round($avg, 2) . ')'; }
+                }
+                if ($val === null && $selfCounts) {
+                    arsort($selfCounts);
+                    $modeKey = (string)array_key_first($selfCounts);
+                    if (mcColIdByValue($cols, $modeKey) !== null) { $val = $modeKey; $via = 'self-mode'; }
+                }
+
+                // (3)fallback רגיל: שאר המטריצות + היסטוריה + ברירת מחדל
+                if ($val === null) {
+                    $sug = mcSuggest($r['label'], $otherAnswers, null, $cols);
+                    if ($sug === null) continue;
+                    [$val, $via] = $sug;
+                    $via = 'cross-' . $via;
+                }
                 $cid = mcColIdByValue($cols, $val);
                 if ($cid === null) continue;
                 $cur[$r['id']] = $cid;
@@ -704,6 +851,7 @@ function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
         'changes' => $changedCount,
         'details' => $updatedList,
         'alreadyFilled' => $skippedCount,
+        'untouchedEmptyMatrices' => $skippedEmpty,
     ];
 }
 
@@ -723,12 +871,14 @@ try {
                 sendResponse(['success' => false, 'error' => 'אין לך גישה לפעולה זו עבור סקר זה'], 403);
             }
         }
-    } catch (Exception $e) {
-        error_log('backfill auth error: ' . $e->getMessage());
-        sendResponse(['success' => false, 'error' => 'שגיאת הרשאה: ' . $e->getMessage()], 500);
-    } catch (Error $e) {
-        error_log('backfill auth fatal: ' . $e->getMessage() . ' @ line ' . $e->getLine());
-        sendResponse(['success' => false, 'error' => 'שגיאה פנימית בשרת (פורט בלוג)'], 500);
+    } catch (Throwable $e) {
+        // Exception + Error כאחד — sendResponse קורא exit() ולכן הוא חייב להיות
+        // מחוץ לבלוק ה-catch (exit בתוך catch עלול להיחסם בסביבות מסוימות).
+        error_log('backfill auth fatal: ' . get_class($e) . ': ' . $e->getMessage() . ' @ line ' . $e->getLine());
+        $__authErr = true;
+    }
+    if (!empty($__authErr)) {
+        sendResponse(['success' => false, 'error' => 'שגיאת הרשאה/התחברות. ייתכן שפג תוקף החיבור — רענן את הדף והתחבר מחדש. הפרטים נרשמו בלוג PHP.'], 403);
     }
 
     try {
