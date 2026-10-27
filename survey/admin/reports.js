@@ -932,11 +932,95 @@ function renderExport() {
   </div>`;
 }
 
+// === עזרי ייצוא: המרת ערך תגובה למחרוזת קריאה (ללא [object Object]) ===
+function csvOptionLabel(f, val) {
+  if (val === '__other__') return '__other__';
+  const opt = (f.options || []).find(o => o.value === val || o.id === val);
+  if (opt) return opt.label != null ? String(opt.label) : String(val);
+  return String(val);
+}
+
+function recordDisplayValue(f, rec) {
+  if (rec == null) return '';
+  if (typeof rec !== 'object') return String(rec);
+  const df = f.displayField || f.sourceDisplayField || null;
+  if (df && rec[df] != null && rec[df] !== '') return String(rec[df]);
+  const keys = Object.keys(rec);
+  const nameKey = keys.find(k => /שם|name/i.test(k));
+  if (nameKey && rec[nameKey]) return String(rec[nameKey]);
+  const nonEmpty = keys.find(k => rec[k] != null && String(rec[k]).trim() !== '');
+  return nonEmpty ? String(rec[nonEmpty]) : (keys.length ? String(rec[keys[0]]) : '');
+}
+
+function matrixRowLabel(f, rowId) {
+  const row = (f.matrixRows || []).find(r => r.id === rowId || r.value === rowId || r.label === rowId);
+  if (row) return row.label != null ? String(row.label) : String(rowId);
+  return String(rowId);
+}
+
+function matrixColLabel(f, colValue) {
+  const col = (f.matrixColumns || []).find(c => c.value === colValue || c.id === colValue || c.label === colValue);
+  if (col) return col.label != null ? String(col.label) : String(colValue);
+  return String(colValue);
+}
+
+// המרה גנרית של כל ערך (מטריצות/מאגרים/בחירה מרובה/קבצים) לטקסט קריא ב-CSV
+function csvCellValue(f, v, otherVal) {
+  if (v === undefined || v === null || v === '') return '';
+  // מטריצה: עצם {rowId: colValue | [colValues]}
+  if (f && f.type === 'matrix' && typeof v === 'object' && !Array.isArray(v)) {
+    const parts = [];
+    Object.keys(v).forEach(rowKey => {
+      const cell = v[rowKey];
+      if (cell === undefined || cell === null || cell === '' || (Array.isArray(cell) && cell.length === 0)) return;
+      const rowLabel = matrixRowLabel(f, rowKey);
+      if (Array.isArray(cell)) {
+        parts.push(rowLabel + ': ' + cell.map(cv => matrixColLabel(f, cv)).join(' / '));
+      } else {
+        parts.push(rowLabel + ': ' + matrixColLabel(f, cell));
+      }
+    });
+    return parts.join('; ');
+  }
+  // רשומה ממאגר (עצם או מערך עצמים)
+  if (f && (f.type === 'record' || f.sourceId) && typeof v === 'object') {
+    if (Array.isArray(v)) return v.map(rec => recordDisplayValue(f, rec)).filter(Boolean).join('; ');
+    return recordDisplayValue(f, v);
+  }
+  if (Array.isArray(v)) {
+    return v.map(item => {
+      if (item === '__other__') {
+        const txt = otherVal ? String(otherVal) : '';
+        return txt ? 'אחר: ' + txt : 'אחר';
+      }
+      if (item && typeof item === 'object') return recordDisplayValue(f || {}, item);
+      return f && (f.options || []).length ? csvOptionLabel(f, item) : String(item);
+    }).filter(s => s !== '').join('; ');
+  }
+  if (typeof v === 'object') {
+    if (v.name) return String(v.name);
+    if (v.url) return String(v.url);
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+  let s = String(v);
+  if (s === '__other__') {
+    const txt = otherVal ? String(otherVal) : '';
+    return txt ? 'אחר: ' + txt : 'אחר';
+  }
+  if (s.startsWith('data:image')) return '[חתימה]';
+  if (s.startsWith('data:')) return '[קובץ מצורף]';
+  return s;
+}
+
 function exportCSV() {
   const allFields = form.pages.flatMap(p => p.fields);
   const headers = ['תאריך שליחה', ...allFields.map(f => f.label)];
-  const rows = filteredResponses.map(r => [formatDateTime(r.submittedAt), ...allFields.map(f => { const v = r.data[f.id]; return Array.isArray(v) ? v.join('; ') : String(v || ''); })]);
-  const csv = '\ufeff' + [headers.join(','), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
+  const rows = filteredResponses.map(r => [
+    formatDateTime(r.submittedAt),
+    ...allFields.map(f => csvCellValue(f, r.data[f.id], r.data[f.id + '_other']))
+  ]);
+  const escCsv = (c) => '"' + String(c).split('"').join('""') + '"';
+  const csv = '\ufeff' + [headers.map(escCsv).join(','), ...rows.map(r => r.map(escCsv).join(','))].join('\r\n');
   download(csv, `${form.settings.title}.csv`, 'text/csv;charset=utf-8;');
 }
 
