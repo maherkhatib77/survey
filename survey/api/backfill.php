@@ -393,6 +393,9 @@ function bfApplyAutoFill(array &$data, ?array $symbolField, array $mappings, arr
         if ($srcCol === null) continue;
         $val = is_scalar($cleanRec[$srcCol]) ? trim((string)$cleanRec[$srcCol]) : '';
         if ($val === '') continue;
+        // הצמדת רשומת-מאגר מלאה כשהערך תואם רשומה בשלב-א'; אחרת מילוי טקסט חופשי.
+        // (חשוב: אין למלא "יסודי בלבד" בתוך מאגר שבו קיימות רק הרשומות "יסודי"/"חטיבת ביניים"... —
+        //  bfSetIfEmpty יזהה שאין התאמה וישמור את הערך כמחרוזת קריאה, עדיף מהשדה הריק.)
         if (bfSetIfEmpty($data, $tid, $val, $byId, $updatedList, $skippedList, 'record-attach:' . $srcCol)) $changedCount++;
     }
 
