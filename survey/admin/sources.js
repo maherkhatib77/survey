@@ -2,7 +2,26 @@
 let sources = [];
 let currentSource = null;
 let currentRecords = [];
-let editingRecordIndex = null; // מעקב אחרי רשומה בעריכה
+let editingRecordIndex = null; // מעקב אחרי רשומה בעריכה (אינדקס ב-currentRecords)
+let lastFilteredRecords = null; // הרשומות המוצגות כרגע (אחרי סינון חיפוש)
+
+// ייצוב סדר: מיון לפי עמודת "סדר" אם קיימת — זהה למערך ולתצוגה
+function sortRecordsByOrder(records, fields) {
+    if (!Array.isArray(records)) return [];
+    if (!fields || !fields.includes('סדר')) return records.slice();
+    return records.slice().sort((a, b) => {
+        const na = parseFloat(a['סדר']), nb = parseFloat(b['סדר']);
+        const va = isNaN(na) ? Infinity : na;
+        const vb = isNaN(nb) ? Infinity : nb;
+        if (va !== vb) return va - vb;
+        return String(a[fields[0]] || '').localeCompare(String(b[fields[0]] || ''), 'he');
+    });
+}
+
+// השוואת תוכן רשומה (למציאת אינדקס אמין ב-currentRecords)
+function recordContentKey(rec) {
+    return JSON.stringify(rec);
+}
 
 // Load sources on page load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -56,10 +75,37 @@ function renderSources() {
             <div class="source-actions">
                 <button class="btn btn-sm btn-outline" onclick="viewRecords('${source.id}')">👁️ צפה ברשומות</button>
                 <button class="btn btn-sm btn-outline" onclick="editSource('${source.id}')">✏️ ערוך</button>
+                <button class="btn btn-sm btn-outline" onclick="exportSource('${source.id}', 'csv')" title="ייצוא לקובץ CSV">📥 CSV</button>
+                <button class="btn btn-sm btn-outline" onclick="exportSource('${source.id}', 'excel')" title="ייצוא לקובץ Excel">📊 Excel</button>
                 <button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="deleteSource('${source.id}')">🗑️ מחק</button>
             </div>
         </div>
     `).join('');
+}
+
+/**
+ * ייצוא מאגר – פותח כתורן מוסתר כך שהדפדפן מוריד את הקובץ ישירות
+ * (ה-Session/Cookie נשלחים אוטומטית, ולכן אין צורך בטוקן CSRF ב-GET).
+ */
+function exportSource(id, format) {
+    const source = sources.find(s => s.id === id);
+    if (source && (source.recordCount || 0) === 0) {
+        showError('המאגר ריק – אין מה לייצא');
+        return;
+    }
+    const url = `../api/sources.php?action=export&id=${encodeURIComponent(id)}&format=${format}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+// ייצוא מהחלון "צפה ברשומות" – מייצא את כל המאגר הפתוח (לא רק את התוצאות המסוננות)
+function exportCurrentSource(format) {
+    if (!currentSource) return;
+    exportSource(currentSource.id, format);
 }
 
 function showCreateModal() {
@@ -199,8 +245,10 @@ async function viewRecords(id) {
         
         if (result.success) {
             currentSource = result.data;
-            currentRecords = result.data.records || [];
-            
+            // מיון יציב — זהה הן למערך והן לתצוגה, כך שאינדקסים תואמים
+            currentRecords = sortRecordsByOrder(result.data.records || [], result.data.fields);
+            lastFilteredRecords = null;
+
             document.getElementById('recordsTitle').textContent = `${result.data.name} - רשומות`;
             renderRecords();
             document.getElementById('recordsModal').style.display = 'flex';
@@ -235,14 +283,17 @@ function renderRecords(filteredRecords = null) {
     });
     html += '<th>פעולות</th></tr></thead><tbody>';
     
-    records.forEach((record, index) => {
+    records.forEach((record) => {
+        // האינדקס האמיתי ב-currentRecords — גם בתצוגה מסוננת אחרי חיפוש
+        const realIdx = currentRecords.indexOf(record);
+        if (realIdx === -1) return;
         html += '<tr>';
         currentSource.fields.forEach(field => {
             html += `<td>${escapeHtml(record[field] || '')}</td>`;
         });
         html += `<td>
-            <button class="btn btn-sm btn-outline" onclick="editRecord(${index})" title="ערוך רשומה">✏️</button>
-            <button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="deleteRecord(${index})" title="מחק רשומה">🗑️</button>
+            <button class="btn btn-sm btn-outline" onclick="editRecord(${realIdx})" title="ערוך רשומה">✏️</button>
+            <button class="btn btn-sm btn-outline" style="color:var(--danger);" onclick="deleteRecord(${realIdx})" title="מחק רשומה">🗑️</button>
         </td>`;
         html += '</tr>';
     });
@@ -318,6 +369,10 @@ async function saveRecord() {
 }
 
 async function deleteRecord(index) {
+    if (index == null || index < 0 || index >= currentRecords.length) {
+        showError('שגיאה: הרשומה לא נמצאה. נא לרענן את הדף ולנסות שוב.');
+        return;
+    }
     if (!confirm('האם אתה בטוח שברצונך למחוק רשומה זו?\n\nפעולה זו בלתי הפיכה!')) {
         return;
     }
@@ -351,8 +406,12 @@ async function deleteRecord(index) {
 function editRecord(index) {
     if (!currentSource || !currentSource.fields) return;
     
-    editingRecordIndex = index;
     const record = currentRecords[index];
+    if (!record) {
+        showError('שגיאה: הרשומה לא נמצאה. נא לרענן את הדף ולנסות שוב.');
+        return;
+    }
+    editingRecordIndex = index;
     
     // עדכון כותרת המודאל
     document.getElementById('addRecordModal').querySelector('h3').textContent = 'ערוך רשומה';
@@ -387,8 +446,20 @@ async function updateRecord() {
         updatedRecord[input.dataset.field] = input.value.trim();
     });
     
-    // עדכון הרשומה במערך
-    currentRecords[editingRecordIndex] = updatedRecord;
+    // עדכון הרשומה במערך — וידוא שהאינדקס תקין
+    let targetIdx = (editingRecordIndex != null && editingRecordIndex >= 0 && editingRecordIndex < currentRecords.length)
+        ? editingRecordIndex : -1;
+    if (targetIdx === -1) {
+        // fallback: איתור לפי עמודת מפתח (סמל/קוד)
+        const keyField = currentSource.fields.find(f => /קוד|סמל|code/i.test(f)) || currentSource.fields[0];
+        const kv = String(updatedRecord[keyField] ?? '').trim();
+        targetIdx = kv ? currentRecords.findIndex(r => String(r[keyField] ?? '').trim() === kv) : -1;
+    }
+    if (targetIdx === -1) {
+        showError('לא ניתן היה לאתר את הרשומה לעדכון. נא לרענן ולנסות שוב.');
+        return;
+    }
+    currentRecords[targetIdx] = updatedRecord;
     
     try {
         const response = await fetch(`../api/sources.php?action=update&id=${currentSource.id}`, {
@@ -469,7 +540,24 @@ async function importCSVAsNew() {
             body: formData
         });
         
-        const result = await response.json();
+        // קריאה עמידה: השרת מחזיר JSON תקין, אך שאריות HTML/Warning ישנות
+        // עלולות להישאר בתגובה – מנקים ומאתרים את בלוק ה-JSON שבתוכה.
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            const startIdx = text.indexOf('{');
+            const endIdx = text.lastIndexOf('}');
+            if (startIdx !== -1 && endIdx > startIdx) {
+                try { result = JSON.parse(text.slice(startIdx, endIdx + 1)); } catch (e2) { result = null; }
+            }
+            if (!result) {
+                console.error('Raw server response:', text);
+                showError('תגובת השרת אינה תקינה – נא בדקו את log השגיאות של PHP');
+                return;
+            }
+        }
         
         if (result.success) {
             closeImportModal();
@@ -569,11 +657,13 @@ function closeImportRecordsModal() {
 
 async function logout() {
     try {
-        await fetch('../api/auth.php?action=logout');
-        window.location.href = 'login.html';
-    } catch (error) {
-        window.location.href = 'login.html';
-    }
+        if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+            await FBAuth.fbLogout('../api', 'login.html');
+            return;
+        }
+    } catch (error) { /* fallback below */ }
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    window.location.href = 'login.html';
 }
 
 function showSuccess(message) {

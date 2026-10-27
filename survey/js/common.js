@@ -76,12 +76,27 @@ async function submitResponse(formId, data) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(response)
       });
-      const j = await r.json();
-      if (j.success) return j.data;
-    } catch(e) { console.warn('API fallback', e); }
+      let j = null;
+      try { j = await r.json(); } catch(e) { j = null; }
+      if (j && j.success) return j.data;
+      // שגיאת אימות מהשרת (400): העבר את הפירוט לקורא כדי להציגו למשתמש
+      if (r.status === 400 && j && j.fieldErrors) {
+        const err = new Error(j.error || 'יש להשלים את כל השדות החובה');
+        err.fieldErrors = j.fieldErrors;
+        throw err;
+      }
+      if (r.status === 400 || r.status === 403 || r.status === 404) {
+        throw new Error((j && j.error) ? j.error : 'השליחה נדחתה על ידי השרת');
+      }
+      console.warn('API submit failed, status:', r.status);
+    } catch(e) {
+      // שגיאת רשת אמיתית -> fallback מקומי; שגיאת אימות -> לשדרג למעלה
+      if (e && (e.fieldErrors || e.name === 'Error') && !(e instanceof TypeError)) throw e;
+      console.warn('API fallback', e);
+    }
   }
-  
-  // Fallback
+
+  // Fallback (רק כשה-API בלתי זמין) - שמירה מקומית
   const responses = getResponsesLS();
   responses.push(response);
   saveResponsesLS(responses);

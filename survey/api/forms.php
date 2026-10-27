@@ -8,6 +8,8 @@
  * DELETE - דורש התחברות
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -34,6 +36,14 @@ switch ($method) {
             // רשימת כל הטפסים - דורש התחברות
             requireLogin();
             $forms = getAllForms();
+            // סינון לפי בעלות: משתמש רגיל רואה רק סקרים שהוא יצר
+            // (סקרים ללא createdBy – היסטוריים – גלויים למנהלים בלבד)
+            $cu = getCurrentUser();
+            if (($cu['role'] ?? 'user') !== 'admin') {
+                $forms = array_values(array_filter($forms, function($f) use ($cu) {
+                    return isset($f['createdBy']) && $f['createdBy'] === ($cu['username'] ?? '');
+                }));
+            }
             sendResponse(['success' => true, 'data' => $forms]);
             
         } elseif ($action === 'get' && $id) {
@@ -56,14 +66,20 @@ switch ($method) {
 
     case 'POST':
         requireLogin();
+        validateCsrf();
         $input = getJSONInput();
         if (!$input) sendResponse(['success' => false, 'error' => 'נתונים לא תקינים'], 400);
 
         if ($action === 'create') {
+            requirePermission('create_forms');
             $input['id'] = generateUUID();
             $input['createdAt'] = date('c');
             $input['updatedAt'] = date('c');
             $input['responseCount'] = 0;
+            // בעלות הסקר נקבעת בצד השרת – אין אפשרות לזיוף
+            $__cu = getCurrentUser();
+            $input['createdBy'] = $__cu['username'] ?? '';
+            $input['createdByName'] = $__cu['fullName'] ?? '';
             
             if (saveForm($input)) {
                 sendResponse(['success' => true, 'data' => $input], 201);
@@ -71,10 +87,22 @@ switch ($method) {
                 sendResponse(['success' => false, 'error' => 'שגיאה בשמירת הטופס'], 500);
             }
         } elseif ($action === 'update' && $id) {
+            requirePermission('edit_forms');
             $existingForm = getForm($id);
             if (!$existingForm) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
-            
+
+            // בדיקת בעלות: משתמש רגיל יכול לערוך רק סקרים שהוא יצר
+            $__cu = getCurrentUser();
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin') {
+                $owner = $existingForm['createdBy'] ?? null;
+                if ($owner !== ($__cu['username'] ?? '')) {
+                    sendResponse(['success' => false, 'error' => 'ניתן לערוך רק סקרים שאתה יצרת'], 403);
+                }
+            }
+
             $input['id'] = $id;
+            $input['createdAt'] = $existingForm['createdAt'];
+            $input['createdBy'] = $existingForm['createdBy'] ?? ($__cu['username'] ?? '');
             $input['updatedAt'] = date('c');
             $input['createdAt'] = $existingForm['createdAt'];
             $input['responseCount'] = $existingForm['responseCount'] ?? 0;
@@ -91,7 +119,18 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
+        validateCsrf();
+        requirePermission('delete_forms');
+        // בדיקת בעלות למשתמש רגיל
         if ($id) {
+            $__cu = getCurrentUser();
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin') {
+                $__form = getForm($id);
+                if (!$__form) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
+                if (($__form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                    sendResponse(['success' => false, 'error' => 'ניתן למחוק רק סקרים שאתה יצרת'], 403);
+                }
+            }
             if (deleteFormFile($id)) {
                 sendResponse(['success' => true, 'message' => 'הטופס נמחק בהצלחה']);
             } else {

@@ -23,7 +23,11 @@ async function checkAuth() {
 }
 
 async function logout() {
-  await fetch(`${API}/auth.php?action=logout`, { method: 'POST' });
+  if (window.FBAuth && typeof FBAuth.fbLogout === 'function') {
+    await FBAuth.fbLogout(API, 'login.html');
+    return;
+  }
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
   window.location.href = 'login.html';
 }
 
@@ -47,7 +51,19 @@ async function init() {
   form = formJson.data;
 
   const resRes = await fetch(`${API}/responses.php?action=list&formId=${id}`);
-  const resJson = await resRes.json();
+  // זיהוי ברור של פג תוקף Session – במקום "0 תגובות" נציג הודעה ונחזיר להתחברות.
+  if (resRes.status === 401) {
+    alert('פג תוקף ההתחברות. יש להתחבר מחדש.');
+    window.location.href = 'login.html';
+    return;
+  }
+  let resJson = {};
+  try { resJson = await resRes.json(); } catch (e) { resJson = { success: false }; }
+  if (!resJson.success && resJson.error) {
+    console.warn('שגיאה בטעינת תגובות:', resRes.status, resJson.error);
+    const banner = document.getElementById('reportSubtitle');
+    if (banner) banner.textContent = `⚠️ לא ניתן לטעון תגובות: ${resJson.error}`;
+  }
   responses = resJson.success ? resJson.data : [];
   filteredResponses = [...responses]; // אתחול - ללא סינון
 
@@ -202,11 +218,20 @@ function switchTab(tab, btn) {
 
 function renderTab() {
   const content = document.getElementById('tabContent');
-  switch (activeTab) {
-    case 'overview': content.innerHTML = renderOverview(); break;
-    case 'fields': content.innerHTML = renderFields(); break;
-    case 'responses': content.innerHTML = renderResponses(); break;
-    case 'export': content.innerHTML = renderExport(); break;
+  // אבחון: ודאו שהסקריפט המעודכן נטען — אם שורה זו לא מופיעה בקונסול, זהו קאש של הדפדפן (Ctrl+F5)
+  console.info('[reports.js] build 20261027a | activeTab=' + activeTab + ' | matrix UI ' + (typeof runMatrixCompletion === 'function' ? 'OK' : 'MISSING'));
+  try {
+    switch (activeTab) {
+      case 'overview': content.innerHTML = renderOverview(); break;
+      case 'fields': content.innerHTML = renderFields(); break;
+      case 'responses': content.innerHTML = renderResponses(); break;
+      case 'export': content.innerHTML = renderExport(); break;
+    }
+  } catch (e) {
+    console.error('renderTab error:', e);
+    content.innerHTML = '<div style="padding:16px;border:1px solid #dc2626;border-radius:8px;color:#dc2626;">' +
+      '❌ שגיאה בתצוגת הלשונית: ' + (window.FBApp && FBApp.escapeHtml ? FBApp.escapeHtml(e.message) : String(e.message)) +
+      '<br><small>רעננו את הדפדפן (Ctrl+F5). אם השגיאה נמשכת — פתחו Console לפירוט.</small></div>';
   }
 }
 
@@ -448,11 +473,233 @@ function renderResponses() {
       
       html += `<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(displayText)}</td>`;
     });
-    html += `<td><button class="btn btn-sm btn-outline" onclick="showResponse(${i})">צפה</button></td></tr>`;
+    html += `<td style="white-space:nowrap;">
+      <button class="btn btn-sm btn-outline" onclick="showResponse(${i})">צפה</button>
+      <button class="btn btn-sm btn-outline" onclick="editResponse(${i})" title="עריכת תגובה">✏️ ערוך</button>
+      <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;" onclick="deleteResponse(${i})" title="מחיקת תגובה">🗑 מחק</button>
+    </td></tr>`;
   });
   html += '</tbody></table></div>';
   return html;
 }
+
+// ===== עריכה / מחיקה של תגובה בודדת (לשונית "תגובות") =====
+let editingResponseIdx = null; // אינדקס בתוך responses (לא מסונן) — נועל מזהה מדויק
+
+function editResponse(listIdx) {
+  const r = filteredResponses[listIdx];
+  if (!r) return;
+  const absIdx = responses.findIndex(x => x.id === r.id);
+  if (absIdx === -1) { alert('התגובה אינה נמצאת ברשימה. רענן את הדף.'); return; }
+  editingResponseIdx = absIdx;
+
+  const allFields = form.pages.flatMap(p => p.fields);
+  document.getElementById('editRespMeta').innerHTML =
+    `תגובה מס׳ ${listIdx + 1} • נשלחה: ${formatDateTime(r.submittedAt)}` +
+    (r.editedAt ? ` • <span style="color:#b45309;">נערכה לאחרונה: ${formatDateTime(r.editedAt)} ע"י ${esc(r.editedBy || '')}</span>` : '');
+
+  let html = '';
+  allFields.forEach((f, fi) => {
+    const v = (r.data || {})[f.id];
+    html += `<div data-edit-field="${esc(f.id)}" style="border:1px solid var(--slate-200);border-radius:8px;padding:10px 12px;">`;
+    html += `<label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">${esc(f.label)}</label>`;
+
+    switch (f.type) {
+      case 'radio':
+      case 'select': {
+        const opts = (f.options || []);
+        html += `<select dir="auto" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        html += `<option value="">— ללא מענה —</option>`;
+        opts.forEach(o => {
+          const ov = (o && typeof o === 'object') ? (o.value !== undefined ? String(o.value) : String(o.label ?? '')) : String(o);
+          const ol = (o && typeof o === 'object') ? (o.label ?? o.value ?? '') : String(o);
+          html += `<option value="${esc(ov)}" ${String(v ?? '') === ov ? 'selected' : ''}>${esc(String(ol))}</option>`;
+        });
+        html += `</select>`;
+        break;
+      }
+      case 'checkbox': {
+        const arr = Array.isArray(v) ? v.map(String) : (v != null && v !== '' ? [String(v)] : []);
+        html += `<div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+        (f.options || []).forEach(o => {
+          const ov = (o && typeof o === 'object') ? String(o.value ?? o.label ?? '') : String(o);
+          const ol = (o && typeof o === 'object') ? String(o.label ?? o.value ?? '') : String(o);
+          html += `<label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;font-size:13px;border:1px solid var(--slate-200);border-radius:6px;padding:4px 8px;cursor:pointer;">
+            <input type="checkbox" value="${esc(ov)}" ${arr.includes(ov) ? 'checked' : ''}> ${esc(String(ol))}</label>`;
+        });
+        html += `</div>`;
+        break;
+      }
+      case 'rating': {
+        const max = f.max || 5;
+        html += `<input type="number" min="1" max="${max}" value="${v != null ? esc(String(v)) : ''}" placeholder="1-${max}" style="width:110px;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      }
+      case 'matrix': {
+        const rowsArr = f.rows || [];
+        const colsArr = f.columns || [];
+        const cur = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+        html += `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:right;padding:4px;"></th>`;
+        colsArr.forEach(c => {
+          const cl = (c && typeof c === 'object') ? String(c.label ?? c.value ?? '') : String(c);
+          html += `<th style="padding:4px 6px;text-align:center;font-weight:600;">${esc(cl)}</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+        rowsArr.forEach(row => {
+          const rk = (row && typeof row === 'object') ? String(row.id ?? row.value ?? row.label ?? '') : String(row);
+          const rl = (row && typeof row === 'object') ? String(row.label ?? row.value ?? '') : String(row);
+          html += `<tr><td style="padding:4px 6px;">${esc(rl)}</td>`;
+          colsArr.forEach(col => {
+            const ck = (col && typeof col === 'object') ? String(col.value ?? col.label ?? '') : String(col);
+            const checked = String(cur[rk] ?? '') === ck;
+            html += `<td style="text-align:center;padding:4px;"><input type="radio" name="mx_${esc(f.id)}_${esc(rk)}" value="${esc(ck)}" ${checked ? 'checked' : ''}></td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        break;
+      }
+      case 'date':
+        html += `<input type="date" value="${v ? esc(String(v)).slice(0,10) : ''}" style="padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      case 'number':
+        html += `<input type="number" step="any" value="${v != null ? esc(String(v)) : ''}" style="width:150px;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      case 'textarea':
+        html += `<textarea rows="3" dir="auto" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">${v != null ? esc(String(v)) : ''}</textarea>`;
+        break;
+      default: // text, email, phone, record וכו' — עריכה כטקסט חופשי
+        html += `<input type="text" dir="auto" value="${v != null ? esc(typeof v === 'object' ? JSON.stringify(v) : String(v)) : ''}" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('editRespBody').innerHTML = html;
+  document.getElementById('editResponseModal').style.display = 'flex';
+}
+
+function closeEditResponseModal() {
+  document.getElementById('editResponseModal').style.display = 'none';
+  editingResponseIdx = null;
+}
+
+async function saveEditedResponse() {
+  if (editingResponseIdx === null) return;
+  const r = responses[editingResponseIdx];
+  const newData = Object.assign({}, r.data || {});
+
+  // חילוץ הערכים החדשים מהשדה לפי סוג
+  document.querySelectorAll('#editRespBody [data-edit-field]').forEach(box => {
+    const fid = box.getAttribute('data-edit-field');
+    const f = form.pages.flatMap(p => p.fields).find(x => x.id === fid);
+    if (!f) return;
+    switch (f.type) {
+      case 'radio':
+      case 'select': {
+        const sel = box.querySelector('select');
+        const val = sel ? sel.value : '';
+        if (val === '') delete newData[fid]; else newData[fid] = val;
+        break;
+      }
+      case 'checkbox': {
+        const vals = Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+        if (!vals.length) delete newData[fid]; else newData[fid] = vals;
+        break;
+      }
+      case 'matrix': {
+        const res = {};
+        box.querySelectorAll('tbody tr').forEach(tr => {
+          const inp = tr.querySelector('input[type=radio]:checked');
+          if (inp && inp.value !== '') {
+            const rk = inp.name.split('_').slice(2).join('_');
+            res[rk] = inp.value;
+          }
+        });
+        if (Object.keys(res).length) newData[fid] = res; else delete newData[fid];
+        break;
+      }
+      case 'number':
+      case 'rating': {
+        const inp = box.querySelector('input');
+        const val = inp ? inp.value : '';
+        if (val === '') delete newData[fid]; else newData[fid] = (f.type === 'number' ? Number(val) : val);
+        break;
+      }
+      default: {
+        const inp = box.querySelector('input[type=text], input[type=date], textarea');
+        const val = inp ? inp.value.trim() : '';
+        if (val === '') delete newData[fid]; else newData[fid] = val;
+      }
+    }
+  });
+
+  const btn = document.getElementById('saveEditRespBtn');
+  btn.disabled = true; btn.textContent = '⏳ שומר...';
+  try {
+    const out = await FBAuth.writeRequest(`${API}/responses.php?action=update&formId=${encodeURIComponent(form.id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ responseId: r.id, data: newData }),
+    });
+    if (out && out.success) {
+      closeEditResponseModal();
+      await reloadResponses();
+      alert('✅ התגובה עודכנה בהצלחה');
+    } else {
+      alert('❌ ' + ((out && out.error) || 'העדכון נכשל'));
+    }
+  } catch (e) {
+    console.error('Update response error:', e);
+    alert('❌ שגיאה בעדכון התגובה');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 שמור שינויים';
+  }
+}
+
+async function deleteResponse(listIdx) {
+  const r = filteredResponses[listIdx];
+  if (!r) return;
+  if (!confirm(`למחוק את תגובה מס׳ ${listIdx + 1} (${formatDateTime(r.submittedAt)})?\nהפעולה בלתי הפיכה.`)) return;
+  try {
+    const out = await FBAuth.writeRequest(
+      `${API}/responses.php?action=one&formId=${encodeURIComponent(form.id)}&responseId=${encodeURIComponent(r.id)}`,
+      { method: 'DELETE' });
+    if (out && out.success) {
+      await reloadResponses();
+      alert('✅ התגובה נמחקה');
+    } else {
+      alert('❌ ' + ((out && out.error) || 'המחיקה נכשלה'));
+    }
+  } catch (e) {
+    console.error('Delete response error:', e);
+    alert('❌ שגיאה במחיקת התגובה');
+  }
+}
+
+// טעינת תגובות מחדש מהשרת + רענון התצוגה (ללא טעינת דף מחדש)
+async function reloadResponses() {
+  try {
+    const res = await fetch(`${API}/responses.php?action=list&formId=${encodeURIComponent(form.id)}`, { credentials: 'same-origin' });
+    const json = await res.json();
+    if (json.success) {
+      responses = json.data;
+      // החלת הפילטרים הפעילים על הרשימה המעודכנת
+      filteredResponses = Object.keys(activeFilters).length
+        ? responses.filter(response => Object.entries(activeFilters).every(([fid, fval]) => {
+            const fieldValue = response.data[fid];
+            if (Array.isArray(fieldValue)) return fieldValue.some(rec => getRecordDisplayValue(rec, fid) === fval);
+            if (typeof fieldValue === 'object' && fieldValue !== null) return getRecordDisplayValue(fieldValue, fid) === fval;
+            return fieldValue === fval;
+          }))
+        : [...responses];
+      const fc = Object.keys(activeFilters).length;
+      document.getElementById('reportSubtitle').textContent = fc > 0
+        ? `${filteredResponses.length} תגובות (מסונן: ${fc} פילטרים פעילים)`
+        : `${responses.length} תגובות`;
+      renderTab(activeTab);
+    }
+  } catch (e) { window.location.reload(); }
+}
+
 
 function showResponse(idx) {
   const r = responses[idx];
@@ -891,8 +1138,36 @@ function renderExport() {
       <div style="border:2px solid var(--slate-200);border-radius:var(--radius);padding:24px;text-align:center;">
         <div style="font-size:36px;margin-bottom:12px;">🔧</div>
         <h4 style="margin-bottom:8px;">ייצוא JSON</h4>
-        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">מתאים לאינטגרציה ו-API</p>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">מתאים לאינטגרציה ו-API (ולשחזור באמצעות ייבוא)</p>
         <button class="btn btn-primary" onclick="exportJSON()" ${!responses.length?'disabled style="opacity:0.5;"':''}>הורד JSON</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">📥</div>
+        <h4 style="margin-bottom:8px;">ייבוא תגובות מקובץ JSON</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">שחזור נתונים מקובץ "ייצוא JSON" של המערכת. תגובות כפולות (לפי מזהה) דולגות אוטומטית.</p>
+        <input type="file" id="importResponsesFile" accept=".json,application/json" style="display:none;" onchange="importResponsesFromFile(this)" />
+        <button class="btn btn-success" onclick="document.getElementById('importResponsesFile').click()">בחר קובץ JSON וייבא</button>
+        <div id="importResult" style="margin-top:12px;font-size:13px;"></div>
+      </div>
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🪄</div>
+        <h4 style="margin-bottom:8px;">השלמת שדות אוטומטיים מהמאגר</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">משלים תגובות ישנות (למשל שם מוסד/מנהל/מפקח לפי סמל המוסד) ע"פ המאגר. לא דורס תשובות קיימות, ויוצר גיבוי לפני שינוי.</p>
+        <button class="btn btn-primary" onclick="runBackfill(false)">🔍 בדיקה מקדימה (Preview)</button>
+        <button class="btn btn-success" onclick="runBackfill(true)" style="margin-inline-start:8px;">▶️ בצע השלמה</button>
+        <div id="backfillResult" style="margin-top:12px;font-size:13px;text-align:start;"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🧩</div>
+        <h4 style="margin-bottom:8px;">השלמת סעיפי מטריצה חסרים</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">סורק את כל התגובות ומשלים שורות ריקות בשאלות מטריצה, בהתאם לתשובות המשיב בשאר המטריצות (ממוצע/שכיח/היסטוריה). לא דורס שורות שנענו, ויוצר גיבוי לפני שינוי.</p>
+        <button class="btn btn-primary" onclick="runMatrixCompletion(false)">🔍 סריקה (Preview)</button>
+        <button class="btn btn-success" onclick="runMatrixCompletion(true)" style="margin-inline-start:8px;">🧩 השלמת מטריצות</button>
+        <div id="matrixCompleteResult" style="margin-top:12px;font-size:13px;text-align:start;"></div>
       </div>
     </div>
     <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--slate-200);">
@@ -906,17 +1181,277 @@ function renderExport() {
   </div>`;
 }
 
+// === עזרי ייצוא: המרת ערך תגובה למחרוזת קריאה (ללא [object Object]) ===
+function csvOptionLabel(f, val) {
+  if (val === '__other__') return '__other__';
+  const opt = (f.options || []).find(o => o.value === val || o.id === val);
+  if (opt) return opt.label != null ? String(opt.label) : String(val);
+  return String(val);
+}
+
+function recordDisplayValue(f, rec) {
+  if (rec == null) return '';
+  if (typeof rec !== 'object') return String(rec);
+  const df = f.displayField || f.sourceDisplayField || null;
+  if (df && rec[df] != null && rec[df] !== '') return String(rec[df]);
+  const keys = Object.keys(rec);
+  const nameKey = keys.find(k => /שם|name/i.test(k));
+  if (nameKey && rec[nameKey]) return String(rec[nameKey]);
+  const nonEmpty = keys.find(k => rec[k] != null && String(rec[k]).trim() !== '');
+  return nonEmpty ? String(rec[nonEmpty]) : (keys.length ? String(rec[keys[0]]) : '');
+}
+
+function matrixRowLabel(f, rowId) {
+  const row = (f.matrixRows || []).find(r => r.id === rowId || r.value === rowId || r.label === rowId);
+  if (row) return row.label != null ? String(row.label) : String(rowId);
+  return String(rowId);
+}
+
+function matrixColLabel(f, colValue) {
+  const col = (f.matrixColumns || []).find(c => c.value === colValue || c.id === colValue || c.label === colValue);
+  if (col) return col.label != null ? String(col.label) : String(colValue);
+  return String(colValue);
+}
+
+// המרה גנרית של כל ערך (מטריצות/מאגרים/בחירה מרובה/קבצים) לטקסט קריא ב-CSV
+function csvCellValue(f, v, otherVal) {
+  if (v === undefined || v === null || v === '') return '';
+  // מטריצה: עצם {rowId: colValue | [colValues]}
+  if (f && f.type === 'matrix' && typeof v === 'object' && !Array.isArray(v)) {
+    const parts = [];
+    Object.keys(v).forEach(rowKey => {
+      const cell = v[rowKey];
+      if (cell === undefined || cell === null || cell === '' || (Array.isArray(cell) && cell.length === 0)) return;
+      const rowLabel = matrixRowLabel(f, rowKey);
+      if (Array.isArray(cell)) {
+        parts.push(rowLabel + ': ' + cell.map(cv => matrixColLabel(f, cv)).join(' / '));
+      } else {
+        parts.push(rowLabel + ': ' + matrixColLabel(f, cell));
+      }
+    });
+    return parts.join('; ');
+  }
+  // רשומה ממאגר (עצם או מערך עצמים)
+  if (f && (f.type === 'record' || f.sourceId) && typeof v === 'object') {
+    if (Array.isArray(v)) return v.map(rec => recordDisplayValue(f, rec)).filter(Boolean).join('; ');
+    return recordDisplayValue(f, v);
+  }
+  if (Array.isArray(v)) {
+    return v.map(item => {
+      if (item === '__other__') {
+        const txt = otherVal ? String(otherVal) : '';
+        return txt ? 'אחר: ' + txt : 'אחר';
+      }
+      if (item && typeof item === 'object') return recordDisplayValue(f || {}, item);
+      return f && (f.options || []).length ? csvOptionLabel(f, item) : String(item);
+    }).filter(s => s !== '').join('; ');
+  }
+  if (typeof v === 'object') {
+    if (v.name) return String(v.name);
+    if (v.url) return String(v.url);
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+  let s = String(v);
+  if (s === '__other__') {
+    const txt = otherVal ? String(otherVal) : '';
+    return txt ? 'אחר: ' + txt : 'אחר';
+  }
+  if (s.startsWith('data:image')) return '[חתימה]';
+  if (s.startsWith('data:')) return '[קובץ מצורף]';
+  return s;
+}
+
 function exportCSV() {
   const allFields = form.pages.flatMap(p => p.fields);
   const headers = ['תאריך שליחה', ...allFields.map(f => f.label)];
-  const rows = filteredResponses.map(r => [formatDateTime(r.submittedAt), ...allFields.map(f => { const v = r.data[f.id]; return Array.isArray(v) ? v.join('; ') : String(v || ''); })]);
-  const csv = '\ufeff' + [headers.join(','), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
+  const rows = filteredResponses.map(r => [
+    formatDateTime(r.submittedAt),
+    ...allFields.map(f => csvCellValue(f, r.data[f.id], r.data[f.id + '_other']))
+  ]);
+  const escCsv = (c) => '"' + String(c).split('"').join('""') + '"';
+  const csv = '\ufeff' + [headers.map(escCsv).join(','), ...rows.map(r => r.map(escCsv).join(','))].join('\r\n');
   download(csv, `${form.settings.title}.csv`, 'text/csv;charset=utf-8;');
 }
 
 function exportJSON() {
   const data = { form: form.settings, responses, exportedAt: new Date().toISOString() };
   download(JSON.stringify(data, null, 2), `${form.settings.title}.json`, 'application/json');
+}
+
+/**
+ * ייבוא תגובות מקובץ JSON שיוצר ע"י "ייצוא JSON" של המערכת (או מגיבוי קובץ התגובות).
+ * נשלח ל-POST api/responses.php?action=import&formId=<id> עם טוקן CSRF.
+ */
+// ===== השלמת שדות אוטומטיים מהמאגר (Backfill) =====
+async function runBackfill(apply) {
+  const box = document.getElementById('backfillResult');
+  if (!box) return;
+  box.innerHTML = '<span style="color:var(--slate-500);">⏳ סורק תגובות...</span>';
+  try {
+    let res;
+    if (apply) {
+      if (!confirm('לבצע השלמה בפועל? ייווצר קובץ גיבוי לפני השינוי.')) { box.innerHTML = ''; return; }
+      res = await FBAuth.writeRequest(`${API}/backfill.php?action=run&formId=${form.id}`, { method: 'POST' });
+    } else {
+      res = await FBAuth.fbFetch(`${API}/backfill.php?action=preview&formId=${form.id}`);
+    }
+    const data = res && res.data ? res.data : null;
+    if (!res || !res.success || !data) {
+      box.innerHTML = `<span style="color:#dc2626;">❌ ${ (res && res.error) ? res.error : 'שגיאה בתפעול' }</span>`;
+      return;
+    }
+    if (data.message) { box.innerHTML = `<span style="color:var(--slate-500);">${data.message}</span>`; return; }
+    let html = `<div style="background:var(--slate-50);border-radius:8px;padding:12px;">`;
+    html += `<b>${data.dryRun ? '🔍 בדיקה מקדימה' : '✅ ההשלמה בוצעה'}</b> — סה"כ תגובות: ${data.totalResponses} | שינויים: <b>${data.changes}</b> | שדות שכבר היו מלאים: ${data.alreadyFilled}<br>`;
+    if (data.backup) html += `📦 גיבוי נשמר: <code>${data.backup}</code><br>`;
+    if (data.unmatchedSymbols && data.unmatchedSymbols.length) {
+      html += `⚠️ סמלים שלא נמצאו במאגר: <code>${data.unmatchedSymbols.join(', ')}</code><br>`;
+    }
+    if (data.details && data.details.length) {
+      html += `<details style="margin-top:6px;"><summary>פירוט שינויים (${data.details.length})</summary><ul style="margin:6px 0;padding-inline-start:20px;">`;
+      data.details.slice(0, 100).forEach(d => {
+        html += `<li>תגובה <code>${String(d.responseId||'').slice(0,8)}</code> → <b>${d.target || d.field}</b>: ${d.to && typeof d.to === 'string' ? d.to : ''}</li>`;
+      });
+      html += `</ul></details>`;
+    }
+    if (!data.dryRun && data.changes > 0) {
+      html += `<div style="margin-top:8px;"><button class="btn btn-primary" onclick="location.reload()">רענן דף כדי לראות את הנתונים המעודכנים</button></div>`;
+    }
+    html += `</div>`;
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('Backfill error:', e);
+    box.innerHTML = `<span style="color:#dc2626;">❌ שגיאה: ${e.message}</span>`;
+  }
+}
+
+// ===== השלמת סעיפי מטריצה חסרים (Matrix Completion) =====
+async function runMatrixCompletion(apply) {
+  const box = document.getElementById('matrixCompleteResult');
+  if (!box) return;
+  box.innerHTML = '<span style="color:var(--slate-500);">⏳ סורק תגובות ומזהה סעיפי מטריצה חסרים...</span>';
+  try {
+    let res;
+    if (apply) {
+      if (!confirm('להשלים סעיפי מטריצה חסרים בפועל? ייווצר קובץ גיבוי לפני השינוי.\nמומלץ לבצע "סריקה (Preview)" תחילה.')) { box.innerHTML = ''; return; }
+      res = await FBAuth.writeRequest(`${API}/backfill.php?action=matrix-complete&formId=${form.id}`, { method: 'POST' });
+    } else {
+      res = await FBAuth.fbFetch(`${API}/backfill.php?action=matrix-preview&formId=${form.id}`);
+    }
+    const data = res && res.data ? res.data : null;
+    if (!res || !res.success || !data) {
+      box.innerHTML = `<span style="color:#dc2626;">❌ ${ (res && res.error) ? res.error : 'שגיאה בתפעול' }</span>`;
+      return;
+    }
+    if (data.message) { box.innerHTML = `<span style="color:var(--slate-500);">${data.message}</span>`; return; }
+    let html = `<div style="background:var(--slate-50);border-radius:8px;padding:12px;">`;
+    html += `<b>${data.dryRun ? '🔍 סריקה מקדימה' : '✅ ההשלמה בוצעה'}</b> — סה"כ תגובות: ${data.totalResponses} | סעיפים שהושלמו: <b>${data.changes}</b> | סעיפים שנענו כבר (לא נגע): ${data.alreadyFilled}<br>`;
+    if (data.backup) html += `📦 גיבוי נשמר: <code>${data.backup}</code><br>`;
+    if (data.details && data.details.length) {
+      html += `<details style="margin-top:6px;" open><summary>פירוט השלמות (${data.details.length})</summary><ul style="margin:6px 0;padding-inline-start:20px;">`;
+      data.details.slice(0, 100).forEach(d => {
+        html += `<li>תגובה <code>${String(d.responseId||'').slice(0,8)}</code> → <b>${d.target}</b> = ${d.to} <span style="color:var(--slate-400);">(${d.via||''})</span></li>`;
+      });
+      html += `</ul></details>`;
+    } else if (data.changes === 0) {
+      html += `<span style="color:var(--success);">✔️ אין סעיפי מטריצה חסרים — כל התגובות שלמות.</span>`;
+    }
+    if (!data.dryRun && data.changes > 0) {
+      html += `<div style="margin-top:8px;"><button class="btn btn-primary" onclick="location.reload()">רענן דף כדי לראות את הנתונים המעודכנים</button></div>`;
+    }
+    html += `</div>`;
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('Matrix completion error:', e);
+    box.innerHTML = `<span style="color:#dc2626;">❌ שגיאה: ${e.message}</span>`;
+  }
+}
+
+async function importResponsesFromFile(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  const resultBox = document.getElementById('importResult');
+  const setMsg = (html, color) => { if (resultBox) { resultBox.innerHTML = html; if (color) resultBox.style.color = color; } };
+
+  // ולידציה גסנה: עד 20MB
+  if (file.size > 20 * 1024 * 1024) {
+    setMsg('❌ הקובץ גדול מדי (מקסימום 20MB)', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  let payload;
+  try {
+    const text = await file.text();
+    payload = JSON.parse(text);
+  } catch (e) {
+    setMsg('❌ הקובץ אינו JSON חוקי (' + e.message + ')', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  // זיהוי רשימת התגובות בקובץ: מעטפה {responses:[...]}, מערך גולמי, או קובץ תגובות גולמי
+  let rows = null;
+  if (payload && Array.isArray(payload.responses)) rows = payload.responses;
+  else if (Array.isArray(payload)) rows = payload;
+  if (!rows || rows.length === 0) {
+    setMsg('❌ לא נמצאו תגובות בקובץ. יש להשתמש בפלט "ייצוא JSON" של המערכת', '#c62828');
+    inputEl.value = '';
+    return;
+  }
+
+  setMsg('⏳ מייבא ' + rows.length + ' תגובות...', '#1565c0');
+  try {
+    const res = await fetch(`${API}/responses.php?action=import&formId=${encodeURIComponent(form.id)}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formId: form.id, responses: rows }),
+    });
+    let out = null;
+    try { out = await res.json(); } catch (e) { /* ננסה לחלץ מתוך תגובה מעורבת */ }
+    if (!out) {
+      const txt = await res.text().catch(() => '');
+      const m = txt.match(/\{[\s\S]*\}\s*$/);
+      if (m) { try { out = JSON.parse(m[0]); } catch (e) {} }
+      if (!out) {
+        setMsg('❌ השירות החזיר תשובה לא צפויה (HTTP ' + res.status + '). בדוק את לוג ה-PHP.', '#c62828');
+        inputEl.value = '';
+        return;
+      }
+    }
+    // גיבוי עצמי ל-CSRF: installAutoCsrf של fb-auth.js מוסיף אוטומטית את הטוקן
+    // ומבצע ניסיון חוזר אחד ב-419. אם בכל זאת נכשל – מנסים שוב עם טוקן עדש מהשרת.
+    if (res.status === 419 || (out && out.csrfFail)) {
+      try {
+        const fresh = await FBAuth.ensureCsrfToken('../api');
+        if (fresh) {
+          const retry = await fetch(`${API}/responses.php?action=import&formId=${encodeURIComponent(form.id)}`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': fresh },
+            body: JSON.stringify({ formId: form.id, responses: rows }),
+          });
+          out = await retry.json().catch(() => null);
+          if (retry.ok && out && out.success) res.status = retry.status; // ממשיכים לזרימת ההצלחה
+          else if (out && out.error) { setMsg('❌ ' + out.error, '#c62828'); inputEl.value = ''; return; }
+        }
+      } catch (e) { /* נופל להודעה הכללית למטה */ }
+    }
+    if (res.ok && out.success) {
+      const dup = out.skippedDuplicates ? ` (${out.skippedDuplicates} כפילויות דולגו)` : '';
+      const bad = out.invalid ? ` (${out.invalid} שורות לא תקינות נדחו)` : '';
+      setMsg(`✅ יובאו ${out.imported} תגובות${dup}${bad}. מרענן נתונים...`, '#2e7d32');
+      inputEl.value = '';
+      await init(); // טעינה מחדש מלאה של הנתונים והדוח
+    } else {
+      setMsg('❌ ' + (out.error || 'הייבוא נכשל'), '#c62828');
+      inputEl.value = '';
+    }
+  } catch (e) {
+    setMsg('❌ שגיאת תקשורת: ' + e.message, '#c62828');
+    inputEl.value = '';
+  }
 }
 
 function exportFormStructure() {
@@ -1716,16 +2251,28 @@ function createChart(field, fieldIndex, chartType = 'bar') {
             weight: 'bold'
           },
           formatter: function(context) {
-            const value = context.dataset.data[context.dataIndex];
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            // תאימות ל-Chart.js v3/v4 (item) וגרסאות ישנות יותר (context): מציאת ה-dataset בבטחה
+            const ctx = (context && context.dataset) ? context
+                      : (context && context.dataIndex !== undefined && context.chart) ? (context.dataset || { data: [] })
+                      : null;
+            const dataset = (context && context.dataset) ? context.dataset
+                          : (context && context.chart && context.chart.data && context.chart.data.datasets)
+                            ? context.chart.data.datasets[context.datasetIndex ?? 0]
+                            : null;
+            if (!dataset || !Array.isArray(dataset.data)) return '';
+            const idx = (context.dataIndex !== undefined) ? context.dataIndex : 0;
+            const value = Number(dataset.data[idx]) || 0;
+            const total = dataset.data.reduce((a, b) => a + (Number(b) || 0), 0);
             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
             return `${value}\n(${percentage}%)`;
           },
           anchor: function(context) {
-            return context.dataset.type === 'pie' || context.dataset.type === 'doughnut' ? 'center' : 'end';
+            const type = (context.dataset && context.dataset.type) || (context.chart && context.chart.config && context.chart.config.type);
+            return (type === 'pie' || type === 'doughnut') ? 'center' : 'end';
           },
           align: function(context) {
-            return context.dataset.type === 'pie' || context.dataset.type === 'doughnut' ? 'center' : 'top';
+            const type = (context.dataset && context.dataset.type) || (context.chart && context.chart.config && context.chart.config.type);
+            return (type === 'pie' || type === 'doughnut') ? 'center' : 'top';
           }
         }
       },

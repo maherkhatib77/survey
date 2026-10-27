@@ -6,6 +6,8 @@
  * DELETE clear - מחיקת תגובות (דורש התחברות)
  */
 require_once 'config.php';
+csrfBootstrap();
+
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -14,18 +16,43 @@ $formId = isset($_GET['formId']) ? $_GET['formId'] : '';
 switch ($method) {
     case 'GET':
         requireLogin();
+        requirePermission('view_responses');
+        // בדיקת בעלות: משתמש רגיל יכול לצפות בתגובות של הסקרים שהוא יצר בלבד
+        $__cu = getCurrentUser();
+        if ($__cu && ($__cu['role'] ?? 'user') !== 'admin' && $formId) {
+            $__form = getForm($formId);
+            if (!$__form || ($__form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                sendResponse(['success' => false, 'error' => 'אין לך גישה לתגובות סקר זה'], 403);
+            }
+        }
         if ($action === 'list' && $formId) {
             $responses = getFormResponses($formId);
             sendResponse(['success' => true, 'data' => $responses]);
         } elseif ($action === 'count' && $formId) {
             $responses = getFormResponses($formId);
-            sendResponse(['success' => true, 'count' => count($responses)]);
+            sendResponse(['success' => true, 'count' => countRealResponses($formId)]);
+        } elseif ($action === 'get' && $formId && isset($_GET['responseId'])) {
+            // שליפת תגובה בודדת לעריכה (נדרש הרשאת עריכת סקרים)
+            requirePermission('edit_forms');
+            $responses = getFormResponses($formId);
+            $rid = $_GET['responseId'];
+            $found = null;
+            foreach ($responses as $r) {
+                if (($r['id'] ?? '') === $rid) { $found = $r; break; }
+            }
+            if ($found === null) {
+                sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+            }
+            sendResponse(['success' => true, 'data' => $found]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
         break;
 
     case 'POST':
+        // שליחת תגובה ציבורית (submit) מתאפשרת ללא token – הקוראים הם מבקרי טפסים אנונימיים.
+        // שאר פעולות הכתיבה כאן דורשות token (admin-submit נבדק שוב בהמשך).
+        if ($action !== 'submit') validateCsrf();
         $input = getJSONInput();
         if (!$input || !$formId) {
             sendResponse(['success' => false, 'error' => 'נתונים לא תקינים'], 400);
@@ -35,25 +62,24 @@ switch ($method) {
             // שליחת תגובה - ציבורי (רק לטפסים מפורסמים)
             // בדיקה שהטופס קיים ומפורסם
             $form = getForm($formId);
-            
-            // Debug logging
-            error_log("submit action for formId: $formId");
-            error_log("Form found: " . ($form ? 'yes' : 'no'));
-            if ($form) {
-                error_log("Form status: " . ($form['status'] ?? 'not set'));
-                error_log("Form file exists: " . (file_exists(FORMS_DIR . '/' . sanitizeFilename($formId) . '.json') ? 'yes' : 'no'));
-            }
-            
+
             if (!$form) {
-                error_log("Form not found for formId: $formId");
                 sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
             }
+
+            // אימות צד-שרת: שדות חובה + מטריצות מלאות (מונע דילוג עקף על הלקוח)
+            $__errors = validateResponseAgainstForm($form, $input['data'] ?? []);
+            if (!empty($__errors)) {
+                sendResponse([
+                    'success' => false,
+                    'error' => 'יש להשלים את כל השדות החובה לפני השליחה',
+                    'fieldErrors' => $__errors,
+                ], 400);
+            }
             if (($form['status'] ?? 'draft') !== 'published') {
-                error_log("Form not published. Status: " . ($form['status'] ?? 'not set'));
-                
                 // אפשר למנהלים מחוברים לשלוח תשובות גם לטפסים שלא פורסמו (לבדיקה)
                 if (isLoggedIn()) {
-                    error_log("Admin user logged in, allowing submission for testing");
+                    // מותר לצורך בדיקה
                 } else {
                     sendResponse(['success' => false, 'error' => 'הטופס אינו פעיל. יש לפרסם את הטופס תחילה דרך ממשק הניהול.'], 403);
                 }
@@ -74,20 +100,17 @@ switch ($method) {
             if (isset($input['calculatedValues'])) $response['calculatedValues'] = $input['calculatedValues'];
 
             $saved = saveResponse($formId, $response);
-            
-            // Debug logging
-            error_log("saveResponse returned: " . ($saved ? 'success' : 'failed'));
-            
+
             if ($saved) {
                 sendResponse(['success' => true, 'data' => $response], 201);
             } else {
-                error_log("Failed to save response for formId: $formId");
                 sendResponse(['success' => false, 'error' => 'שגיאה בשמירת התגובה'], 500);
             }
             
         } elseif ($action === 'admin-submit') {
             // שליחת תגובה - מנהל (עובד גם לטפסים שלא מפורסמים)
             requireLogin();
+            validateCsrf();
             
             $form = getForm($formId);
             if (!$form) {
@@ -114,6 +137,150 @@ switch ($method) {
             } else {
                 sendResponse(['success' => false, 'error' => 'שגיאה בשמירת התגובה'], 500);
             }
+
+        } elseif ($action === 'import') {
+            // ייבוא תגובות מקובץ JSON שיוצר בייצוא הדוחות / מגיבוי
+            // הגוף: { formId, responses: [...] } או מעטפת מלאה { form: {...}, responses: [...] }
+            requireLogin();
+            requirePermission('create_forms');
+            validateCsrf();
+
+            // זיהוי formId: מה-GET או מתוך המעטפה/התגובות שבגוף
+            $impFormId = $formId;
+            if (!$impFormId && isset($input['formId'])) $impFormId = $input['formId'];
+            if (!$impFormId && isset($input['form']['id'])) $impFormId = $input['form']['id'];
+
+            if (!$impFormId) {
+                sendResponse(['success' => false, 'error' => 'לא זוהה מזהה סקר (formId) בקובץ הייבוא'], 400);
+            }
+            $form = getForm($impFormId);
+            if (!$form) {
+                sendResponse(['success' => false, 'error' => 'הסקר "' . htmlspecialchars($impFormId, ENT_QUOTES) . '" אינו קיים במערכת. יש ליצור סקר זהה או להשתמש בקובץ הייצוא של הסקר הקיים.'], 404);
+            }
+            // בעלות: משתמש רגיל מייבא רק לסקרים שלו
+            $__cu = getCurrentUser();
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin') {
+                if (($form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                    sendResponse(['success' => false, 'error' => 'אין לך גישה לייבוא תגובות לסקר זה'], 403);
+                }
+            }
+
+            // חילוץ רשימת התגובות – תמיכה בשלושה פורמטים:
+            // א) מעטפת ייצוא מלאה: { form: {...}, responses: [...] }
+            // ב) אובייקט: { responses: [...] }
+            // ג) מערך גולמי של תגובות
+            $rows = null;
+            if (isset($input['responses']) && is_array($input['responses'])) {
+                $rows = $input['responses'];
+            } elseif (is_array($input) && array_values($input) === $input) {
+                $rows = $input; // מערך גולמי
+            }
+            if ($rows === null || count($rows) === 0) {
+                sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות בקובץ. ודא שהקובץ הוא פלט "ייצוא JSON" של המערכת'], 400);
+            }
+
+            // טעינת תגובות קיימות לשם מניעת כפילויות לפי id
+            $existing = getFormResponses($impFormId);
+            $existingIds = [];
+            foreach ($existing as $e) {
+                if (isset($e['id'])) $existingIds[$e['id']] = true;
+            }
+
+            $imported = 0;
+            $skipped = 0;
+            $invalid = 0;
+            $newItems = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || !isset($row['data']) || !is_array($row['data'])) {
+                    $invalid++;
+                    continue;
+                }
+                $rid = isset($row['id']) && is_string($row['id']) ? $row['id'] : generateUUID();
+                if (isset($existingIds[$rid])) { $skipped++; continue; }
+                $existingIds[$rid] = true;
+                $resp = [
+                    'id' => $rid,
+                    'formId' => $impFormId,
+                    'data' => $row['data'],
+                    'submittedAt' => isset($row['submittedAt']) ? $row['submittedAt'] : date('c'),
+                    'respondentInfo' => $row['respondentInfo'] ?? ['ip' => 'import', 'userAgent' => 'json-import'],
+                ];
+                if (isset($row['signature'])) $resp['signature'] = $row['signature'];
+                if (isset($row['calculatedValues'])) $resp['calculatedValues'] = $row['calculatedValues'];
+                $newItems[] = $resp;
+                $imported++;
+            }
+
+            if ($imported > 0) {
+                // כתיבה אטומית: קריאת המערך הקיים + הוספה + שמירה בבת אחת
+                $merged = array_merge($existing, $newItems);
+                $filepath = RESPONSES_DIR . '/' . sanitizeFilename($impFormId) . '.json';
+                if (!file_exists(RESPONSES_DIR)) @mkdir(RESPONSES_DIR, 0755, true);
+                $fp = @fopen($filepath, 'c');
+                $okWrite = false;
+                if ($fp && flock($fp, LOCK_EX)) {
+                    ftruncate($fp, 0);
+                    rewind($fp);
+                    $okWrite = (fwrite($fp, json_encode($merged, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+                    fflush($fp);
+                    flock($fp, LOCK_UN);
+                    fclose($fp);
+                } elseif ($fp) { fclose($fp); }
+                if (!$okWrite) {
+                    error_log('responses import: failed writing ' . $filepath);
+                    sendResponse(['success' => false, 'error' => 'כשל בכתיבת קובץ התגובות. בדוק הרשאות כתיבה לתיקיית data/responses'], 500);
+                }
+                $form['responseCount'] = countRealResponses($impFormId);
+                saveForm($form);
+            }
+
+            sendResponse(['success' => true, 'imported' => $imported, 'skippedDuplicates' => $skipped, 'invalid' => $invalid]);
+
+        } elseif ($action === 'update') {
+            // עריכת תגובה קיימת ע"י מנהל/בעל הסקר (נשלח מלשונית "תגובות" בדוח)
+            requireLogin();
+            requirePermission('edit_forms');
+            $__cu = getCurrentUser();
+            $form = getForm($formId);
+            if (!$form) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin' && ($form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                sendResponse(['success' => false, 'error' => 'אין לך גישה לעריכת תגובות בסקר זה'], 403);
+            }
+            $rid = isset($input['responseId']) ? $input['responseId'] : '';
+            $newData = isset($input['data']) && is_array($input['data']) ? $input['data'] : null;
+            if (!$rid || $newData === null) {
+                sendResponse(['success' => false, 'error' => 'נתונים לא תקינים (responseId/data חסרים)'], 400);
+            }
+            $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+            $responses = getFormResponses($formId);
+            $idx = null;
+            foreach ($responses as $i => $r) {
+                if (($r['id'] ?? '') === $rid) { $idx = $i; break; }
+            }
+            if ($idx === null) sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+
+            // עדכון: מחליפים את ה-data שניהל ערך, שומרים רשומת ביקורת
+            $responses[$idx]['data'] = $newData;
+            $responses[$idx]['editedAt'] = date('c');
+            $responses[$idx]['editedBy'] = $__cu['username'] ?? 'unknown';
+
+            // כתיבה אטומית עם נעילה
+            if (!file_exists(RESPONSES_DIR)) @mkdir(RESPONSES_DIR, 0755, true);
+            $fp = @fopen($filepath, 'c');
+            $okWrite = false;
+            if ($fp && flock($fp, LOCK_EX)) {
+                ftruncate($fp, 0);
+                rewind($fp);
+                $okWrite = (fwrite($fp, json_encode($responses, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+                fflush($fp);
+                flock($fp, LOCK_UN);
+                fclose($fp);
+            } elseif ($fp) { fclose($fp); }
+            if (!$okWrite) {
+                error_log('responses update: failed writing ' . $filepath);
+                sendResponse(['success' => false, 'error' => 'כשל בכתיבת קובץ התגובות. בדוק הרשאות כתיבה'], 500);
+            }
+            sendResponse(['success' => true, 'data' => $responses[$idx]]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
@@ -121,20 +288,63 @@ switch ($method) {
 
     case 'DELETE':
         requireLogin();
-        if ($action === 'clear' && $formId) {
-            $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
-            if (file_exists($filepath)) {
-                unlink($filepath);
-                $form = getForm($formId);
-                if ($form) {
-                    $form['responseCount'] = 0;
-                    saveForm($form);
-                }
-                sendResponse(['success' => true, 'message' => 'כל התגובות נמחקו']);
-            } else {
-                sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות'], 404);
+        validateCsrf();
+        requirePermission('delete_forms');
+        // בעלות: משתמש רגיל מוחק תגובות רק בסקרים שלו
+        $__cu = getCurrentUser();
+        if ($__cu && ($__cu['role'] ?? 'user') !== 'admin' && $formId) {
+            $__form = getForm($formId);
+            if (!$__form || ($__form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                sendResponse(['success' => false, 'error' => 'אין לך גישה לפעולה זו'], 403);
             }
+        }
+    if ($action === 'clear' && $formId) {
+        $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+        if (file_exists($filepath)) {
+            unlink($filepath);
+            $form = getForm($formId);
+            if ($form) {
+                $form['responseCount'] = 0;
+                saveForm($form);
+            }
+            sendResponse(['success' => true, 'message' => 'כל התגובות נמחקו']);
         } else {
+            sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות'], 404);
+        }
+    } elseif ($action === 'one' && $formId && isset($_GET['responseId'])) {
+        // מחיקת תגובה בודדת (נדרש אימות מחדש של הרשאת מחיקה על הסקר)
+        $rid = $_GET['responseId'];
+        $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+        $responses = getFormResponses($formId);
+        $found = false;
+        $kept = [];
+        foreach ($responses as $r) {
+            if (($r['id'] ?? '') === $rid) { $found = true; continue; }
+            $kept[] = $r;
+        }
+        if (!$found) sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+
+        $fp = @fopen($filepath, 'c');
+        $okWrite = false;
+        if ($fp && flock($fp, LOCK_EX)) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            $okWrite = (fwrite($fp, json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+            fflush($fp);
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        } elseif ($fp) { fclose($fp); }
+        if (!$okWrite) {
+            error_log('responses delete-one: failed writing ' . $filepath);
+            sendResponse(['success' => false, 'error' => 'כשל במחיקת התגובה. בדוק הרשאות כתיבה'], 500);
+        }
+        $form = getForm($formId);
+        if ($form) {
+            $form['responseCount'] = countRealResponses($formId);
+            saveForm($form);
+        }
+        sendResponse(['success' => true, 'message' => 'התגובה נמחקה', 'remaining' => count($kept)]);
+    } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
         break;
