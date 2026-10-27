@@ -1968,16 +1968,28 @@ function createChart(field, fieldIndex, chartType = 'bar') {
             weight: 'bold'
           },
           formatter: function(context) {
-            const value = context.dataset.data[context.dataIndex];
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            // תאימות ל-Chart.js v3/v4 (item) וגרסאות ישנות יותר (context): מציאת ה-dataset בבטחה
+            const ctx = (context && context.dataset) ? context
+                      : (context && context.dataIndex !== undefined && context.chart) ? (context.dataset || { data: [] })
+                      : null;
+            const dataset = (context && context.dataset) ? context.dataset
+                          : (context && context.chart && context.chart.data && context.chart.data.datasets)
+                            ? context.chart.data.datasets[context.datasetIndex ?? 0]
+                            : null;
+            if (!dataset || !Array.isArray(dataset.data)) return '';
+            const idx = (context.dataIndex !== undefined) ? context.dataIndex : 0;
+            const value = Number(dataset.data[idx]) || 0;
+            const total = dataset.data.reduce((a, b) => a + (Number(b) || 0), 0);
             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
             return `${value}\n(${percentage}%)`;
           },
           anchor: function(context) {
-            return context.dataset.type === 'pie' || context.dataset.type === 'doughnut' ? 'center' : 'end';
+            const type = (context.dataset && context.dataset.type) || (context.chart && context.chart.config && context.chart.config.type);
+            return (type === 'pie' || type === 'doughnut') ? 'center' : 'end';
           },
           align: function(context) {
-            return context.dataset.type === 'pie' || context.dataset.type === 'doughnut' ? 'center' : 'top';
+            const type = (context.dataset && context.dataset.type) || (context.chart && context.chart.config && context.chart.config.type);
+            return (type === 'pie' || type === 'doughnut') ? 'center' : 'top';
           }
         }
       },
