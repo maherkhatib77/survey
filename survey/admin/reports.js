@@ -218,11 +218,20 @@ function switchTab(tab, btn) {
 
 function renderTab() {
   const content = document.getElementById('tabContent');
-  switch (activeTab) {
-    case 'overview': content.innerHTML = renderOverview(); break;
-    case 'fields': content.innerHTML = renderFields(); break;
-    case 'responses': content.innerHTML = renderResponses(); break;
-    case 'export': content.innerHTML = renderExport(); break;
+  // אבחון: ודאו שהסקריפט המעודכן נטען — אם שורה זו לא מופיעה בקונסול, זהו קאש של הדפדפן (Ctrl+F5)
+  console.info('[reports.js] build 20261027a | activeTab=' + activeTab + ' | matrix UI ' + (typeof runMatrixCompletion === 'function' ? 'OK' : 'MISSING'));
+  try {
+    switch (activeTab) {
+      case 'overview': content.innerHTML = renderOverview(); break;
+      case 'fields': content.innerHTML = renderFields(); break;
+      case 'responses': content.innerHTML = renderResponses(); break;
+      case 'export': content.innerHTML = renderExport(); break;
+    }
+  } catch (e) {
+    console.error('renderTab error:', e);
+    content.innerHTML = '<div style="padding:16px;border:1px solid #dc2626;border-radius:8px;color:#dc2626;">' +
+      '❌ שגיאה בתצוגת הלשונית: ' + (window.FBApp && FBApp.escapeHtml ? FBApp.escapeHtml(e.message) : String(e.message)) +
+      '<br><small>רעננו את הדפדפן (Ctrl+F5). אם השגיאה נמשכת — פתחו Console לפירוט.</small></div>';
   }
 }
 
