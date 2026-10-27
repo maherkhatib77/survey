@@ -53,6 +53,16 @@ switch ($method) {
             if (!$form) {
                 sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
             }
+
+            // אימות צד-שרת: שדות חובה + מטריצות מלאות (מונע דילוג עקף על הלקוח)
+            $__errors = validateResponseAgainstForm($form, $input['data'] ?? []);
+            if (!empty($__errors)) {
+                sendResponse([
+                    'success' => false,
+                    'error' => 'יש להשלים את כל השדות החובה לפני השליחה',
+                    'fieldErrors' => $__errors,
+                ], 400);
+            }
             if (($form['status'] ?? 'draft') !== 'published') {
                 // אפשר למנהלים מחוברים לשלוח תשובות גם לטפסים שלא פורסמו (לבדיקה)
                 if (isLoggedIn()) {

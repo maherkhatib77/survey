@@ -325,11 +325,55 @@ function validatePage() {
       return;
     }
     if (field.required && (!values[field.id] || values[field.id] === '')) { errors[field.id] = 'حقل مطلوب'; valid = false; return; }
+    // מטריצה: ודא שכל השורות סומנו (גם אם "חובה" אינה מוגדרת במיפוי ה-validation)
+    if (field.type === 'matrix') {
+      const mErr = validateMatrix(field);
+      if (mErr) { errors[field.id] = mErr; valid = false; return; }
+    }
     const err = validateField(field, values[field.id]);
     if (err) { errors[field.id] = err; valid = false; }
   });
-  if (!valid) render();
+  if (!valid) {
+    render();
+    scrollToFirstError();
+  }
   return valid;
+}
+
+// בדיקת מטריצה: כל שורה חייבת להיות מסומנת (radio/checkbox)
+function validateMatrix(field) {
+  const rows = field.matrixRows || [];
+  const cols = field.matrixColumns || [];
+  if (!rows.length || !cols.length) return null;
+  const mv = values[field.id];
+  const isReq = field.required === true;
+  const answered = [];
+  const unanswered = [];
+  rows.forEach(row => {
+    const v = mv ? mv[row.id] : undefined;
+    const filled = Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && String(v).trim() !== '');
+    if (filled) answered.push(row); else unanswered.push(row);
+  });
+  if (isReq && unanswered.length === rows.length && rows.length > 0) {
+    return 'يجب تقييم جميع البنود في هذا السؤال';
+  }
+  if (unanswered.length > 0 && (isReq || answered.length > 0)) {
+    const names = unanswered.slice(0, 3).map(r => r.label).join('، ');
+    return `يجب الإجابة على جميع بنود السؤال — لم يتم تقييم: ${names}${unanswered.length > 3 ? ' …' : ''} (${unanswered.length}/${rows.length})`;
+  }
+  return null;
+}
+
+// גלילה לשדה הראשון עם שגיאה + הדגה
+function scrollToFirstError() {
+  setTimeout(() => {
+    const el = document.querySelector('.filler-field.has-error');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('error-flash');
+      setTimeout(() => el.classList.remove('error-flash'), 1600);
+    }
+  }, 60);
 }
 
 function nextPage() { if (validatePage()) { currentPage++; render(); window.scrollTo(0, 0); } }

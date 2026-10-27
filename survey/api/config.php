@@ -107,8 +107,8 @@ header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
 // מאפשר ל-Javascript לקרוא את טוקן ה-CSRF מכותרת התגובה (נדרש ב-CORS cross-origin)
 header('Access-Control-Expose-Headers: X-CSRF-Token');
 
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Handle preflight (בדיקה חסינה גם בסביבות CLI ללא REQUEST_METHOD)
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
     exit();
 }
@@ -221,7 +221,7 @@ function getCsrfToken() {
  * GET/OPTIONS מדלגים אוטומטית.
  */
 function validateCsrf() {
-    if (in_array($_SERVER['REQUEST_METHOD'], ['GET', 'HEAD', 'OPTIONS'], true)) return;
+    if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD', 'OPTIONS'], true)) return;
 
     // נתיב גיבוי: העלאת קבצים (multipart) שנשלחת ללא Cookie של צד שלישי / אחרי
     // הזרקת הטוקן מכותרת התגובה – מאפשרים גם שדה 'csrf_token' בגוף הבקשה.
@@ -1138,6 +1138,94 @@ function saveResponse($formId, $response) {
 
 function sanitizeFilename($name) {
     return preg_replace('/[^a-zA-Z0-9_\-]/', '', $name);
+}
+
+// ===== אימות תגובה בצד השרת =====
+// החזרת מערך שגיאות ריק = תקין. נבדקים: שדות חובה (כולל מטריצות מלאות)
+// היגיון נגישות (conditionalLogic) נתמך ברמה הבסיסית כדי לא לחייב שדות נסתרים.
+function serverFieldVisible(array $field, array $data): bool {
+    $logic = $field['conditionalLogic'] ?? null;
+    if (!is_array($logic) || empty($logic['conditions'])) return true;
+    $matchType = $logic['matchType'] ?? 'all';
+    $results = [];
+    foreach ($logic['conditions'] as $c) {
+        $fid = $c['fieldId'] ?? '';
+        $v = $data[$fid] ?? null;
+        if (is_array($v)) $v = json_encode($v, JSON_UNESCAPED_UNICODE);
+        switch ($c['operator'] ?? 'equals') {
+            case 'equals': $r = ($v == ($c['value'] ?? '')); break;
+            case 'notEquals': $r = ($v != ($c['value'] ?? '')); break;
+            case 'contains': $r = (string)$v !== '' && mb_strpos((string)$v, (string)($c['value'] ?? '')) !== false; break;
+            case 'greaterThan': $r = is_numeric($v) && $v > ($c['value'] ?? 0); break;
+            case 'lessThan': $r = is_numeric($v) && $v < ($c['value'] ?? 0); break;
+            case 'isEmpty': $r = ($v === null || $v === ''); break;
+            case 'isNotEmpty': $r = !($v === null || $v === ''); break;
+            default: $r = true;
+        }
+        $results[] = $r;
+    }
+    $res = $matchType === 'all' ? !in_array(false, $results, true) : in_array(true, $results, true);
+    $action = $logic['action'] ?? 'show';
+    if ($action === 'hide') return !$res;
+    return $res;
+}
+
+function serverValueFilled($v): bool {
+    if ($v === null) return false;
+    if (is_string($v)) return trim(preg_replace('/\s+/u', ' ', $v)) !== '';
+    if (is_array($v)) {
+        if (count($v) === 0) return false;
+        foreach ($v as $item) {
+            if (serverValueFilled($item)) return true;
+        }
+        return false;
+    }
+    if (is_bool($v)) return true;
+    return is_numeric($v);
+}
+
+function validateResponseAgainstForm(array $form, $rawData): array {
+    if (!is_array($rawData)) return ['general' => 'נתוני התגובה אינם תקינים'];
+    $errors = [];
+    $pages = $form['pages'] ?? [];
+    foreach ($pages as $page) {
+        foreach (($page['fields'] ?? []) as $f) {
+            $type = $f['type'] ?? '';
+            // שדות שאינם דורשים מענה
+            if (in_array($type, ['heading', 'divider', 'calculation', 'info'], true)) continue;
+            if (!serverFieldVisible($f, $rawData)) continue;
+            $fid = $f['id'] ?? '';
+            if ($fid === '') continue;
+            $val = $rawData[$fid] ?? null;
+            $label = preg_replace('/\s+/u', ' ', (string)($f['label'] ?? $fid));
+            $required = !empty($f['required']);
+
+            if ($type === 'matrix') {
+                $rows = $f['matrixRows'] ?? ($f['rows'] ?? []);
+                $cols = $f['matrixColumns'] ?? ($f['columns'] ?? []);
+                if (!$rows || !$cols) continue; // מטריצה לא מוגדרת — אשמת הטופס, לא המשיב
+                $missing = [];
+                foreach ($rows as $row) {
+                    $rid = is_array($row) ? ($row['id'] ?? ($row['label'] ?? '')) : (string)$row;
+                    $rv = is_array($val) ? ($val[$rid] ?? null) : null;
+                    if (!serverValueFilled($rv)) $missing[] = is_array($row) ? (string)($row['label'] ?? $rid) : (string)$row;
+                }
+                $answeredCount = count($rows) - count($missing);
+                // חובה: כל השורות; וגם אם המשיב התחיל但未 סיים — נחסום (מניעת מטריצה חלקית)
+                if ($required && $missing) {
+                    $errors[$fid] = ['label' => $label, 'message' => 'יש להשלים את כל שורות המטריצה', 'missingRows' => array_slice($missing, 0, 10), 'missingCount' => count($missing), 'totalRows' => count($rows)];
+                } elseif (!$required && $missing && $answeredCount > 0) {
+                    $errors[$fid] = ['label' => $label, 'message' => 'יש להשלים את כל שורות המטריצה או להשאירה ריקה לגמרי', 'missingRows' => array_slice($missing, 0, 10), 'missingCount' => count($missing), 'totalRows' => count($rows)];
+                }
+                continue;
+            }
+
+            if ($required && !serverValueFilled($val)) {
+                $errors[$fid] = ['label' => $label, 'message' => 'שדה חובה ללא מענה'];
+            }
+        }
+    }
+    return $errors;
 }
 
 function getJSONInput() {
