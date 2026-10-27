@@ -44,8 +44,19 @@ function bfBuildSourceIndex($sourceId) {
 
 try {
     requireLogin();
-    requirePermission('manage_forms');
+    // Backfill = כתיבה לתגובות השמורות: נדרשת הרשאת עריכת סקרים (ללא קשר לבעלות,
+    // כי מדובר בפעולת תחזוקת נתונים מבוקרת; משתמש רגיל עם edit_forms מורשה).
+    requirePermission('edit_forms');
     if ($method === 'POST' && $action === 'run') validateCsrf();
+
+    // בדיקת בעלות: משתמש רגיל יכול להריץ backfill רק על סקרים שהוא יצר
+    $__cu = getCurrentUser();
+    if ($__cu && ($__cu['role'] ?? 'user') !== 'admin') {
+        $__f = getForm($formId);
+        if (!$__f || ($__f['createdBy'] ?? null) !== ($__cu['id'] ?? '') && ($__f['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+            sendResponse(['success' => false, 'error' => 'אין לך גישה לפעולה זו עבור סקר זה'], 403);
+        }
+    }
 
     $form = getForm($formId);
     if (!$form) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
