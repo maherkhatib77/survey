@@ -344,7 +344,18 @@ function renderProps() {
   if (!field) { panel.style.display = 'none'; return; }
   panel.style.display = 'block';
 
+  const curWidget = WIDGETS.find(w => w.type === field.type);
   let html = `
+    <div class="field-group"><label>סוג השדה</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="convertTypeSelect" style="flex:1;padding:8px;border:1px solid var(--slate-300);border-radius:8px;">
+          ${conversionBackups[field.id] ? `<option value="__undo__">↩️ בטול המרה (חזרה ל-${WIDGETS.find(w=>w.type===conversionBackups[field.id].type)?.label||conversionBackups[field.id].type})</option>` : ''}
+          ${WIDGETS.filter(w => !['divider','heading','richtext'].includes(w.type)).map(w => `<option value="${w.type}" ${w.type===field.type?'selected':''}>${w.icon} ${w.label}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-outline" title="המר את סוג השדה תוך שמירת ה-ID, התווית והנתונים שנאספו" onclick="handleConvertClick()">🔄 המר סוג</button>
+      </div>
+      <div class="help">שינוי הסוג שומר על מזהה השדה — לוגיקה מותנית, חישובים ותגובות קיימות נשארים תקפים.</div>
+    </div>
     <div class="field-group"><label>תווית</label><input type="text" value="${esc(field.label)}" onchange="updateFieldProp('label',this.value)"></div>
     <div class="field-group"><label>טקסט עזרה</label><input type="text" value="${esc(field.helpText||'')}" onchange="updateFieldProp('helpText',this.value)"></div>`;
 
@@ -493,6 +504,117 @@ function renderLogicConditions() {
       <input type="text" value="${esc(c.value||'')}" onchange="updateLogicCondition(${i},'value',this.value)" style="width:60px;padding:4px;border-radius:4px;border:1px solid var(--slate-300);font-size:12px;" placeholder="ערך">
     </div>
   `).join('');
+}
+
+// ===== Field Type Conversion (המרת סוג שדה) =====
+// שמירת ערכי המאגר/מטריצה לפני מחיקתם, כדי לאפשר Undo מלא
+const conversionBackups = {};
+
+function handleConvertClick() {
+  const sel = document.getElementById('convertTypeSelect');
+  if (!sel) return;
+  if (sel.value === '__undo__') { undoConversion(selectedFieldId); return; }
+  convertFieldType(sel.value);
+}
+
+function extractFieldAnswers(fieldId) {
+  // חילוץ כל התשובות לשדה מסויים מתוך הדוח הטעון (אם קיים) - לשימוש בהמרה
+  try {
+    const all = window.__loadedResponses || [];
+    return all.map(r => r.answers?.[fieldId]).filter(v => v !== undefined && v !== null && v !== '');
+  } catch(e) { return []; }
+}
+
+function convertFieldType(newType) {
+  const f = getCurrentField();
+  if (!f) return;
+  if (!newType || newType === f.type) { alert('בחרו סוג שונה מהסוג הנוכחי'); return; }
+
+  const oldType = f.type;
+  const srcLabel = WIDGETS.find(w=>w.type===oldType)?.label || oldType;
+  const dstLabel = WIDGETS.find(w=>w.type===newType)?.label || newType;
+
+  // חסימות היגיוניות
+  if (['file','signature'].includes(oldType)) {
+    alert(`⚠️ לא ניתן להמיר שדה "${srcLabel}" — העלאות קבצים/חתימות אינן מרות למבנה אחר.`);
+    return;
+  }
+  if (['file','signature','calculation'].includes(newType) && oldType !== 'number') {
+    if (!confirm(`⚠️ המרה לסוג "${dstLabel}" עלולה שלא לשמור את הערכים הקיימים (${srcLabel}). להמשיך?`)) return;
+  }
+  if (oldType === 'record' && !['select','text','radio'].includes(newType)) {
+    if (!confirm(`⚠️ שדה רשומה ממאגר יומר ל-${dstLabel}; ברירות המאגר וה-autoFill יישמרו בגיבוי ויהיו זמינות לביטול.`)) return;
+  }
+
+  // גיבוי מלא של הגדרות השדה (לUndo)
+  conversionBackups[f.id] = { type: oldType, snapshot: JSON.parse(JSON.stringify(f)) };
+
+  // אוסף תוויות/ערכים קיימים מהתגובות כדי ליצור אפשרויות בהתאמה
+  const answers = extractFieldAnswers(f.id);
+
+  const needsOptions = ['select','radio','checkbox'].includes(newType);
+  const wasOptionType = ['select','radio','checkbox'].includes(oldType);
+
+  // ניקוי מאפיינים ייחודיים לסוג הישן
+  ['placeholder','options','ratingScale','matrixRows','matrixCols','sourceId','autoFill','displayFields','multiple','maxSelections','calculation','enableOther','otherLabel']
+    .forEach(k => { if (k in f) delete f[k]; });
+
+  f.type = newType;
+
+  if (needsOptions) {
+    let opts = [];
+    if (wasOptionType && conversionBackups[f.id]?.snapshot?.options?.length) {
+      opts = conversionBackups[f.id].snapshot.options.map(o => ({ label: o.label, value: o.value }));
+    } else if (answers.length) {
+      const uniq = [...new Set(answers.map(a => typeof a === 'object' ? (a.label || JSON.stringify(a)) : String(a)))];
+      opts = uniq.slice(0, 50).map(v => ({ label: v, value: v }));
+    } else {
+      opts = [{ label: 'אפשרות 1', value: 'opt1' }, { label: 'אפשרות 2', value: 'opt2' }];
+    }
+    f.options = opts;
+    if (newType === 'checkbox') f.maxSelections = 0;
+  }
+
+  if (newType === 'rating') {
+    f.ratingScale = 5;
+    f.options = ['גרוע מאוד','גרוע','בינוני','טוב','מצוין'].map((l,i)=>({label:l,value:String(i+1)}));
+  }
+
+  if (newType === 'number') {
+    f.validation = (f.validation||[]).filter(v=>!['min','max'].includes(v.type));
+  }
+
+  if (newType === 'matrix') {
+    f.matrixRows = (f.matrixRows && f.matrixRows.length) ? f.matrixRows : (conversionBackups[f.id]?.snapshot?.options?.map(o=>o.label) || ['שורה 1']);
+    if (!f.matrixRows?.length) f.matrixRows = ['שורה 1'];
+    f.matrixCols = [{ label: 'כן', value: 'yes' }, { label: 'לא', value: 'no' }];
+  }
+
+  if (newType === 'text' || newType === 'textarea') {
+    // המרה משדות בעלי אפשרויות: הערך עצמו יוצג כטקסט - אין צורך בשינוי נוסף
+  }
+
+  save();
+  renderProps();
+  renderFields();
+
+  let msg = `✅ הסוג הומר: "${srcLabel}" ← "${dstLabel}".\nמזהה השדה נשמר — לוגיקה מותנית ותגובות קיימות נשארו תקפות.`;
+  if (conversionBackups[f.id]) msg += `\n\nלביטול ההמרה לחצו שוב על "🔄 המר סוג" ובחרו "↩️ בטול המרה" (או השתמשו בפקודה undoConversion('${f.id}') בקונסול).`;
+  alert(msg);
+}
+
+function undoConversion(fieldId) {
+  const backup = conversionBackups[fieldId];
+  if (!backup) { alert('אין גיבוי זמין להמרה זו (הדף נטען מחדש או עבר זמן).'); return; }
+  const f = form.pages[activePage].fields.find(x => x.id === fieldId);
+  if (!f) { alert('השדה לא נמצא בעמוד הנוכחי.'); return; }
+  Object.keys(f).forEach(k => delete f[k]);
+  Object.assign(f, backup.snapshot);
+  delete conversionBackups[fieldId];
+  save();
+  renderProps();
+  renderFields();
+  alert('↩️ ההמרה בוטלה — השדה חזר למצבו המקורי.');
 }
 
 // ===== Field Updates =====
