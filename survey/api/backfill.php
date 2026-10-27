@@ -455,13 +455,265 @@ function bfApplyAutoFill(array &$data, ?array $symbolField, array $mappings, arr
     return $changedCount;
 }
 
+// ===== מנוע השלמת מטריצות חסרות (matrix-complete) =====
+// לוגיקה: לכל שאלת מטריצה שהמשיב דילג על חלק משורותיה — מסיקים ערך עקבי
+// מתוך תשובות המשיב בשאר המטריצות שבסקר. אסטרטגיות (לפי סדר עדיפות):
+//  A) ממוצע הציונים של המשיב בכל המטריצות -> העמודה הקרובה ביותר לממוצע.
+//     (מתאים למטריצות סולם 1-5 / "מאוד"-"לא"; מתעלם מערכי טקסט לא-מספריים)
+//  B) שכיח (Mode): אם המשיב בחר בעמודה אחת ברוב שורות המטריצות שלו -> נשתמש בה.
+//  C) היסטוריה לפי אותה שורה: אם אותו משיב (לפי מזהה מוסד/שם) ענה על אותה
+//     שורת מטריצה בתגובה אחרת באותו הסקר -> נעתיק את ציונו מהפעם הקודמת.
+//  D) ברירת מחדל: העמודה האמצעית בסולם (שמרני, מסומן כ-via=default).
+// החוקים: לא דורסים שורות שנענו; אין הוספת עמודות שאינן קיימות בטופס;
+// רק סעיפים (שורות) חסרים ממולאים; נוצר גיבוי לפני הכתיבה (ב-run).
+
+/** שלוף רשימת {id,label,value} של עמודות מטריצה */
+function mcColumns($f) {
+    $cols = !empty($f['matrixColumns']) ? $f['matrixColumns'] : ($f['columns'] ?? []);
+    $out = [];
+    foreach ($cols as $c) {
+        if (is_array($c)) {
+            $out[] = ['id' => (string)($c['id'] ?? $c['value'] ?? ''), 'label' => (string)($c['label'] ?? ''), 'value' => (string)($c['value'] ?? $c['id'] ?? '')];
+        } else {
+            $out[] = ['id' => (string)$c, 'label' => (string)$c, 'value' => (string)$c];
+        }
+    }
+    return $out;
+}
+
+/** שורות מטריצה: [{id,label}] */
+function mcRows($f) {
+    $rows = !empty($f['matrixRows']) ? $f['matrixRows'] : ($f['rows'] ?? []);
+    $out = [];
+    foreach ($rows as $r) {
+        if (is_array($r)) $out[] = ['id' => (string)($r['id'] ?? $r['label'] ?? ''), 'label' => (string)($r['label'] ?? '')];
+        else $out[] = ['id' => (string)$r, 'label' => (string)$r];
+    }
+    return $out;
+}
+
+/** האם ערך עמודה הוא מספרי (לצורך ממוצע)? */
+function mcNumericValue($col) {
+    // עדיפות ל-value; אם הטקסט עצמו מכיל ספרה בודדת (1-10) — נחלץ
+    $v = trim($col['value']);
+    if ($v !== '' && is_numeric($v)) return (float)$v;
+    if (preg_match('/^\s*(\d{1,2})\s*$/', $col['label'], $m)) return (float)$m[1];
+    return null;
+}
+
+/** נרמול תשובת מטריצה לשורה: scalar | [scalars] | null */
+function mcCellNormalize($cell) {
+    if ($cell === null || $cell === '' || $cell === []) return null;
+    if (is_array($cell)) {
+        $flat = [];
+        foreach ($cell as $x) if (is_scalar($x) && trim((string)$x) !== '') $flat[] = trim((string)$x);
+        return $flat ?: null;
+    }
+    if (is_scalar($cell)) return [trim((string)$cell)];
+    return null;
+}
+
+/** מיפוי ערך-עמודה -> id העמודה (עבור כתיבה במבנה האחסון) */
+function mcColIdByValue(array $cols, $val) {
+    foreach ($cols as $c) {
+        if ($c['value'] === $val || $c['id'] === $val || $c['label'] === $val) return $c['id'];
+    }
+    return null;
+}
+
+/** זיהוי "מזהה משיב" לתגובה (לצורך היסטוריה בין-תגובתית): סמל מוסד או שם מלא */
+function mcRespondentKey(array $respData, array $allFields) {
+    // 1) שדה record עם עמודת תצוגה של סמל
+    foreach ($allFields as $f) {
+        if (($f['type'] ?? '') !== 'record' || empty($f['sourceId'])) continue;
+        $df = bfCleanKey((string)($f['displayField'] ?? ''));
+        if ($df !== '' && preg_match('/סמל/iu', $df)) {
+            $sym = bfResolveSymbol($respData[$f['id']] ?? '', $f);
+            if ($sym !== '') return 'inst:' . $sym;
+        }
+    }
+    // 2) שדה טקסט עם שם מלא/שם משתמש
+    foreach ($allFields as $f) {
+        $lbl = bfNormText($f['label'] ?? '');
+        if (!in_array($f['type'] ?? '', ['text', 'email'], true)) continue;
+        if (preg_match('/שם.*מלא|full.?name|اسم.*(كامل|المستخدم)|שם משתמש/iu', $lbl)) {
+            $v = $respData[$f['id']] ?? '';
+            if (is_scalar($v) && trim((string)$v) !== '') return 'name:' . bfNormText($v);
+        }
+    }
+    return null;
+}
+
+/**
+ * חישוב ערך מומלץ לשורת מטריצה חסרה עבור משיב אחד.
+ * מחזיר [value, via] או null אם אין המלעה סבירה.
+ */
+function mcSuggest($rowLabel, array $respondentMatrixAnswers, ?array $historyRowVal, array $cols) {
+    // A+B: שקלול תשובות המשיב בשאר המטריצות
+    $nums = [];      // ערכים מספריים
+    $counts = [];    // שכיחות ערכים (גם לא-מספריים)
+    foreach ($respondentMatrixAnswers as $vals) {
+        foreach ($vals as $v) {
+            $cid = mcColIdByValue($cols, $v);
+            if ($cid === null) continue; // ערך שלא שייך לעמודות השאלה הנתונה
+            $colObj = null;
+            foreach ($cols as $c) if ($c['id'] === $cid) { $colObj = $c; break; }
+            $nv = mcNumericValue($colObj);
+            if ($nv !== null) $nums[] = $nv;
+            $counts[$v] = ($counts[$v] ?? 0) + 1;
+        }
+    }
+    // A) ממוצע -> העמודה המספרית הקרובה
+    if (count($nums) >= 2) {
+        $avg = array_sum($nums) / count($nums);
+        $best = null; $bestDist = INF;
+        foreach ($cols as $c) {
+            $nv = mcNumericValue($c);
+            if ($nv === null) continue;
+            $dist = abs($nv - $avg);
+            if ($dist < $bestDist) { $bestDist = $dist; $best = $c['value']; }
+        }
+        if ($best !== null) return [$best, 'avg(' . round($avg, 2) . ')'];
+    }
+    // C) היסטוריה: אותו משיב ענה על אותה שורה בתגובה אחרת
+    if ($historyRowVal !== null) return [$historyRowVal, 'history'];
+    // B) שכיח
+    if ($counts) {
+        arsort($counts);
+        $mode = (string)array_key_first($counts);
+        if (mcColIdByValue($cols, $mode) !== null) return [$mode, 'mode'];
+    }
+    // D) ברירת מחדל: עמודה אמצעית (בסולם מספרי) או ראשונה
+    $numericCols = array_values(array_filter($cols, fn($c) => mcNumericValue($c) !== null));
+    if ($numericCols) {
+        $mid = $numericCols[(int)floor(count($numericCols) / 2)];
+        return [$mid['value'], 'default-mid'];
+    }
+    if ($cols) return [$cols[0]['value'], 'default-first'];
+    return null;
+}
+
+/**
+ * הרצת מנוע השלמת מטריצות על כלל התגובות.
+ * $dryRun=true — לא כותבים כלום.
+ */
+function runMatrixCompletion(array $form, array &$responses, bool $dryRun) {
+    $allFields = [];
+    foreach (($form['pages'] ?? []) as $page) {
+        foreach (($page['fields'] ?? []) as $f) $allFields[] = $f;
+    }
+    $matrixFields = array_values(array_filter($allFields, fn($f) => ($f['type'] ?? '') === 'matrix'));
+    if (!$matrixFields) {
+        return ['totalResponses' => count($responses), 'changes' => 0, 'details' => [], 'skipped' => 0, 'message' => 'לסקר זה אין שאלות מטריצה'];
+    }
+
+    // מעבר ראשון: איסוף תשובות לפי משיב (להיסטוריה) ומילויים קיימים
+    $respKeys = [];       // idx -> respondentKey
+    $answersByKey = [];   // key => [ [fieldId => [rowLabel => [values]]], ... ]
+    foreach ($responses as $i => $resp) {
+        if (!is_array($resp)) continue;
+        $data = $resp['data'] ?? [];
+        if (!is_array($data)) $data = [];
+        $key = mcRespondentKey($data, $allFields) ?? ('idx:' . $i);
+        $respKeys[$i] = $key;
+        $perResp = [];
+        foreach ($matrixFields as $mf) {
+            $rows = mcRows($mf);
+            $ans = [];
+            $cur = $data[$mf['id']] ?? null;
+            if (is_array($cur)) {
+                foreach ($rows as $r) {
+                    $norm = mcCellNormalize($cur[$r['id']] ?? ($cur[$r['label']] ?? null));
+                    if ($norm !== null) $ans[$r['label']] = $norm;
+                }
+            }
+            $perResp[$mf['id']] = $ans;
+        }
+        $answersByKey[$key][] = $perResp;
+    }
+
+    $updatedList = [];
+    $skippedCount = 0;
+    $changedCount = 0;
+
+    // מעבר שני: זיהוי ומילוי חוסרים
+    foreach ($responses as $i => &$resp) {
+        if (!is_array($resp)) continue;
+        $key = $respKeys[$i] ?? ('idx:' . $i);
+        $histEntries = $answersByKey[$key] ?? [];
+        // היסטוריה = כל תגובות אותו משיב *מלבד* התגובה הנוכחית
+        $history = [];
+        foreach ($histEntries as $j => $h) { if ($j !== array_search($resp, $histEntries, false)) {} }
+        // פשוט יותר: נשתמש בכל יתר הערכים של אותו משיב
+        foreach ($histEntries as $h) $history[] = $h;
+
+        if (!isset($resp['data']) || !is_array($resp['data'])) $resp['data'] = [];
+        $newData = [];
+        $anyChange = false;
+
+        foreach ($matrixFields as $mf) {
+            $cols = mcColumns($mf);
+            $rows = mcRows($mf);
+            if (!$cols || !$rows) continue;
+            $fid = $mf['id'];
+            $cur = $resp['data'][$fid] ?? null;
+            if (!is_array($cur)) $cur = [];
+            $filledHere = 0;
+
+            // תשובות המשיב בשאר המטריצות (לצורך ממוצע/שכיח)
+            $otherAnswers = [];
+            foreach ($matrixFields as $of) {
+                if ($of['id'] === $fid) continue;
+                foreach ($history as $h) {
+                    foreach (($h[$of['id']] ?? []) as $vals) $otherAnswers[] = $vals;
+                }
+            }
+
+            foreach ($rows as $r) {
+                $existing = mcCellNormalize($cur[$r['id']] ?? ($cur[$r['label']] ?? null));
+                if ($existing !== null) { $skippedCount++; continue; } // נענה — לא דורסים
+                // היסטוריה לאותה שורה בדיוק (בתגובות אחרות של אותו משיב)
+                $histVal = null;
+                foreach ($history as $h) {
+                    if (isset($h[$fid][$r['label']])) { $hv = $h[$fid][$r['label']]; $histVal = $hv[0] ?? null; if ($histVal !== null) break; }
+                }
+                $sug = mcSuggest($r['label'], $otherAnswers, $histVal, $cols);
+                if ($sug === null) continue;
+                [$val, $via] = $sug;
+                $cid = mcColIdByValue($cols, $val);
+                if ($cid === null) continue;
+                $cur[$r['id']] = $cid;
+                $filledHere++;
+                $changedCount++;
+                $updatedList[] = [
+                    'responseId' => $resp['id'] ?? '',
+                    'target' => ($mf['label'] ?? $fid) . ' → ' . $r['label'],
+                    'from' => null,
+                    'to' => $val,
+                    'via' => 'matrix:' . $via
+                ];
+            }
+            if ($filledHere > 0) { $resp['data'][$fid] = $cur; $anyChange = true; }
+        }
+        unset($newData);
+    }
+    unset($resp);
+
+    return [
+        'totalResponses' => count($responses),
+        'changes' => $changedCount,
+        'details' => $updatedList,
+        'alreadyFilled' => $skippedCount,
+    ];
+}
+
 try {
     try {
         requireLogin();
         // Backfill = כתיבה לתגובות השמורות: נדרשת הרשאת עריכת סקרים (ללא קשר לבעלות,
         // כי מדובר בפעולת תחזוקת נתונים מבוקרת; משתמש רגיל עם edit_forms מורשה).
         requirePermission('edit_forms');
-        if ($method === 'POST' && $action === 'run') validateCsrf();
+        if ($method === 'POST' && ($action === 'run' || $action === 'matrix-complete')) validateCsrf();
 
         // בדיקת בעלות: משתמש רגיל יכול להריץ backfill רק על סקרים שהוא יצר
         $__cu = getCurrentUser();
@@ -483,6 +735,36 @@ try {
 
     $form = getForm($formId);
     if (!$form) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
+
+    // ===== מסלול matrix-preview / matrix-complete: השלמת סעיפי מטריצה חסרים =====
+    if ($action === 'matrix-preview' || $action === 'matrix-complete') {
+        $mFile = RESPONSES_DIR . '/' . $formId . '.json';
+        $mRaw = readJSON($mFile);
+        if ($mRaw === null) {
+            sendResponse(['success' => true, 'data' => ['totalResponses' => 0, 'changes' => 0, 'details' => [], 'alreadyFilled' => 0, 'dryRun' => true, 'message' => 'אין עדיין תגובות לסקר זה']]);
+        }
+        $mEnv = is_array($mRaw) && isset($mRaw['responses']) && is_array($mRaw['responses']);
+        $mResps = $mEnv ? $mRaw['responses'] : $mRaw;
+        $mResult = runMatrixCompletion($form, $mResps, true);
+        if (!empty($mResult['message'])) {
+            sendResponse(['success' => true, 'data' => ['totalResponses' => count($mResps), 'changes' => 0, 'details' => [], 'alreadyFilled' => 0, 'dryRun' => true, 'message' => $mResult['message']]]);
+        }
+        $mResult['dryRun'] = ($action === 'matrix-preview');
+        if ($action === 'matrix-preview') {
+            sendResponse(['success' => true, 'data' => $mResult]);
+        }
+        // matrix-complete (POST): כתיבה + גיבוי
+        if ($mResult['changes'] > 0) {
+            $mBackup = RESPONSES_DIR . '/' . $formId . '.backup-matrix-' . date('Ymd-His') . '.json';
+            @copy($mFile, $mBackup);
+            $mPayload = $mEnv ? array_merge($mRaw, ['responses' => $mResps]) : $mResps;
+            if (!writeJSON($mFile, $mPayload)) {
+                sendResponse(['success' => false, 'error' => 'כתיבת הקובץ נכשלה. בדוק הרשאות לתיקיית data/responses'], 500);
+            }
+            $mResult['backup'] = basename($mBackup);
+        }
+        sendResponse(['success' => true, 'data' => $mResult]);
+    }
 
     // איסוף כל השדות (כולל מטריצות/עמודות)
     $allFields = [];

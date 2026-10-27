@@ -929,6 +929,16 @@ function renderExport() {
         <div id="backfillResult" style="margin-top:12px;font-size:13px;text-align:start;"></div>
       </div>
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+      <div style="border:2px dashed var(--slate-300);border-radius:var(--radius);padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🧩</div>
+        <h4 style="margin-bottom:8px;">השלמת סעיפי מטריצה חסרים</h4>
+        <p style="font-size:13px;color:var(--slate-500);margin-bottom:16px;">סורק את כל התגובות ומשלים שורות ריקות בשאלות מטריצה, בהתאם לתשובות המשיב בשאר המטריצות (ממוצע/שכיח/היסטוריה). לא דורס שורות שנענו, ויוצר גיבוי לפני שינוי.</p>
+        <button class="btn btn-primary" onclick="runMatrixCompletion(false)">🔍 סריקה (Preview)</button>
+        <button class="btn btn-success" onclick="runMatrixCompletion(true)" style="margin-inline-start:8px;">🧩 השלמת מטריצות</button>
+        <div id="matrixCompleteResult" style="margin-top:12px;font-size:13px;text-align:start;"></div>
+      </div>
+    </div>
     <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--slate-200);">
       <h4 style="margin-bottom:12px;">🌐 API Endpoints</h4>
       <div style="background:var(--slate-50);padding:16px;border-radius:8px;font-family:monospace;font-size:13px;">
@@ -1080,6 +1090,48 @@ async function runBackfill(apply) {
     box.innerHTML = html;
   } catch (e) {
     console.error('Backfill error:', e);
+    box.innerHTML = `<span style="color:#dc2626;">❌ שגיאה: ${e.message}</span>`;
+  }
+}
+
+// ===== השלמת סעיפי מטריצה חסרים (Matrix Completion) =====
+async function runMatrixCompletion(apply) {
+  const box = document.getElementById('matrixCompleteResult');
+  if (!box) return;
+  box.innerHTML = '<span style="color:var(--slate-500);">⏳ סורק תגובות ומזהה סעיפי מטריצה חסרים...</span>';
+  try {
+    let res;
+    if (apply) {
+      if (!confirm('להשלים סעיפי מטריצה חסרים בפועל? ייווצר קובץ גיבוי לפני השינוי.\nמומלץ לבצע "סריקה (Preview)" תחילה.')) { box.innerHTML = ''; return; }
+      res = await FBAuth.writeRequest(`${API}/backfill.php?action=matrix-complete&formId=${form.id}`, { method: 'POST' });
+    } else {
+      res = await FBAuth.fbFetch(`${API}/backfill.php?action=matrix-preview&formId=${form.id}`);
+    }
+    const data = res && res.data ? res.data : null;
+    if (!res || !res.success || !data) {
+      box.innerHTML = `<span style="color:#dc2626;">❌ ${ (res && res.error) ? res.error : 'שגיאה בתפעול' }</span>`;
+      return;
+    }
+    if (data.message) { box.innerHTML = `<span style="color:var(--slate-500);">${data.message}</span>`; return; }
+    let html = `<div style="background:var(--slate-50);border-radius:8px;padding:12px;">`;
+    html += `<b>${data.dryRun ? '🔍 סריקה מקדימה' : '✅ ההשלמה בוצעה'}</b> — סה"כ תגובות: ${data.totalResponses} | סעיפים שהושלמו: <b>${data.changes}</b> | סעיפים שנענו כבר (לא נגע): ${data.alreadyFilled}<br>`;
+    if (data.backup) html += `📦 גיבוי נשמר: <code>${data.backup}</code><br>`;
+    if (data.details && data.details.length) {
+      html += `<details style="margin-top:6px;" open><summary>פירוט השלמות (${data.details.length})</summary><ul style="margin:6px 0;padding-inline-start:20px;">`;
+      data.details.slice(0, 100).forEach(d => {
+        html += `<li>תגובה <code>${String(d.responseId||'').slice(0,8)}</code> → <b>${d.target}</b> = ${d.to} <span style="color:var(--slate-400);">(${d.via||''})</span></li>`;
+      });
+      html += `</ul></details>`;
+    } else if (data.changes === 0) {
+      html += `<span style="color:var(--success);">✔️ אין סעיפי מטריצה חסרים — כל התגובות שלמות.</span>`;
+    }
+    if (!data.dryRun && data.changes > 0) {
+      html += `<div style="margin-top:8px;"><button class="btn btn-primary" onclick="location.reload()">רענן דף כדי לראות את הנתונים המעודכנים</button></div>`;
+    }
+    html += `</div>`;
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('Matrix completion error:', e);
     box.innerHTML = `<span style="color:#dc2626;">❌ שגיאה: ${e.message}</span>`;
   }
 }
