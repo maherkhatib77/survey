@@ -31,6 +31,19 @@ switch ($method) {
         } elseif ($action === 'count' && $formId) {
             $responses = getFormResponses($formId);
             sendResponse(['success' => true, 'count' => countRealResponses($formId)]);
+        } elseif ($action === 'get' && $formId && isset($_GET['responseId'])) {
+            // שליפת תגובה בודדת לעריכה (נדרש הרשאת עריכת סקרים)
+            requirePermission('edit_forms');
+            $responses = getFormResponses($formId);
+            $rid = $_GET['responseId'];
+            $found = null;
+            foreach ($responses as $r) {
+                if (($r['id'] ?? '') === $rid) { $found = $r; break; }
+            }
+            if ($found === null) {
+                sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+            }
+            sendResponse(['success' => true, 'data' => $found]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
@@ -222,6 +235,52 @@ switch ($method) {
             }
 
             sendResponse(['success' => true, 'imported' => $imported, 'skippedDuplicates' => $skipped, 'invalid' => $invalid]);
+
+        } elseif ($action === 'update') {
+            // עריכת תגובה קיימת ע"י מנהל/בעל הסקר (נשלח מלשונית "תגובות" בדוח)
+            requireLogin();
+            requirePermission('edit_forms');
+            $__cu = getCurrentUser();
+            $form = getForm($formId);
+            if (!$form) sendResponse(['success' => false, 'error' => 'טופס לא נמצא'], 404);
+            if ($__cu && ($__cu['role'] ?? 'user') !== 'admin' && ($form['createdBy'] ?? null) !== ($__cu['username'] ?? '')) {
+                sendResponse(['success' => false, 'error' => 'אין לך גישה לעריכת תגובות בסקר זה'], 403);
+            }
+            $rid = isset($input['responseId']) ? $input['responseId'] : '';
+            $newData = isset($input['data']) && is_array($input['data']) ? $input['data'] : null;
+            if (!$rid || $newData === null) {
+                sendResponse(['success' => false, 'error' => 'נתונים לא תקינים (responseId/data חסרים)'], 400);
+            }
+            $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+            $responses = getFormResponses($formId);
+            $idx = null;
+            foreach ($responses as $i => $r) {
+                if (($r['id'] ?? '') === $rid) { $idx = $i; break; }
+            }
+            if ($idx === null) sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+
+            // עדכון: מחליפים את ה-data שניהל ערך, שומרים רשומת ביקורת
+            $responses[$idx]['data'] = $newData;
+            $responses[$idx]['editedAt'] = date('c');
+            $responses[$idx]['editedBy'] = $__cu['username'] ?? 'unknown';
+
+            // כתיבה אטומית עם נעילה
+            if (!file_exists(RESPONSES_DIR)) @mkdir(RESPONSES_DIR, 0755, true);
+            $fp = @fopen($filepath, 'c');
+            $okWrite = false;
+            if ($fp && flock($fp, LOCK_EX)) {
+                ftruncate($fp, 0);
+                rewind($fp);
+                $okWrite = (fwrite($fp, json_encode($responses, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+                fflush($fp);
+                flock($fp, LOCK_UN);
+                fclose($fp);
+            } elseif ($fp) { fclose($fp); }
+            if (!$okWrite) {
+                error_log('responses update: failed writing ' . $filepath);
+                sendResponse(['success' => false, 'error' => 'כשל בכתיבת קובץ התגובות. בדוק הרשאות כתיבה'], 500);
+            }
+            sendResponse(['success' => true, 'data' => $responses[$idx]]);
         } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
@@ -239,20 +298,53 @@ switch ($method) {
                 sendResponse(['success' => false, 'error' => 'אין לך גישה לפעולה זו'], 403);
             }
         }
-        if ($action === 'clear' && $formId) {
-            $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
-            if (file_exists($filepath)) {
-                unlink($filepath);
-                $form = getForm($formId);
-                if ($form) {
-                    $form['responseCount'] = 0;
-                    saveForm($form);
-                }
-                sendResponse(['success' => true, 'message' => 'כל התגובות נמחקו']);
-            } else {
-                sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות'], 404);
+    if ($action === 'clear' && $formId) {
+        $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+        if (file_exists($filepath)) {
+            unlink($filepath);
+            $form = getForm($formId);
+            if ($form) {
+                $form['responseCount'] = 0;
+                saveForm($form);
             }
+            sendResponse(['success' => true, 'message' => 'כל התגובות נמחקו']);
         } else {
+            sendResponse(['success' => false, 'error' => 'לא נמצאו תגובות'], 404);
+        }
+    } elseif ($action === 'one' && $formId && isset($_GET['responseId'])) {
+        // מחיקת תגובה בודדת (נדרש אימות מחדש של הרשאת מחיקה על הסקר)
+        $rid = $_GET['responseId'];
+        $filepath = RESPONSES_DIR . '/' . sanitizeFilename($formId) . '.json';
+        $responses = getFormResponses($formId);
+        $found = false;
+        $kept = [];
+        foreach ($responses as $r) {
+            if (($r['id'] ?? '') === $rid) { $found = true; continue; }
+            $kept[] = $r;
+        }
+        if (!$found) sendResponse(['success' => false, 'error' => 'התגובה לא נמצאה'], 404);
+
+        $fp = @fopen($filepath, 'c');
+        $okWrite = false;
+        if ($fp && flock($fp, LOCK_EX)) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            $okWrite = (fwrite($fp, json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false);
+            fflush($fp);
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        } elseif ($fp) { fclose($fp); }
+        if (!$okWrite) {
+            error_log('responses delete-one: failed writing ' . $filepath);
+            sendResponse(['success' => false, 'error' => 'כשל במחיקת התגובה. בדוק הרשאות כתיבה'], 500);
+        }
+        $form = getForm($formId);
+        if ($form) {
+            $form['responseCount'] = countRealResponses($formId);
+            saveForm($form);
+        }
+        sendResponse(['success' => true, 'message' => 'התגובה נמחקה', 'remaining' => count($kept)]);
+    } else {
             sendResponse(['success' => false, 'error' => 'פעולה לא חוקית'], 400);
         }
         break;

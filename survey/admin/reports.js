@@ -473,11 +473,233 @@ function renderResponses() {
       
       html += `<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(displayText)}</td>`;
     });
-    html += `<td><button class="btn btn-sm btn-outline" onclick="showResponse(${i})">צפה</button></td></tr>`;
+    html += `<td style="white-space:nowrap;">
+      <button class="btn btn-sm btn-outline" onclick="showResponse(${i})">צפה</button>
+      <button class="btn btn-sm btn-outline" onclick="editResponse(${i})" title="עריכת תגובה">✏️ ערוך</button>
+      <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;" onclick="deleteResponse(${i})" title="מחיקת תגובה">🗑 מחק</button>
+    </td></tr>`;
   });
   html += '</tbody></table></div>';
   return html;
 }
+
+// ===== עריכה / מחיקה של תגובה בודדת (לשונית "תגובות") =====
+let editingResponseIdx = null; // אינדקס בתוך responses (לא מסונן) — נועל מזהה מדויק
+
+function editResponse(listIdx) {
+  const r = filteredResponses[listIdx];
+  if (!r) return;
+  const absIdx = responses.findIndex(x => x.id === r.id);
+  if (absIdx === -1) { alert('התגובה אינה נמצאת ברשימה. רענן את הדף.'); return; }
+  editingResponseIdx = absIdx;
+
+  const allFields = form.pages.flatMap(p => p.fields);
+  document.getElementById('editRespMeta').innerHTML =
+    `תגובה מס׳ ${listIdx + 1} • נשלחה: ${formatDateTime(r.submittedAt)}` +
+    (r.editedAt ? ` • <span style="color:#b45309;">נערכה לאחרונה: ${formatDateTime(r.editedAt)} ע"י ${esc(r.editedBy || '')}</span>` : '');
+
+  let html = '';
+  allFields.forEach((f, fi) => {
+    const v = (r.data || {})[f.id];
+    html += `<div data-edit-field="${esc(f.id)}" style="border:1px solid var(--slate-200);border-radius:8px;padding:10px 12px;">`;
+    html += `<label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">${esc(f.label)}</label>`;
+
+    switch (f.type) {
+      case 'radio':
+      case 'select': {
+        const opts = (f.options || []);
+        html += `<select dir="auto" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        html += `<option value="">— ללא מענה —</option>`;
+        opts.forEach(o => {
+          const ov = (o && typeof o === 'object') ? (o.value !== undefined ? String(o.value) : String(o.label ?? '')) : String(o);
+          const ol = (o && typeof o === 'object') ? (o.label ?? o.value ?? '') : String(o);
+          html += `<option value="${esc(ov)}" ${String(v ?? '') === ov ? 'selected' : ''}>${esc(String(ol))}</option>`;
+        });
+        html += `</select>`;
+        break;
+      }
+      case 'checkbox': {
+        const arr = Array.isArray(v) ? v.map(String) : (v != null && v !== '' ? [String(v)] : []);
+        html += `<div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+        (f.options || []).forEach(o => {
+          const ov = (o && typeof o === 'object') ? String(o.value ?? o.label ?? '') : String(o);
+          const ol = (o && typeof o === 'object') ? String(o.label ?? o.value ?? '') : String(o);
+          html += `<label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;font-size:13px;border:1px solid var(--slate-200);border-radius:6px;padding:4px 8px;cursor:pointer;">
+            <input type="checkbox" value="${esc(ov)}" ${arr.includes(ov) ? 'checked' : ''}> ${esc(String(ol))}</label>`;
+        });
+        html += `</div>`;
+        break;
+      }
+      case 'rating': {
+        const max = f.max || 5;
+        html += `<input type="number" min="1" max="${max}" value="${v != null ? esc(String(v)) : ''}" placeholder="1-${max}" style="width:110px;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      }
+      case 'matrix': {
+        const rowsArr = f.rows || [];
+        const colsArr = f.columns || [];
+        const cur = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+        html += `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:right;padding:4px;"></th>`;
+        colsArr.forEach(c => {
+          const cl = (c && typeof c === 'object') ? String(c.label ?? c.value ?? '') : String(c);
+          html += `<th style="padding:4px 6px;text-align:center;font-weight:600;">${esc(cl)}</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+        rowsArr.forEach(row => {
+          const rk = (row && typeof row === 'object') ? String(row.id ?? row.value ?? row.label ?? '') : String(row);
+          const rl = (row && typeof row === 'object') ? String(row.label ?? row.value ?? '') : String(row);
+          html += `<tr><td style="padding:4px 6px;">${esc(rl)}</td>`;
+          colsArr.forEach(col => {
+            const ck = (col && typeof col === 'object') ? String(col.value ?? col.label ?? '') : String(col);
+            const checked = String(cur[rk] ?? '') === ck;
+            html += `<td style="text-align:center;padding:4px;"><input type="radio" name="mx_${esc(f.id)}_${esc(rk)}" value="${esc(ck)}" ${checked ? 'checked' : ''}></td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        break;
+      }
+      case 'date':
+        html += `<input type="date" value="${v ? esc(String(v)).slice(0,10) : ''}" style="padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      case 'number':
+        html += `<input type="number" step="any" value="${v != null ? esc(String(v)) : ''}" style="width:150px;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+        break;
+      case 'textarea':
+        html += `<textarea rows="3" dir="auto" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">${v != null ? esc(String(v)) : ''}</textarea>`;
+        break;
+      default: // text, email, phone, record וכו' — עריכה כטקסט חופשי
+        html += `<input type="text" dir="auto" value="${v != null ? esc(typeof v === 'object' ? JSON.stringify(v) : String(v)) : ''}" style="width:100%;padding:8px;border:1px solid var(--slate-300);border-radius:6px;">`;
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('editRespBody').innerHTML = html;
+  document.getElementById('editResponseModal').style.display = 'flex';
+}
+
+function closeEditResponseModal() {
+  document.getElementById('editResponseModal').style.display = 'none';
+  editingResponseIdx = null;
+}
+
+async function saveEditedResponse() {
+  if (editingResponseIdx === null) return;
+  const r = responses[editingResponseIdx];
+  const newData = Object.assign({}, r.data || {});
+
+  // חילוץ הערכים החדשים מהשדה לפי סוג
+  document.querySelectorAll('#editRespBody [data-edit-field]').forEach(box => {
+    const fid = box.getAttribute('data-edit-field');
+    const f = form.pages.flatMap(p => p.fields).find(x => x.id === fid);
+    if (!f) return;
+    switch (f.type) {
+      case 'radio':
+      case 'select': {
+        const sel = box.querySelector('select');
+        const val = sel ? sel.value : '';
+        if (val === '') delete newData[fid]; else newData[fid] = val;
+        break;
+      }
+      case 'checkbox': {
+        const vals = Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+        if (!vals.length) delete newData[fid]; else newData[fid] = vals;
+        break;
+      }
+      case 'matrix': {
+        const res = {};
+        box.querySelectorAll('tbody tr').forEach(tr => {
+          const inp = tr.querySelector('input[type=radio]:checked');
+          if (inp && inp.value !== '') {
+            const rk = inp.name.split('_').slice(2).join('_');
+            res[rk] = inp.value;
+          }
+        });
+        if (Object.keys(res).length) newData[fid] = res; else delete newData[fid];
+        break;
+      }
+      case 'number':
+      case 'rating': {
+        const inp = box.querySelector('input');
+        const val = inp ? inp.value : '';
+        if (val === '') delete newData[fid]; else newData[fid] = (f.type === 'number' ? Number(val) : val);
+        break;
+      }
+      default: {
+        const inp = box.querySelector('input[type=text], input[type=date], textarea');
+        const val = inp ? inp.value.trim() : '';
+        if (val === '') delete newData[fid]; else newData[fid] = val;
+      }
+    }
+  });
+
+  const btn = document.getElementById('saveEditRespBtn');
+  btn.disabled = true; btn.textContent = '⏳ שומר...';
+  try {
+    const out = await FBAuth.writeRequest(`${API}/responses.php?action=update&formId=${encodeURIComponent(form.id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ responseId: r.id, data: newData }),
+    });
+    if (out && out.success) {
+      closeEditResponseModal();
+      await reloadResponses();
+      alert('✅ התגובה עודכנה בהצלחה');
+    } else {
+      alert('❌ ' + ((out && out.error) || 'העדכון נכשל'));
+    }
+  } catch (e) {
+    console.error('Update response error:', e);
+    alert('❌ שגיאה בעדכון התגובה');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 שמור שינויים';
+  }
+}
+
+async function deleteResponse(listIdx) {
+  const r = filteredResponses[listIdx];
+  if (!r) return;
+  if (!confirm(`למחוק את תגובה מס׳ ${listIdx + 1} (${formatDateTime(r.submittedAt)})?\nהפעולה בלתי הפיכה.`)) return;
+  try {
+    const out = await FBAuth.writeRequest(
+      `${API}/responses.php?action=one&formId=${encodeURIComponent(form.id)}&responseId=${encodeURIComponent(r.id)}`,
+      { method: 'DELETE' });
+    if (out && out.success) {
+      await reloadResponses();
+      alert('✅ התגובה נמחקה');
+    } else {
+      alert('❌ ' + ((out && out.error) || 'המחיקה נכשלה'));
+    }
+  } catch (e) {
+    console.error('Delete response error:', e);
+    alert('❌ שגיאה במחיקת התגובה');
+  }
+}
+
+// טעינת תגובות מחדש מהשרת + רענון התצוגה (ללא טעינת דף מחדש)
+async function reloadResponses() {
+  try {
+    const res = await fetch(`${API}/responses.php?action=list&formId=${encodeURIComponent(form.id)}`, { credentials: 'same-origin' });
+    const json = await res.json();
+    if (json.success) {
+      responses = json.data;
+      // החלת הפילטרים הפעילים על הרשימה המעודכנת
+      filteredResponses = Object.keys(activeFilters).length
+        ? responses.filter(response => Object.entries(activeFilters).every(([fid, fval]) => {
+            const fieldValue = response.data[fid];
+            if (Array.isArray(fieldValue)) return fieldValue.some(rec => getRecordDisplayValue(rec, fid) === fval);
+            if (typeof fieldValue === 'object' && fieldValue !== null) return getRecordDisplayValue(fieldValue, fid) === fval;
+            return fieldValue === fval;
+          }))
+        : [...responses];
+      const fc = Object.keys(activeFilters).length;
+      document.getElementById('reportSubtitle').textContent = fc > 0
+        ? `${filteredResponses.length} תגובות (מסונן: ${fc} פילטרים פעילים)`
+        : `${responses.length} תגובות`;
+      renderTab(activeTab);
+    }
+  } catch (e) { window.location.reload(); }
+}
+
 
 function showResponse(idx) {
   const r = responses[idx];
