@@ -12,6 +12,20 @@ async function init() {
   await loadSampleData();
   const id = getParam('id');
   if (!id) { window.location.href = 'index.html'; return; }
+
+  // מצב עריכת תגובה קיימת (נפתח מדוחות → ✏️ ערוך): edit=<responseId>
+  const editRid = getParam('edit');
+  if (editRid) {
+    try {
+      await editExistingResponse(id, editRid);
+    } catch (e) {
+      console.error('Edit mode failed:', e);
+      alert('שגיאה בטעינת התגובה לעריכה: ' + e.message);
+      window.location.href = `admin/reports.html?id=${encodeURIComponent(id)}`;
+    }
+    return;
+  }
+
   form = await fetchForm(id);
   if (!form) {
     document.getElementById('formContent').innerHTML = `
@@ -286,6 +300,147 @@ function toggleCheckboxOther(id) {
   render();
 }
 
+// ===== מצב עריכה (דוחות → ✏️ ערוך): שימוש באותו טופס מקורי לעריכת תגובה קיימת =====
+window.__editMode = false;
+window.__editResponseId = null;
+
+// הרכבת אובייקט "record" מלא מתוך ערכי שדות רגילים — נחוץ כדי ששדות
+// מסוג record יציגו נכון את הרשומה שנבחרה במקור (גם אם אינה קיימת במאגר כעת)
+function buildRecordFromFields(allFields, vals) {
+  const rec = {};
+  allFields.forEach(f => {
+    if (!f.autoFill || !f.sourceId) return;
+    f.autoFill.forEach(m => {
+      if (m.targetField && m.sourceField && vals[m.targetField] !== undefined && vals[m.targetField] !== '') {
+        rec[m.sourceField] = vals[m.targetField];
+      }
+    });
+  });
+  return Object.keys(rec).length ? rec : null;
+}
+
+// נרמול מטריצה: fill.js משתמש ב-matrixRows/matrixColumns; שמות ישנים rows/columns
+// וכן matrixCols מהעורך הישן — ממירים למבנה התקין [{id,label,value}]
+function normalizeMatrixField(field) {
+  if (!field || field.type !== 'matrix') return;
+  const toObj = (x, prefix, i) => {
+    if (x && typeof x === 'object') {
+      const label = String(x.label ?? x.value ?? '');
+      return { id: String(x.id ?? x.value ?? (prefix + '_' + i)), label, value: String(x.value ?? x.id ?? label) };
+    }
+    const s = String(x ?? '');
+    return { id: prefix + '_' + i, label: s, value: s };
+  };
+  if ((!field.matrixRows || !field.matrixRows.length)) {
+    const src = (field.rows && field.rows.length) ? field.rows
+      : ((field.options && field.options.length && !(field.matrixColumns || field.columns)) ? field.options : null);
+    if (src) field.matrixRows = src.map((r, i) => toObj(r, 'row', i));
+  } else {
+    field.matrixRows = field.matrixRows.map((r, i) => toObj(r, 'row', i));
+  }
+  if ((!field.matrixColumns || !field.matrixColumns.length)) {
+    const src = (field.columns && field.columns.length) ? field.columns : (field.matrixCols && field.matrixCols.length ? field.matrixCols : null);
+    if (src) field.matrixColumns = src.map((c, i) => toObj(c, 'col', i));
+  } else {
+    field.matrixColumns = field.matrixColumns.map((c, i) => toObj(c, 'col', i));
+  }
+  if (!Array.isArray(field.matrixRows)) field.matrixRows = [];
+  if (!Array.isArray(field.matrixColumns)) field.matrixColumns = [];
+}
+
+async function editExistingResponse(formId, responseId) {
+  // טעינת הטופס המלא דרך API מוגן (מופעל רק מדפי ניהול)
+  const res = await fetch(`${API_BASE}/forms.php?action=get&id=` + encodeURIComponent(formId), { credentials: 'same-origin' });
+  const json = await res.json();
+  if (!json.success || !json.data) throw new Error('forms get failed');
+  form = json.data;
+  (form.pages || []).forEach(p => (p.fields || []).forEach(normalizeMatrixField));
+
+  // טעינת מאגרים לרשומות
+  await preloadAllSources();
+
+  // שליפת כל התגובות ומציאת הרשומה הנערכת
+  const rres = await fetch(`${API_BASE}/responses.php?action=list&formId=` + encodeURIComponent(formId), { credentials: 'same-origin' });
+  const rjson = await rres.json();
+  if (!rjson.success) throw new Error('responses list failed');
+  const target = (rjson.data || []).find(x => x.id === responseId);
+  if (!target) throw new Error('response not found');
+
+  // טעינת הערכים השמורים לתוך state המילוי
+  values = JSON.parse(JSON.stringify(target.data || {}));
+  signatures = {};
+  errors = {};
+  currentPage = 0;
+
+  // שחזור חתימות: הצגת התמונה השמורה
+  (form.pages || []).flatMap(p => p.fields).forEach(f => {
+    if (f.type === 'signature' && typeof values[f.id] === 'string' && values[f.id].startsWith('data:image')) {
+      signatures[f.id] = values[f.id];
+    }
+  });
+
+  // שחזור רשומות מלאות (single) בשדות record — כולל בנייה מהערכים המפוזים
+  const allF = (form.pages || []).flatMap(p => p.fields);
+  const fallbackRec = buildRecordFromFields(allF, values);
+  allF.forEach(f => {
+    if (f.type !== 'record' || !f.sourceId) return;
+    if (values[`${f.id}_record`]) return; // כבר שמור במבנה המקורי
+    const df = f.displayField || '';
+    const v = values[f.id];
+    if (f.recordSelectionType === 'multiple') return;
+    if (v && typeof v === 'string') {
+      const recs = loadedSources[f.sourceId] || [];
+      const found = recs.find(r => String(r[df] ?? '') === v) || fallbackRec;
+      if (found) values[`${f.id}_record`] = found;
+    }
+  });
+
+  window.__editMode = true;
+  window.__editResponseId = responseId;
+
+  render();
+  // החלפת כפתור השליחה לכפתור שמירת עריכה
+  setTimeout(() => {
+    const nav = document.querySelector('.filler-nav');
+    if (nav) {
+      const sendBtn = nav.querySelector('.btn-success');
+      if (sendBtn) {
+        sendBtn.textContent = '💾 שמור שינויים';
+        sendBtn.classList.remove('btn-success');
+        sendBtn.classList.add('btn-primary');
+        sendBtn.onclick = saveEditChanges;
+      }
+    }
+  }, 50);
+}
+
+async function saveEditChanges() {
+  if (!validatePage()) return;
+  const btn = document.querySelector('.filler-nav .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ שומר...'; }
+  try {
+    const out = await FBAuth.writeRequest(`${API_BASE}/responses.php?action=update&formId=${encodeURIComponent(form.id)}`, {
+      method: 'POST',
+      body: JSON.stringify({ responseId: window.__editResponseId, data: values })
+    });
+    if (out && out.success) {
+      alert('✅ התגובה עודכנה בהצלחה');
+      if (document.referrer && /reports\.html/.test(document.referrer)) {
+        window.location.href = document.referrer;
+      } else {
+        window.location.href = `admin/reports.html?id=${encodeURIComponent(form.id)}`;
+      }
+    } else {
+      alert('❌ ' + ((out && out.error) || 'העדכון נכשל'));
+      if (btn) { btn.disabled = false; btn.textContent = '💾 שמור שינויים'; }
+    }
+  } catch (e) {
+    console.error('saveEditChanges error:', e);
+    alert('❌ שגיאה בשמירת העריכה');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 שמור שינויים'; }
+  }
+}
+
 function execRTE(id, cmd) { document.execCommand(cmd, false, null); const el = document.getElementById(`rte-${id}`); if (el) values[id] = el.innerHTML; }
 
 function initSignature(fieldId) {
@@ -412,7 +567,7 @@ async function preloadAllSources() {
 
       // נסיון 1: שליאת המאגר המלא עם Cookie של Session (המסלול הרגיל)
       try {
-        const res = await fetch(`api/sources.php?action=get&id=${field.sourceId}`, {
+        const res = await fetch(`${API_BASE}/sources.php?action=get&id=${field.sourceId}`, {
           credentials: 'same-origin'
         });
         if (res.ok) {
@@ -431,7 +586,7 @@ async function preloadAllSources() {
       // של ה-Session לא מגיע לשרת (חסימת מעקב/Privacy Badger בסביבת localhost)
       if (records === null) {
         try {
-          const res2 = await fetch(`api/sources.php?action=fields&id=${field.sourceId}`);
+          const res2 = await fetch(`${API_BASE}/sources.php?action=fields&id=${field.sourceId}`);
           if (res2.ok) {
             const json2 = await res2.json();
             if (json2.success && Array.isArray(json2.data.records)) {
